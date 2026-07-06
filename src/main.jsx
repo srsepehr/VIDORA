@@ -8710,6 +8710,7 @@ function LoginPage() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     console.log("Sign In submitted:", data);
+    window.location.hash = "#/dashboard";
   };
 
   return (
@@ -8722,7 +8723,7 @@ function LoginPage() {
         heroImageSrc={AUTH_HERO_IMAGE()}
         testimonials={t.testimonials}
         onSignIn={handleSignIn}
-        onGoogleSignIn={() => console.log("Continue with Google clicked")}
+        onGoogleSignIn={() => { window.location.hash = "#/dashboard"; }}
         onResetPassword={() => console.log("Reset password clicked")}
         onCreateAccount={() => { window.location.hash = "#/signup"; }}
       />
@@ -8772,6 +8773,7 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
+  if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;
   if (path === "/dashboard" || path === "/panel" || path.endsWith("/dashboard")) {
