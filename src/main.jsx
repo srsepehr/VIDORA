@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./tailwind.css";
-import { BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/heroui-card";
 
 window.React = React;
@@ -7893,7 +7893,7 @@ function MockupPlaceholder() {
     <div
       className="vh-mockup"
       style={{
-        width: "min(100%, 720px)",
+        width: "min(100%, 820px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -7912,7 +7912,7 @@ function MockupPlaceholder() {
         style={{
           display: "block",
           width: "100%",
-          maxWidth: 720,
+          maxWidth: 820,
           height: "auto",
           objectFit: "contain",
           filter: "none",
@@ -7936,13 +7936,13 @@ function CategoryCard({ item, rtl }) {
   const LucideIcon = CATEGORY_ICONS[item.icon] || BrainCircuit;
   return (
     <Card dir={rtl ? "rtl" : "ltr"} className="w-full">
-      <div className="flex items-start gap-3.5">
+      <div className="flex items-center gap-4">
         <Card.Header className="min-w-0 flex-1 gap-1">
           <Card.Title>{item.title}</Card.Title>
           <Card.Description>{item.desc}</Card.Description>
         </Card.Header>
-        <span className="flex size-10 flex-none items-center justify-center rounded-xl border border-zinc-200 bg-zinc-100 text-zinc-800">
-          <LucideIcon size={19} strokeWidth={1.7} aria-hidden="true" />
+        <span className="flex size-12 flex-none items-center justify-center rounded-[14px] bg-zinc-100 text-zinc-900">
+          <LucideIcon size={22} strokeWidth={1.8} aria-hidden="true" />
         </span>
       </div>
     </Card>
@@ -8007,17 +8007,17 @@ function EditorialHero() {
 
   const css = `
     .vh-wrap{ max-width:1440px; margin:0 auto; padding:52px 40px 40px; }
-    .vh-grid{ display:grid; grid-template-columns:minmax(390px,.95fr) minmax(560px,1.3fr) 320px; gap:24px; align-items:center; }
-    .vh-center{ display:flex; align-items:center; justify-content:center; min-height:430px; }
-    .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
+    .vh-grid{ display:grid; grid-template-columns:minmax(380px,.95fr) minmax(560px,1.5fr) 292px; gap:20px; align-items:center; }
+    .vh-center{ display:flex; align-items:center; justify-content:center; min-height:460px; }
+    .vh-right{ display:flex; flex-direction:column; gap:16px; align-self:center; }
     .vh-cardslot{ display:flex; }
-    .vh-cardslot > div{ width:100%; min-height:102px; }
+    .vh-cardslot > div{ width:100%; min-height:118px; }
     /* Category cards (components/ui/heroui-card) — calm grayscale tuning via
        the component's data-slot hooks: modest radius, Persian-friendly type. */
-    .vh-cardslot > [data-slot="card"]{ --radius-3xl:14px; }
-    .vh-cardslot [data-slot="card-title"]{ margin:0; font-size:14.5px; font-weight:600; line-height:1.55; }
-    .vh-cardslot [data-slot="card-description"]{ margin:0; font-size:12.5px; line-height:1.75; }
-    .vh-catcta{ margin-top:2px; }
+    .vh-cardslot > [data-slot="card"]{ --radius-3xl:16px; box-sizing:border-box; justify-content:center; }
+    .vh-cardslot [data-slot="card-title"]{ margin:0; font-size:16px; font-weight:700; line-height:1.5; }
+    .vh-cardslot [data-slot="card-description"]{ margin:0; font-size:12px; line-height:1.7; }
+    .vh-catcta{ margin-top:4px; display:flex; justify-content:flex-start; }
     .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
     .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
     .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
@@ -8075,7 +8075,17 @@ function EditorialHero() {
               <div key={i} className="vh-cardslot"><CategoryCard item={cat} rtl={rtl} /></div>
             ))}
             <div className="vh-catcta">
-              <Button variant="secondary" fullWidth iconLeft={<Icon name="arrowRight" size={15} stroke={2} />}>{d.categoriesCta}</Button>
+              <button
+                type="button"
+                dir={rtl ? "rtl" : "ltr"}
+                className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-full border border-zinc-200 bg-white px-6 text-[13px] font-semibold text-zinc-900 shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
+                style={{ fontFamily: "inherit" }}
+              >
+                {d.categoriesCta}
+                {rtl
+                  ? <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+                  : <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />}
+              </button>
             </div>
           </div>
         </div>
