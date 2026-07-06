@@ -8405,9 +8405,8 @@ function useAuthLang() {
   return { t, rtl: lang === "fa" };
 }
 
-// Fluted-glass B&W texture (the user's chosen auth backdrop) — Unsplash
-// photo by Milad Fakurian, desaturated to grayscale by the panel's filter.
-const AUTH_HERO_IMAGE = () => "https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80";
+// Fluted-glass B&W texture — the user's own photo, committed to the repo.
+const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/IMG_0765.JPG`;
 
 function LoginPage() {
   React.useEffect(() => {
