@@ -8405,8 +8405,8 @@ function useAuthLang() {
   return { t, rtl: lang === "fa" };
 }
 
-// Fluted-glass B&W texture — the user's own photo, committed to the repo.
-const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/IMG_0765.JPG`;
+// Auth backdrop — the user's own photo, committed to the repo.
+const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/IMG_0766.JPG`;
 
 function LoginPage() {
   React.useEffect(() => {
