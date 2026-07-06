@@ -4979,36 +4979,27 @@ try { (() => {
 
 function MockupPlaceholder() {
   return /*#__PURE__*/React.createElement("div", {
-    "aria-hidden": "true",
+    className: "vh-mockup",
     style: {
       width: "100%",
-      aspectRatio: "16 / 10",
-      borderRadius: "var(--radius-2xl)",
-      border: "1px solid var(--ed-line)",
-      background: "linear-gradient(180deg, #fafafa 0%, #f2f2f0 100%)",
-      boxShadow: "var(--shadow-lg)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 46,
-      height: 46,
-      borderRadius: "var(--radius-full)",
-      border: "1px solid var(--ed-line)",
-      background: "#fff",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      color: "#c4c4c0",
-      boxShadow: "var(--shadow-xs)"
+      padding: "4px 0"
     }
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "play",
-    size: 18,
-    fill: true
-  })));
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "/images/vidora-macbook-mockup.png",
+    alt: "Vidora video learning interface with Persian subtitles, summary and key takeaways",
+    style: {
+      display: "block",
+      width: "100%",
+      maxWidth: 620,
+      height: "auto",
+      objectFit: "contain",
+      filter: "none",
+      boxShadow: "0 18px 38px -30px rgba(0,0,0,0.35)"
+    }
+  }));
 }
 function CategoryCard({
   item,
@@ -7887,22 +7878,28 @@ window.EditorialHeader = EditorialHeader;
 function MockupPlaceholder() {
   return (
     <div
-      aria-hidden="true"
+      className="vh-mockup"
       style={{
         width: "100%",
-        aspectRatio: "16 / 10",
-        borderRadius: "var(--radius-2xl)",
-        border: "1px solid var(--ed-line)",
-        background: "linear-gradient(180deg, #fafafa 0%, #f2f2f0 100%)",
-        boxShadow: "var(--shadow-lg)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        padding: "4px 0",
       }}
     >
-      <div style={{ width: 46, height: 46, borderRadius: "var(--radius-full)", border: "1px solid var(--ed-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#c4c4c0", boxShadow: "var(--shadow-xs)" }}>
-        <Icon name="play" size={18} fill />
-      </div>
+      <img
+        src="/images/vidora-macbook-mockup.png"
+        alt="Vidora video learning interface with Persian subtitles, summary and key takeaways"
+        style={{
+          display: "block",
+          width: "100%",
+          maxWidth: 620,
+          height: "auto",
+          objectFit: "contain",
+          filter: "none",
+          boxShadow: "0 18px 38px -30px rgba(0,0,0,0.35)",
+        }}
+      />
     </div>
   );
 }
