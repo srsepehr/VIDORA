@@ -4978,6 +4978,7 @@ try { (() => {
 // per-block dir. Premium B&W, DS Button, tokens only.
 
 function MockupPlaceholder() {
+  const mockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-mockup.png`;
   return /*#__PURE__*/React.createElement("div", {
     className: "vh-mockup",
     style: {
@@ -4988,7 +4989,7 @@ function MockupPlaceholder() {
       padding: "4px 0"
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/images/vidora-macbook-mockup.png",
+    src: mockupSrc,
     alt: "Vidora video learning interface with Persian subtitles, summary and key takeaways",
     style: {
       display: "block",
@@ -7876,6 +7877,8 @@ window.EditorialHeader = EditorialHeader;
 // per-block dir. Premium B&W, DS Button, tokens only.
 
 function MockupPlaceholder() {
+  const mockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-mockup.png`;
+
   return (
     <div
       className="vh-mockup"
@@ -7888,7 +7891,7 @@ function MockupPlaceholder() {
       }}
     >
       <img
-        src="/images/vidora-macbook-mockup.png"
+        src={mockupSrc}
         alt="Vidora video learning interface with Persian subtitles, summary and key takeaways"
         style={{
           display: "block",
