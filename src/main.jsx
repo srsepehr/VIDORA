@@ -2,25 +2,15 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   BadgeDollarSign,
-  BookOpen,
-  Captions,
-  ChevronDown,
   Circle,
-  Clock3,
   CreditCard,
   FileText,
-  Folder,
-  FolderOpen,
   Gauge,
   Home,
   Languages as DashboardLanguages,
   Library,
   Link2,
-  MoreHorizontal,
-  PlayCircle,
-  Search,
   Settings,
-  Sparkles,
   Upload,
 } from "lucide-react";
 import "./styles.css";
@@ -8331,86 +8321,71 @@ function EditorialFooter() {
 window.EditorialFooter = EditorialFooter;
 
 const dockItems = [
-  { icon: Home, label: "Dashboard", active: true },
-  { icon: Upload, label: "Upload" },
-  { icon: DashboardLanguages, label: "Languages" },
-  { icon: Captions, label: "Subtitles" },
-  { icon: Library, label: "Library" },
-  { icon: Sparkles, label: "AI tools" },
+  { icon: Home, label: "Dashboard", target: "#/dashboard", active: true },
+  { icon: Upload, label: "Upload", target: "#/dashboard/new" },
+  { icon: Library, label: "Library", target: "#/dashboard/videos" },
+  { icon: DashboardLanguages, label: "Translate", target: "#/dashboard/new" },
+  { icon: Settings, label: "Settings", target: "#/dashboard/settings" },
 ];
 
 const sidebarGroups = [
   {
-    label: "Workspace",
+    label: "Primary",
     items: [
-      { icon: Gauge, label: "Dashboard", count: "0", active: true },
-      { icon: Upload, label: "Upload Video" },
-      { icon: Link2, label: "YouTube Import" },
-      { icon: Library, label: "My Library", count: "24" },
-    ],
-  },
-  {
-    label: "Learning",
-    items: [
-      { icon: DashboardLanguages, label: "Translated Videos", count: "18" },
-      { icon: FileText, label: "Summaries", count: "9" },
-      { icon: BookOpen, label: "Saved Notes" },
-      { icon: Clock3, label: "Watch Later", count: "6" },
+      { icon: Gauge, label: "Dashboard", target: "#/dashboard", active: true },
+      { icon: Upload, label: "New Translation", target: "#/dashboard/new" },
+      { icon: Library, label: "My Videos", target: "#/dashboard/videos", count: "24" },
+      { icon: FileText, label: "Saved Notes", target: "#/dashboard/notes", count: "86" },
     ],
   },
   {
     label: "Account",
     items: [
-      { icon: BadgeDollarSign, label: "Subscription" },
-      { icon: Circle, label: "Usage" },
-      { icon: CreditCard, label: "Billing" },
+      { icon: BadgeDollarSign, label: "Subscription", target: "#/dashboard/subscription" },
+      { icon: Circle, label: "Usage", target: "#/dashboard/usage" },
+      { icon: CreditCard, label: "Billing", target: "#/dashboard/billing" },
     ],
   },
-];
-
-const collections = [
-  {
-    icon: FolderOpen,
-    label: "AI Courses",
-    count: "12",
-    children: [
-      { label: "Product Strategy", count: "3" },
-      { label: "Startup Lessons", count: "4" },
-      { label: "Prompt Engineering", count: "5", active: true },
-    ],
-  },
-  { icon: Folder, label: "Founder Stories", count: "7" },
-  { icon: Folder, label: "Language Learning", count: "9" },
-  { icon: Folder, label: "Saved Translations", count: "15" },
 ];
 
 const recentVideos = [
   {
     title: "How AI agents work",
     status: "Completed",
-    language: "English -> Persian",
-    duration: "18 min",
+    action: "Open",
+    target: "#/dashboard/videos/ai-agents",
   },
   {
     title: "Startup pricing strategy",
-    status: "Translating",
-    language: "English -> Persian",
-    duration: "42 min",
+    status: "Processing",
+    action: "View progress",
+    target: "#/dashboard/progress/startup-pricing",
   },
   {
     title: "Sam Altman interview",
     status: "Completed",
-    language: "English -> Persian",
-    duration: "55 min",
+    action: "Open",
+    target: "#/dashboard/videos/sam-altman-interview",
   },
 ];
 
 function VidoraDashboard() {
+  const fileInputRef = React.useRef(null);
+  const [showLinkInput, setShowLinkInput] = React.useState(false);
+
+  const navigate = (target) => {
+    if (target) window.location.hash = target.replace(/^#/, "");
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const renderSidebarItem = (item) => {
     const ItemIcon = item.icon;
     return (
-      <button className={`vd-nav-item ${item.active ? "is-active" : ""}`} key={item.label}>
-        <ItemIcon size={19} strokeWidth={1.8} />
+      <button className={`vd-nav-item ${item.active ? "is-active" : ""}`} key={item.label} onClick={() => navigate(item.target)}>
+        <ItemIcon size={18} strokeWidth={1.8} />
         <span>{item.label}</span>
         {item.count ? <span className="vd-count">{item.count}</span> : null}
       </button>
@@ -8420,60 +8395,48 @@ function VidoraDashboard() {
   return (
     <main className="vd-page">
       <style dangerouslySetInnerHTML={{ __html: `
-        .vd-page{min-height:100vh;background:radial-gradient(circle at 18% 12%,rgba(255,255,255,.72),transparent 30%),linear-gradient(135deg,#d7d7d4 0%,#bebfbc 48%,#d9d9d5 100%);display:flex;align-items:center;justify-content:center;padding:34px;font-family:var(--font-sans);color:#111113;overflow:hidden}
-        .vd-shell{width:min(1440px,100%);height:min(900px,calc(100vh - 68px));min-height:720px;display:grid;grid-template-columns:96px 420px minmax(0,1fr);gap:14px;border-radius:38px;border:1px solid rgba(255,255,255,.45);background:rgba(238,239,236,.42);box-shadow:0 38px 120px rgba(32,33,31,.22),inset 0 1px 0 rgba(255,255,255,.55);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden}
-        .vd-dock-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
-        .vd-dock{width:74px;flex:1;border-radius:24px;background:rgba(246,247,244,.35);border:1px solid rgba(255,255,255,.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 18px 42px rgba(35,35,33,.12);display:flex;flex-direction:column;align-items:center;padding:14px 10px}
-        .vd-mark{width:54px;height:84px;border-radius:18px;background:#202020;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 16px 24px rgba(0,0,0,.18);margin-bottom:14px}
-        .vd-mark span{font-size:38px;font-weight:200;line-height:1;transform:translateY(-1px)}
-        .vd-dock-line{width:42px;height:1px;background:rgba(20,20,20,.2);margin:0 0 12px}
-        .vd-dock-btn{width:52px;height:52px;border:0;background:transparent;color:#f7f7f5;border-radius:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin:2px 0}
-        .vd-dock-btn:not(.is-active){color:#f1f1ee}
-        .vd-dock-btn.is-active{background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 10px 20px rgba(0,0,0,.15)}
-        .vd-settings{width:74px;height:154px;border-radius:24px;background:rgba(246,247,244,.42);border:1px solid rgba(255,255,255,.45);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-shadow:0 20px 44px rgba(35,35,33,.13)}
-        .vd-settings button{width:52px;height:52px;border:0;border-radius:15px;background:#202020;color:white;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 24px rgba(0,0,0,.18)}
-        .vd-sidebar{border-radius:28px;background:rgba(239,240,237,.5);border:1px solid rgba(255,255,255,.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.44);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:24px 24px 20px;overflow:auto}
-        .vd-window-dots{display:flex;gap:10px;margin:4px 0 24px}.vd-window-dots span{width:14px;height:14px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.14)}.vd-window-dots span:nth-child(1){background:#e6a1aa}.vd-window-dots span:nth-child(2){background:#dbc687}.vd-window-dots span:nth-child(3){background:#8fd1bf}
-        .vd-user{display:flex;align-items:center;gap:16px;margin-bottom:28px}.vd-avatar{width:62px;height:62px;border-radius:999px;background:linear-gradient(145deg,#f8f8f6,#d8d9d5);border:1px solid rgba(255,255,255,.65);box-shadow:0 12px 20px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#202020}.vd-user h2{margin:0;font-size:21px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6f716f;font-size:17px}
-        .vd-section{padding:22px 0;border-top:1px solid rgba(30,30,28,.16)}.vd-section:first-of-type{border-top:0;padding-top:0}.vd-label{font-size:15px;color:#858782;margin:0 0 12px}
-        .vd-nav-list{display:grid;gap:6px}.vd-nav-item{height:50px;width:100%;border:0;border-radius:14px;background:transparent;color:#171716;display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:14px;padding:0 16px;text-align:left;font-size:20px;font-weight:550;cursor:pointer;letter-spacing:0}.vd-nav-item svg{color:#1c1c1b}.vd-nav-item.is-active{height:58px;border:1px solid rgba(255,255,255,.55);background:linear-gradient(90deg,rgba(255,255,255,.46),rgba(236,241,239,.3));box-shadow:0 16px 34px rgba(142,149,144,.26),inset 0 1px 0 rgba(255,255,255,.62)}.vd-count{min-width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.38);display:inline-flex;align-items:center;justify-content:center;color:#8b8d89;font-size:14px;font-weight:700}
-        .vd-search{height:56px;border-radius:15px;border:1px solid rgba(30,30,28,.16);background:rgba(255,255,255,.28);display:flex;align-items:center;gap:12px;padding:0 16px;color:#1b1b1a;margin-bottom:12px}.vd-search input{border:0;background:transparent;outline:none;font:inherit;font-size:18px;min-width:0;width:100%;color:#1d1d1c}.vd-search input::placeholder{color:#8b8d88}
-        .vd-folder{border-radius:14px;display:grid;gap:4px}.vd-folder-row,.vd-child{height:40px;display:grid;grid-template-columns:24px 1fr auto;gap:12px;align-items:center;padding:0 12px;border-radius:12px;font-size:17px;font-weight:560}.vd-folder-row svg,.vd-child svg{color:#2b2b2a}.vd-child{margin-left:28px;color:#30302f;font-size:16px}.vd-child.is-active{background:rgba(0,0,0,.11)}.vd-folder .vd-count{height:25px;min-width:25px;font-size:13px}
-        .vd-main{border-radius:30px;background:rgba(237,238,235,.46);border:1px solid rgba(255,255,255,.46);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:54px;overflow:auto}
-        .vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:38px}.vd-head h1{margin:0;font-size:45px;line-height:1.04;font-weight:720;letter-spacing:0;color:#101010}.vd-head p{margin:12px 0 0;color:#777a76;font-size:21px;line-height:1.4}.vd-plan{height:42px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.28);display:flex;align-items:center;gap:8px;padding:0 16px;color:#565856;font-weight:650}
-        .vd-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.75fr);gap:28px}.vd-stats{display:grid;grid-template-columns:1.2fr .9fr .9fr;gap:16px;margin-bottom:22px}.vd-card{border-radius:22px;border:1px solid rgba(255,255,255,.52);background:rgba(255,255,255,.33);box-shadow:0 18px 50px rgba(65,66,62,.12),inset 0 1px 0 rgba(255,255,255,.46);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-        .vd-stat{min-height:150px;padding:24px}.vd-stat strong{display:block;font-size:72px;line-height:.9;font-weight:520;letter-spacing:-.03em;margin-top:22px;color:#343534}.vd-stat span{display:block;color:#151515;font-size:21px;font-weight:650}.vd-stat small{display:inline-flex;align-items:center;height:28px;border-radius:999px;background:rgba(124,108,246,.13);color:#6c5cea;padding:0 10px;font-size:14px;font-weight:760;margin-left:10px}.vd-stat:not(.is-large) strong{font-size:38px;margin-top:18px}.vd-stat:not(.is-large){min-height:150px}
-        .vd-action{padding:26px;margin-bottom:28px;display:grid;gap:18px}.vd-action h2{margin:0;font-size:25px;letter-spacing:0}.vd-action p{margin:0;color:#6d706c;font-size:16px;line-height:1.7;max-width:650px}.vd-actions{display:flex;gap:12px;flex-wrap:wrap}.vd-primary,.vd-secondary{height:44px;border-radius:13px;border:1px solid transparent;padding:0 16px;font-weight:720;font-size:14px;display:inline-flex;align-items:center;gap:9px}.vd-primary{background:#1f1f1f;color:#fff;box-shadow:0 12px 22px rgba(0,0,0,.14)}.vd-secondary{background:rgba(255,255,255,.36);border-color:rgba(35,35,35,.14);color:#151515}
-        .vd-recent h2{font-size:31px;margin:0 0 14px}.vd-tabs{display:flex;gap:30px;border-bottom:1px solid rgba(30,30,28,.14);margin-bottom:18px}.vd-tab{border:0;background:transparent;padding:0 0 14px;font-size:16px;color:#777a76;font-weight:620}.vd-tab.is-active{color:#101010;box-shadow:0 2px 0 #101010}.vd-video-list{display:grid;gap:10px}.vd-video{min-height:78px;border-radius:18px;border:1px solid rgba(255,255,255,.48);background:rgba(255,255,255,.28);display:grid;grid-template-columns:64px minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:12px}.vd-thumb{width:64px;height:48px;border-radius:12px;background:linear-gradient(135deg,#1a1b20,#565754);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}.vd-video h3{margin:0;font-size:17px;line-height:1.2}.vd-video p{margin:5px 0 0;color:#747672;font-size:14px}.vd-status{height:30px;border-radius:999px;padding:0 10px;background:rgba(255,255,255,.36);display:flex;align-items:center;font-size:13px;font-weight:720;color:#555754}.vd-status.is-progress{color:#6c5cea;background:rgba(124,108,246,.12)}.vd-open{height:34px;border-radius:10px;border:1px solid rgba(30,30,28,.14);background:rgba(255,255,255,.34);font-weight:720;color:#191919;padding:0 13px}
-        .vd-preview{min-height:100%;padding:26px;display:flex;flex-direction:column}.vd-preview-top{display:flex;justify-content:space-between;align-items:center;color:#6e706c;margin-bottom:22px}.vd-preview-box{flex:1;min-height:430px;border-radius:22px;border:1px solid rgba(30,30,28,.12);background:rgba(255,255,255,.24);box-shadow:inset 0 1px 0 rgba(255,255,255,.34);display:flex;align-items:center;justify-content:center;text-align:center;color:#898b87;padding:36px}.vd-preview-box svg{margin:0 auto 18px;color:#a2a49f}.vd-preview-box h3{margin:0;font-size:17px;color:#747672;font-weight:660}.vd-preview-box p{margin:8px auto 0;max-width:300px;line-height:1.65;font-size:14px}
-        @media(max-width:1180px){.vd-page{padding:18px}.vd-shell{height:auto;min-height:0;grid-template-columns:80px minmax(260px,340px);overflow:visible}.vd-main{grid-column:1/-1}.vd-grid{grid-template-columns:1fr}.vd-stats{grid-template-columns:1fr 1fr}.vd-stat.is-large{grid-column:1/-1}.vd-preview{min-height:420px}}
-        @media(max-width:760px){.vd-page{align-items:flex-start;padding:10px}.vd-shell{grid-template-columns:1fr;padding:10px;border-radius:26px}.vd-dock-wrap{display:none}.vd-sidebar{border-radius:22px;padding:18px}.vd-main{border-radius:22px;padding:24px}.vd-head{display:block}.vd-head h1{font-size:36px}.vd-head p{font-size:17px}.vd-stats{grid-template-columns:1fr}.vd-grid{gap:20px}.vd-video{grid-template-columns:54px minmax(0,1fr);}.vd-status,.vd-open{justify-self:start}.vd-video{align-items:start}.vd-preview-box{min-height:300px}.vd-nav-item{font-size:17px}}
+        .vd-page{min-height:100vh;background:radial-gradient(circle at 14% 8%,rgba(255,255,255,.7),transparent 32%),linear-gradient(135deg,#d8d8d5 0%,#c4c5c1 48%,#dededb 100%);display:flex;align-items:center;justify-content:center;padding:32px;font-family:var(--font-sans);color:#111;overflow:hidden}
+        .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:88px 310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden}
+        .vd-dock{border-radius:24px;background:rgba(247,248,245,.4);border:1px solid rgba(255,255,255,.48);box-shadow:inset 0 1px 0 rgba(255,255,255,.44),0 18px 38px rgba(35,35,33,.1);display:flex;flex-direction:column;align-items:center;padding:16px 10px;gap:10px}
+        .vd-mark{width:52px;height:62px;border-radius:18px;background:#1f1f1f;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 24px rgba(0,0,0,.16);margin-bottom:12px}
+        .vd-mark span{font-size:34px;font-weight:200;line-height:1}
+        .vd-dock-btn{width:50px;height:50px;border:0;background:transparent;color:#3d3e3c;border-radius:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s ease,color .18s ease,transform .18s ease}
+        .vd-dock-btn:hover{background:rgba(255,255,255,.42);transform:translateY(-1px)}
+        .vd-dock-btn.is-active{background:#202020;color:#fff;box-shadow:0 14px 24px rgba(0,0,0,.16)}
+        .vd-dock-spacer{flex:1}
+        .vd-sidebar{border-radius:28px;background:rgba(243,244,241,.55);border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:26px 22px;overflow:auto}
+        .vd-user{display:flex;align-items:center;gap:14px;margin-bottom:32px}.vd-avatar{width:54px;height:54px;border-radius:999px;background:linear-gradient(145deg,#fafafa,#d9dad6);border:1px solid rgba(255,255,255,.7);box-shadow:0 10px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#202020}.vd-user h2{margin:0;font-size:19px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6d6f6b;font-size:14px}
+        .vd-section{padding:18px 0}.vd-section+.vd-section{border-top:1px solid rgba(30,30,28,.1)}.vd-label{font-size:12px;color:#858782;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+        .vd-nav-list{display:grid;gap:5px}.vd-nav-item{height:46px;width:100%;border:0;border-radius:14px;background:transparent;color:#191a18;display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:12px;padding:0 13px;text-align:left;font-size:15px;font-weight:650;cursor:pointer;letter-spacing:0;transition:background .18s ease,box-shadow .18s ease}.vd-nav-item svg{color:#2d2e2c}.vd-nav-item:hover{background:rgba(255,255,255,.32)}.vd-nav-item.is-active{height:52px;border:1px solid rgba(255,255,255,.62);background:rgba(255,255,255,.42);box-shadow:0 14px 28px rgba(110,114,109,.18),inset 0 1px 0 rgba(255,255,255,.66)}.vd-count{min-width:26px;height:24px;border-radius:999px;background:rgba(255,255,255,.45);display:inline-flex;align-items:center;justify-content:center;color:#777976;font-size:12px;font-weight:750}
+        .vd-main{border-radius:30px;background:rgba(241,242,239,.52);border:1px solid rgba(255,255,255,.52);box-shadow:inset 0 1px 0 rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:44px;overflow:auto}
+        .vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:28px}.vd-head h1{margin:0;font-size:42px;line-height:1.05;font-weight:720;letter-spacing:0;color:#101010}.vd-head p{margin:10px 0 0;color:#727570;font-size:18px;line-height:1.45}
+        .vd-top-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.54fr);gap:18px;margin-bottom:20px}.vd-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px}.vd-card{border-radius:22px;border:1px solid rgba(255,255,255,.56);background:rgba(255,255,255,.34);box-shadow:0 16px 42px rgba(65,66,62,.1),inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+        .vd-stat{min-height:138px;padding:24px}.vd-stat span{display:block;color:#555854;font-size:14px;font-weight:750;letter-spacing:.01em}.vd-stat strong{display:block;font-size:58px;line-height:.95;font-weight:560;letter-spacing:-.03em;margin-top:22px;color:#222321}
+        .vd-plan-card{padding:22px;display:grid;gap:15px}.vd-plan-card h2,.vd-upload h2,.vd-recent h2{margin:0;color:#151515;font-size:22px;line-height:1.15}.vd-plan-line{display:flex;justify-content:space-between;gap:16px;color:#6f716d;font-size:14px}.vd-plan-line strong{color:#171817}.vd-meter{height:8px;border-radius:999px;background:rgba(0,0,0,.1);overflow:hidden}.vd-meter span{display:block;width:64%;height:100%;background:#202020;border-radius:inherit}
+        .vd-upload{padding:26px;margin-bottom:22px}.vd-upload-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:20px}.vd-upload p{margin:8px 0 0;color:#6d706c;font-size:15px;line-height:1.65;max-width:680px}.vd-drop{min-height:190px;border:1.5px dashed rgba(35,35,33,.24);border-radius:22px;background:rgba(255,255,255,.22);display:grid;place-items:center;text-align:center;padding:28px}.vd-drop-icon{width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.58);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;color:#1f1f1f}.vd-drop h3{margin:0;font-size:18px}.vd-drop p{margin:6px 0 0;color:#777a76;font-size:13px}.vd-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;justify-content:center}.vd-primary,.vd-secondary{height:42px;border-radius:13px;border:1px solid transparent;padding:0 15px;font-weight:720;font-size:14px;display:inline-flex;align-items:center;gap:9px;cursor:pointer}.vd-primary{background:#1f1f1f;color:#fff;box-shadow:0 12px 22px rgba(0,0,0,.13)}.vd-secondary{background:rgba(255,255,255,.42);border-color:rgba(35,35,35,.14);color:#151515}.vd-link-input{margin-top:16px;display:flex;gap:10px}.vd-link-input input{height:42px;flex:1;min-width:0;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.42);padding:0 14px;font:inherit;outline:none;color:#151515}
+        .vd-recent{padding:24px}.vd-video-list{display:grid;gap:10px;margin-top:16px}.vd-video{min-height:74px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.28);display:grid;grid-template-columns:62px minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:12px}.vd-thumb{width:62px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2c2d2d,#777872);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}.vd-video h3{margin:0;font-size:16px;line-height:1.2}.vd-video p{margin:5px 0 0;color:#747672;font-size:13px}.vd-status{height:28px;border-radius:999px;padding:0 10px;background:rgba(255,255,255,.42);display:flex;align-items:center;font-size:12px;font-weight:750;color:#555754}.vd-open{height:34px;border-radius:10px;border:1px solid rgba(30,30,28,.14);background:rgba(255,255,255,.38);font-weight:720;color:#191919;padding:0 13px;cursor:pointer}
+        @media(max-width:1180px){.vd-page{padding:18px;overflow:auto}.vd-shell{height:auto;min-height:0;grid-template-columns:78px minmax(250px,300px);overflow:visible}.vd-main{grid-column:1/-1}.vd-top-grid{grid-template-columns:1fr}.vd-stats{grid-template-columns:1fr 1fr}}
+        @media(max-width:760px){.vd-page{align-items:flex-start;padding:10px}.vd-shell{grid-template-columns:1fr;padding:10px;border-radius:26px}.vd-dock{display:none}.vd-sidebar{border-radius:22px;padding:18px}.vd-main{border-radius:22px;padding:22px}.vd-head{display:block}.vd-head h1{font-size:34px}.vd-head p{font-size:16px}.vd-stats{grid-template-columns:1fr}.vd-upload-head{display:block}.vd-video{grid-template-columns:54px minmax(0,1fr);align-items:start}.vd-status,.vd-open{justify-self:start}.vd-link-input{display:grid}}
       ` }} />
       <section className="vd-shell" aria-label="Vidora dashboard">
-        <aside className="vd-dock-wrap">
-          <div className="vd-dock">
-            <div className="vd-mark" aria-label="Vidora"><span>*</span></div>
-            <div className="vd-dock-line" />
-            {dockItems.map((item) => {
-              const DockIcon = item.icon;
-              return (
-                <button className={`vd-dock-btn ${item.active ? "is-active" : ""}`} key={item.label} aria-label={item.label}>
-                  <DockIcon size={26} strokeWidth={1.8} />
-                </button>
-              );
-            })}
-          </div>
-          <div className="vd-settings">
-            <button aria-label="Settings"><Settings size={25} strokeWidth={1.8} /></button>
-          </div>
+        <aside className="vd-dock">
+          <div className="vd-mark" aria-label="Vidora"><span>*</span></div>
+          {dockItems.map((item) => {
+            const DockIcon = item.icon;
+            return (
+              <button className={`vd-dock-btn ${item.active ? "is-active" : ""}`} key={item.label} aria-label={item.label} onClick={() => navigate(item.target)}>
+                <DockIcon size={24} strokeWidth={1.8} />
+              </button>
+            );
+          })}
+          <div className="vd-dock-spacer" />
         </aside>
 
         <aside className="vd-sidebar">
-          <div className="vd-window-dots"><span /><span /><span /></div>
           <div className="vd-user">
             <div className="vd-avatar">S</div>
             <div>
-              <h2>Sepehr <ChevronDown size={16} style={{ verticalAlign: "-2px" }} /></h2>
+              <h2>Sepehr</h2>
               <p>sepehr@vidora.ai</p>
             </div>
           </div>
@@ -8484,115 +8447,81 @@ function VidoraDashboard() {
               <div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div>
             </section>
           ))}
-
-          <section className="vd-section">
-            <p className="vd-label">Collections</p>
-            <label className="vd-search">
-              <Search size={22} strokeWidth={1.8} />
-              <input placeholder="Search" />
-            </label>
-            <div className="vd-nav-list">
-              {collections.map((folder) => {
-                const FolderIcon = folder.icon;
-                return (
-                  <div className="vd-folder" key={folder.label}>
-                    <div className="vd-folder-row">
-                      <FolderIcon size={20} strokeWidth={1.8} />
-                      <span>{folder.label}</span>
-                      <span className="vd-count">{folder.count}</span>
-                    </div>
-                    {folder.children?.map((child) => (
-                      <div className={`vd-child ${child.active ? "is-active" : ""}`} key={child.label}>
-                        <Folder size={18} strokeWidth={1.7} />
-                        <span>{child.label}</span>
-                        <span className="vd-count">{child.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </aside>
 
         <section className="vd-main">
           <header className="vd-head">
             <div>
               <h1>Dashboard</h1>
-              <p>Translate, summarize, and learn from videos in any language.</p>
+              <p>Translate videos, generate subtitles, and save learning notes.</p>
             </div>
-            <div className="vd-plan"><Sparkles size={17} /> Pro workspace</div>
           </header>
 
-          <div className="vd-grid">
-            <div>
-              <div className="vd-stats">
-                <article className="vd-card vd-stat is-large">
-                  <span>Translated Videos <small>+18% this month</small></span>
-                  <strong>24</strong>
-                </article>
-                <article className="vd-card vd-stat">
-                  <span>Minutes Processed</span>
-                  <strong>1,280</strong>
-                </article>
-                <article className="vd-card vd-stat">
-                  <span>Saved Notes</span>
-                  <strong>86</strong>
-                </article>
-              </div>
-
-              <article className="vd-card vd-action">
-                <div>
-                  <h2>Start a new translation</h2>
-                  <p>Upload a video or paste a YouTube link to generate subtitles, translation, summary, and notes.</p>
-                </div>
-                <div className="vd-actions">
-                  <button className="vd-primary"><Upload size={17} /> Upload Video</button>
-                  <button className="vd-secondary"><Link2 size={17} /> Paste YouTube Link</button>
-                </div>
+          <div className="vd-top-grid">
+            <div className="vd-stats">
+              <article className="vd-card vd-stat">
+                <span>Videos Translated</span>
+                <strong>24</strong>
               </article>
-
-              <section className="vd-recent">
-                <h2>Recent Videos</h2>
-                <div className="vd-tabs">
-                  {["All", "Translating", "Completed", "Saved"].map((tab, index) => (
-                    <button className={`vd-tab ${index === 0 ? "is-active" : ""}`} key={tab}>{tab}</button>
-                  ))}
-                </div>
-                <label className="vd-search">
-                  <Search size={22} strokeWidth={1.8} />
-                  <input placeholder="Search" />
-                </label>
-                <div className="vd-video-list">
-                  {recentVideos.map((video, index) => (
-                    <article className="vd-video" key={video.title}>
-                      <div className="vd-thumb" />
-                      <div>
-                        <h3>{video.title}</h3>
-                        <p>{video.language} · {video.duration}</p>
-                      </div>
-                      <span className={`vd-status ${video.status === "Translating" ? "is-progress" : ""}`}>{video.status}</span>
-                      <button className="vd-open">Open</button>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <article className="vd-card vd-stat">
+                <span>Minutes Processed</span>
+                <strong>1,280</strong>
+              </article>
             </div>
 
-            <aside className="vd-card vd-preview">
-              <div className="vd-preview-top">
-                <span>Preview</span>
-                <MoreHorizontal size={22} />
-              </div>
-              <div className="vd-preview-box">
-                <div>
-                  <PlayCircle size={48} strokeWidth={1.4} />
-                  <h3>Select a video</h3>
-                  <p>Select a video to preview transcript, summary, and notes.</p>
-                </div>
-              </div>
+            <aside className="vd-card vd-plan-card">
+              <h2>Current Plan</h2>
+              <div className="vd-plan-line"><span>Plan</span><strong>Pro</strong></div>
+              <div className="vd-plan-line"><span>Monthly minutes</span><strong>1,280 / 2,000</strong></div>
+              <div className="vd-meter"><span /></div>
+              <div className="vd-plan-line"><span>Renewal</span><strong>Aug 12</strong></div>
+              <button className="vd-secondary" onClick={() => navigate("#/dashboard/subscription")}>Manage subscription</button>
             </aside>
           </div>
+
+          <article className="vd-card vd-upload" id="dashboard-upload">
+            <div className="vd-upload-head">
+              <div>
+                <h2>Start a new translation</h2>
+                <p>Upload a video or paste a YouTube link to generate subtitles, translation, summary, and notes.</p>
+              </div>
+            </div>
+            <div className="vd-drop">
+              <div>
+                <span className="vd-drop-icon"><Upload size={26} strokeWidth={1.7} /></span>
+                <h3>Drop your video here</h3>
+                <p>MP4, MOV, or WebM up to 2GB</p>
+                <div className="vd-actions">
+                  <button className="vd-primary" onClick={openFilePicker}><Upload size={17} /> Upload Video</button>
+                  <button className="vd-secondary" onClick={() => setShowLinkInput((value) => !value)}><Link2 size={17} /> Paste YouTube Link</button>
+                </div>
+              </div>
+            </div>
+            <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" hidden />
+            {showLinkInput ? (
+              <div className="vd-link-input">
+                <input type="url" placeholder="Paste YouTube URL" aria-label="YouTube URL" />
+                <button className="vd-primary" onClick={() => navigate("#/dashboard/new")}>Start</button>
+              </div>
+            ) : null}
+          </article>
+
+          <section className="vd-card vd-recent">
+            <h2>Recent Videos</h2>
+            <div className="vd-video-list">
+              {recentVideos.map((video) => (
+                <article className="vd-video" key={video.title}>
+                  <div className="vd-thumb" />
+                  <div>
+                    <h3>{video.title}</h3>
+                    <p>English -&gt; Persian</p>
+                  </div>
+                  <span className="vd-status">{video.status}</span>
+                  <button className="vd-open" onClick={() => navigate(video.target)}>{video.action}</button>
+                </article>
+              ))}
+            </div>
+          </section>
         </section>
       </section>
     </main>
