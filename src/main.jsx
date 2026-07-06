@@ -1,6 +1,9 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import "./tailwind.css";
+import { BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
+import { Card } from "@/components/ui/heroui-card";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -7920,35 +7923,29 @@ function MockupPlaceholder() {
   );
 }
 
+// Grayscale lucide-react icons for the hero category cards, keyed by the
+// icon names already used in the i18n dictionary.
+const CATEGORY_ICONS = {
+  sparkles: BrainCircuit, // هوش مصنوعی و ابزارهای جدید
+  cpu: Code2, // ساخت محصول و برنامه‌نویسی
+  globe: Languages, // یادگیری زبان با ویدیو
+  trending: TrendingUp, // بیزنس و رشد فردی
+};
+
 function CategoryCard({ item, rtl }) {
-  const [hover, setHover] = React.useState(false);
+  const LucideIcon = CATEGORY_ICONS[item.icon] || BrainCircuit;
   return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      dir={rtl ? "rtl" : "ltr"}
-      style={{
-        display: "flex",
-        gap: 14,
-        alignItems: "flex-start",
-        padding: "16px 18px",
-        borderRadius: "var(--radius-xl)",
-        border: "1px solid var(--ed-line)",
-        background: "var(--ed-paper)",
-        boxShadow: hover ? "var(--shadow-md)" : "var(--shadow-xs)",
-        transition: "box-shadow var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard)",
-        transform: hover ? "translateY(-2px)" : "none",
-        cursor: "pointer",
-      }}
-    >
-      <div style={{ flex: "none", order: 2, width: 40, height: 40, borderRadius: "var(--radius-md)", background: "var(--muted)", border: "1px solid var(--ed-line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ed-ink)" }}>
-        <Icon name={item.icon} size={20} stroke={1.6} />
+    <Card dir={rtl ? "rtl" : "ltr"} className="w-full">
+      <div className="flex items-start gap-3.5">
+        <Card.Header className="min-w-0 flex-1 gap-1">
+          <Card.Title>{item.title}</Card.Title>
+          <Card.Description>{item.desc}</Card.Description>
+        </Card.Header>
+        <span className="flex size-10 flex-none items-center justify-center rounded-xl border border-zinc-200 bg-zinc-100 text-zinc-800">
+          <LucideIcon size={19} strokeWidth={1.7} aria-hidden="true" />
+        </span>
       </div>
-      <div style={{ order: 1, flex: 1, textAlign: rtl ? "right" : "left" }}>
-        <div style={{ fontFamily: "var(--font-sans)", fontSize: 14.5, fontWeight: 700, lineHeight: 1.4, color: "var(--ed-ink)" }}>{item.title}</div>
-        <div style={{ marginTop: 6, fontFamily: "var(--font-sans)", fontSize: 12.5, lineHeight: 1.6, color: "var(--ed-text-muted)" }}>{item.desc}</div>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -8015,6 +8012,11 @@ function EditorialHero() {
     .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
     .vh-cardslot{ display:flex; }
     .vh-cardslot > div{ width:100%; min-height:102px; }
+    /* Category cards (components/ui/heroui-card) — calm grayscale tuning via
+       the component's data-slot hooks: modest radius, Persian-friendly type. */
+    .vh-cardslot > [data-slot="card"]{ --radius-3xl:14px; }
+    .vh-cardslot [data-slot="card-title"]{ margin:0; font-size:14.5px; font-weight:600; line-height:1.55; }
+    .vh-cardslot [data-slot="card-description"]{ margin:0; font-size:12.5px; line-height:1.75; }
     .vh-catcta{ margin-top:2px; }
     .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
     .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
@@ -8030,6 +8032,7 @@ function EditorialHero() {
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
       .vh-center{ min-height:260px; }
       .vh-right{ flex-direction:column; }
+      .vh-right .vh-cardslot{ flex:1 1 auto; }
       .vh-cta,.vh-chips{ width:100%; }
     }
   `;

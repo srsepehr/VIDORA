@@ -1,0 +1,13 @@
+/* Tailwind v4 entry — utilities + theme only.
+   Preflight (tailwindcss/preflight.css) is intentionally NOT imported:
+   the existing landing page is styled with inline styles + design tokens
+   and must not be affected by a global reset. Tailwind here only powers
+   opt-in components under src/components/ui/. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* The site is light-only. Gate `dark:` behind a `.dark` class (never set)
+   instead of the default prefers-color-scheme media query, so components
+   with dark: variants stay light for dark-OS visitors too. */
+@custom-variant dark (&:where(.dark, .dark *));
