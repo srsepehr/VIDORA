@@ -5,6 +5,7 @@ import "./tailwind.css";
 import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/heroui-card";
 import { SignInPage } from "@/components/ui/sign-in";
+import { SignUpPage } from "@/components/ui/sign-up";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -7825,7 +7826,7 @@ function EditorialHeader() {
             <LanguageToggle />
             <div style={{ width: 1, height: 24, background: "var(--border)", margin: "0 4px" }} />
             <Button variant="secondary" onClick={() => { window.location.hash = "#/login"; }}>{d.login}</Button>
-            <Button variant="primary">{d.startFree}</Button>
+            <Button variant="primary" onClick={() => { window.location.hash = "#/signup"; }}>{d.startFree}</Button>
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -7869,7 +7870,7 @@ function EditorialHeader() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <Button variant="secondary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/login"; }}>{d.login}</Button>
-            <Button variant="primary" fullWidth onClick={() => setOpen(false)}>{d.startFree}</Button>
+            <Button variant="primary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/signup"; }}>{d.startFree}</Button>
           </div>
         </div>
       ) : null}
@@ -8307,35 +8308,110 @@ function EditorialFooter() {
 window.EditorialFooter = EditorialFooter;
 
 
-// Login page — full-screen SignInPage (components/ui/sign-in) in the B&W
-// design system. Reached via the header's login button (#/login hash route,
-// which also works on GitHub Pages). The component is an LTR layout, so the
-// wrapper pins dir="ltr" while the rest of the site stays RTL-aware.
-const LOGIN_TESTIMONIALS = [
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
-    name: "Sarah Chen",
-    handle: "@sarahdigital",
-    text: "Amazing platform! The user experience is seamless and the features are exactly what I needed.",
+// Auth pages — full-screen SignInPage / SignUpPage (components/ui) in the
+// dark B&W theme (`dark` class flips the semantic tokens). Reached via the
+// header buttons through #/login and #/signup hash routes (GitHub Pages
+// friendly). Copy follows the site language: Persian (RTL form) by default,
+// English when the visitor switched the site to EN.
+const AUTH_STRINGS = {
+  fa: {
+    signInTitle: "خوش آمدید",
+    signInDescription: "وارد حساب کاربری خود شوید و یادگیری را ادامه دهید",
+    signUpTitle: "ساخت حساب",
+    signUpDescription: "به ویدورا بپیوندید و از بهترین ویدیوهای آموزشی دنیا یاد بگیرید",
+    signIn: {
+      emailLabel: "ایمیل",
+      emailPlaceholder: "ایمیل خود را وارد کنید",
+      passwordLabel: "رمز عبور",
+      passwordPlaceholder: "رمز عبور خود را وارد کنید",
+      keepSignedIn: "مرا وارد نگه دار",
+      resetPassword: "بازیابی رمز عبور",
+      signIn: "ورود",
+      orContinueWith: "یا ادامه با",
+      continueWithGoogle: "ادامه با گوگل",
+      newToPlatform: "کاربر جدید هستید؟",
+      createAccount: "ساخت حساب",
+    },
+    signUp: {
+      nameLabel: "نام و نام خانوادگی",
+      namePlaceholder: "نام خود را وارد کنید",
+      emailLabel: "ایمیل",
+      emailPlaceholder: "ایمیل خود را وارد کنید",
+      passwordLabel: "رمز عبور",
+      passwordPlaceholder: "یک رمز عبور بسازید",
+      confirmPasswordLabel: "تکرار رمز عبور",
+      confirmPasswordPlaceholder: "رمز عبور را دوباره وارد کنید",
+      agreeToTerms: "با شرایط استفاده و حریم خصوصی موافقم",
+      createAccount: "ساخت حساب",
+      orContinueWith: "یا ادامه با",
+      continueWithGoogle: "ادامه با گوگل",
+      alreadyHaveAccount: "قبلاً حساب دارید؟",
+      signIn: "ورود",
+    },
+    testimonials: [
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
+        name: "سارا محمدی",
+        handle: "@sara_learns",
+        text: "با ویدورا بالاخره می‌تونم سخنرانی‌های انگلیسی رو کامل بفهمم. زیرنویس‌ها فوق‌العاده دقیق هستن.",
+      },
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
+        name: "امیر رضایی",
+        handle: "@amir_dev",
+        text: "خلاصه‌ها و نکات کلیدی وقتم رو نصف کرده. بهترین ابزار یادگیری که استفاده کردم.",
+      },
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/men/32.jpg",
+        name: "حسین کریمی",
+        handle: "@hossein_pm",
+        text: "هر روز باهاش ویدیوهای آموزشی می‌بینم. ترجمه‌ها روان و طبیعی هستن.",
+      },
+    ],
   },
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
-    name: "Marcus Johnson",
-    handle: "@marcustech",
-    text: "This service has transformed how I work. Clean design, powerful features, and excellent support.",
+  en: {
+    signInTitle: "Welcome",
+    signInDescription: "Access your account and continue your journey with us",
+    signUpTitle: "Create Account",
+    signUpDescription: "Join Vidora and learn from the world's best educational videos",
+    signIn: undefined, // component's English defaults
+    signUp: undefined,
+    testimonials: [
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
+        name: "Sarah Chen",
+        handle: "@sarahdigital",
+        text: "Amazing platform! The user experience is seamless and the features are exactly what I needed.",
+      },
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
+        name: "Marcus Johnson",
+        handle: "@marcustech",
+        text: "This service has transformed how I work. Clean design, powerful features, and excellent support.",
+      },
+      {
+        avatarSrc: "https://randomuser.me/api/portraits/men/32.jpg",
+        name: "David Martinez",
+        handle: "@davidcreates",
+        text: "I've tried many platforms, but this one stands out. Intuitive, reliable, and genuinely helpful for productivity.",
+      },
+    ],
   },
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/men/32.jpg",
-    name: "David Martinez",
-    handle: "@davidcreates",
-    text: "I've tried many platforms, but this one stands out. Intuitive, reliable, and genuinely helpful for productivity.",
-  },
-];
+};
+
+function useAuthLang() {
+  const { lang } = window.useLang();
+  const t = AUTH_STRINGS[lang] || AUTH_STRINGS.fa;
+  return { t, rtl: lang === "fa" };
+}
+
+const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/vidora_learning_woman_photo.jpg`;
 
 function LoginPage() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+  const { t, rtl } = useAuthLang();
 
   const handleSignIn = (event) => {
     event.preventDefault();
@@ -8344,14 +8420,47 @@ function LoginPage() {
   };
 
   return (
-    <div className="vd-signin bg-background text-foreground" dir="ltr">
+    <div className="vd-signin dark bg-background text-foreground">
       <SignInPage
-        heroImageSrc="https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80&sat=-100"
-        testimonials={LOGIN_TESTIMONIALS}
+        title={<span className="font-light text-foreground tracking-tighter">{t.signInTitle}</span>}
+        description={t.signInDescription}
+        dir={rtl ? "rtl" : "ltr"}
+        labels={t.signIn}
+        heroImageSrc={AUTH_HERO_IMAGE()}
+        testimonials={t.testimonials}
         onSignIn={handleSignIn}
         onGoogleSignIn={() => console.log("Continue with Google clicked")}
         onResetPassword={() => console.log("Reset password clicked")}
-        onCreateAccount={() => console.log("Create Account clicked")}
+        onCreateAccount={() => { window.location.hash = "#/signup"; }}
+      />
+    </div>
+  );
+}
+
+function SignupPage() {
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+  const { t, rtl } = useAuthLang();
+
+  const handleSignUp = (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    console.log("Sign Up submitted:", data);
+  };
+
+  return (
+    <div className="vd-signin dark bg-background text-foreground">
+      <SignUpPage
+        title={<span className="font-light text-foreground tracking-tighter">{t.signUpTitle}</span>}
+        description={t.signUpDescription}
+        dir={rtl ? "rtl" : "ltr"}
+        labels={t.signUp}
+        heroImageSrc={AUTH_HERO_IMAGE()}
+        testimonials={t.testimonials}
+        onSignUp={handleSignUp}
+        onGoogleSignUp={() => console.log("Continue with Google clicked")}
+        onSignIn={() => { window.location.hash = "#/login"; }}
       />
     </div>
   );
@@ -8370,6 +8479,7 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   if (hash.startsWith("#/login")) return <LoginPage />;
+  if (hash.startsWith("#/signup")) return <SignupPage />;
   return (
     <React.Fragment>
       <EditorialHeader />

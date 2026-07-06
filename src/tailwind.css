@@ -12,22 +12,54 @@
    with dark: variants stay light for dark-OS visitors too. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* shadcn-style semantic tokens, mapped to the Vidora black & white
-   design system (zinc scale, light-only). */
-@theme {
-  --color-background: #ffffff;
-  --color-foreground: #09090b;
-  --color-card: #ffffff;
-  --color-card-foreground: #09090b;
-  --color-border: #e4e4e7;
-  --color-input: #e4e4e7;
-  --color-muted: #f4f4f5;
-  --color-muted-foreground: #71717a;
-  --color-primary: #18181b;
-  --color-primary-foreground: #fafafa;
-  --color-secondary: #f4f4f5;
-  --color-secondary-foreground: #18181b;
+/* shadcn-style semantic tokens, mapped to the Vidora black & white design
+   system (zinc scale). Light by default; a `.dark` class on a subtree (the
+   auth pages) flips it to the black theme. Vars are vd-prefixed so they
+   can't collide with the site's own --border/--muted tokens. */
+@theme inline {
+  --color-background: var(--vd-background);
+  --color-foreground: var(--vd-foreground);
+  --color-card: var(--vd-card);
+  --color-card-foreground: var(--vd-card-foreground);
+  --color-border: var(--vd-border);
+  --color-input: var(--vd-input);
+  --color-muted: var(--vd-muted);
+  --color-muted-foreground: var(--vd-muted-foreground);
+  --color-primary: var(--vd-primary);
+  --color-primary-foreground: var(--vd-primary-foreground);
+  --color-secondary: var(--vd-secondary);
+  --color-secondary-foreground: var(--vd-secondary-foreground);
   --font-geist: "Geist", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --vd-background: #ffffff;
+  --vd-foreground: #09090b;
+  --vd-card: #ffffff;
+  --vd-card-foreground: #09090b;
+  --vd-border: #e4e4e7;
+  --vd-input: #e4e4e7;
+  --vd-muted: #f4f4f5;
+  --vd-muted-foreground: #71717a;
+  --vd-primary: #18181b;
+  --vd-primary-foreground: #fafafa;
+  --vd-secondary: #f4f4f5;
+  --vd-secondary-foreground: #18181b;
+}
+
+.dark {
+  --vd-background: #09090b;
+  --vd-foreground: #fafafa;
+  --vd-card: #18181b;
+  --vd-card-foreground: #fafafa;
+  --vd-border: #27272a;
+  --vd-input: #27272a;
+  --vd-muted: #18181b;
+  --vd-muted-foreground: #a1a1aa;
+  --vd-primary: #fafafa;
+  --vd-primary-foreground: #18181b;
+  --vd-secondary: #27272a;
+  --vd-secondary-foreground: #fafafa;
 }
 
 /* Scoped stand-in for preflight on full-page ui components (the landing
@@ -156,4 +188,18 @@
   border: solid #ffffff;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+
+.dark .custom-checkbox {
+  border-color: #3f3f46;
+  background: transparent;
+}
+
+.dark .custom-checkbox:checked {
+  background: #fafafa;
+  border-color: #fafafa;
+}
+
+.dark .custom-checkbox:checked::after {
+  border-color: #09090b;
 }
