@@ -5208,13 +5208,16 @@ function EditorialHero() {
   const rtl = lang === "fa";
   const align = rtl ? "right" : "left";
   const css = `
-    .vh-wrap{ max-width:1440px; margin:0 auto; padding:48px 56px 40px; }
-    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:36px; align-items:center; }
+    .vh-wrap{ max-width:1440px; margin:0 auto; padding:56px 56px 40px; }
+    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:30px; align-items:center; }
     .vh-center{ display:flex; align-items:center; justify-content:center; }
-    .vh-right{ display:flex; flex-direction:column; gap:14px; }
-    .vh-cta{ display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; align-items:center; }
-    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,430px); margin-top:24px; }
-    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:36px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:12.5px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
+    .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
+    .vh-cardslot{ display:flex; }
+    .vh-cardslot > div{ width:100%; min-height:102px; }
+    .vh-catcta{ margin-top:2px; }
+    .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
+    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
+    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
     @media (max-width:1100px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
       .vh-center{ order:2; grid-column:1 / -1; }
@@ -5225,7 +5228,7 @@ function EditorialHero() {
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
       .vh-right{ flex-direction:column; }
-      .vh-chips{ width:100%; }
+      .vh-cta,.vh-chips{ width:100%; }
     }
   `;
   return /*#__PURE__*/React.createElement("section", {
@@ -5256,25 +5259,29 @@ function EditorialHero() {
       lineHeight: 1.22,
       letterSpacing: "-0.01em",
       color: "var(--ed-ink)",
-      maxWidth: 560
+      maxWidth: 520,
+      marginInlineEnd: "auto"
     }
   }, d.heroTitle.map((l, i) => /*#__PURE__*/React.createElement(React.Fragment, {
     key: i
   }, i > 0 ? /*#__PURE__*/React.createElement("br", null) : null, l))), /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "22px 0 0",
+      margin: "20px 0 0",
       fontFamily: "var(--font-sans)",
-      fontSize: 16,
-      lineHeight: 1.8,
-      color: "var(--ed-body)",
-      maxWidth: 460,
-      marginInlineStart: rtl ? "auto" : 0
+      fontSize: 16.5,
+      lineHeight: 1.9,
+      color: "#52525b",
+      maxWidth: 520,
+      textAlign: rtl ? "right" : "left",
+      marginInlineEnd: "auto",
+      textWrap: "balance"
     }
   }, d.heroSubNew), /*#__PURE__*/React.createElement("div", {
     className: "vh-cta",
     style: {
       justifyContent: rtl ? "flex-end" : "flex-start",
-      flexDirection: rtl ? "row-reverse" : "row"
+      flexDirection: rtl ? "row-reverse" : "row",
+      marginInlineEnd: "auto"
     }
   }, /*#__PURE__*/React.createElement(Button, {
     variant: "primary",
@@ -5302,7 +5309,7 @@ function EditorialHero() {
     className: "vh-chips",
     dir: rtl ? "rtl" : "ltr",
     style: {
-      marginInlineStart: rtl ? "auto" : 0
+      marginInlineEnd: "auto"
     }
   }, d.heroChips.map((c, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
@@ -7989,13 +7996,16 @@ function EditorialHero() {
   const align = rtl ? "right" : "left";
 
   const css = `
-    .vh-wrap{ max-width:1440px; margin:0 auto; padding:48px 56px 40px; }
-    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:36px; align-items:center; }
+    .vh-wrap{ max-width:1440px; margin:0 auto; padding:56px 56px 40px; }
+    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:30px; align-items:center; }
     .vh-center{ display:flex; align-items:center; justify-content:center; }
-    .vh-right{ display:flex; flex-direction:column; gap:14px; }
-    .vh-cta{ display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; align-items:center; }
-    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,430px); margin-top:24px; }
-    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:36px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:12.5px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
+    .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
+    .vh-cardslot{ display:flex; }
+    .vh-cardslot > div{ width:100%; min-height:102px; }
+    .vh-catcta{ margin-top:2px; }
+    .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
+    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
+    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
     @media (max-width:1100px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
       .vh-center{ order:2; grid-column:1 / -1; }
@@ -8006,7 +8016,7 @@ function EditorialHero() {
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
       .vh-right{ flex-direction:column; }
-      .vh-chips{ width:100%; }
+      .vh-cta,.vh-chips{ width:100%; }
     }
   `;
 
@@ -8017,17 +8027,17 @@ function EditorialHero() {
         <div className="vh-grid">
           {/* LEFT — headline / paragraph / CTAs / chips */}
           <div className="vh-left" dir={rtl ? "rtl" : "ltr"} style={{ textAlign: align }}>
-            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "clamp(34px, 3.15vw, 46px)", lineHeight: 1.22, letterSpacing: "-0.01em", color: "var(--ed-ink)", maxWidth: 560 }}>
+            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "clamp(34px, 3.15vw, 46px)", lineHeight: 1.22, letterSpacing: "-0.01em", color: "var(--ed-ink)", maxWidth: 520, marginInlineEnd: "auto" }}>
               {d.heroTitle.map((l, i) => (<React.Fragment key={i}>{i > 0 ? <br /> : null}{l}</React.Fragment>))}
             </h1>
-            <p style={{ margin: "22px 0 0", fontFamily: "var(--font-sans)", fontSize: 16, lineHeight: 1.8, color: "var(--ed-body)", maxWidth: 460, marginInlineStart: rtl ? "auto" : 0 }}>
+            <p style={{ margin: "20px 0 0", fontFamily: "var(--font-sans)", fontSize: 16.5, lineHeight: 1.9, color: "#52525b", maxWidth: 520, textAlign: rtl ? "right" : "left", marginInlineEnd: "auto", textWrap: "balance" }}>
               {d.heroSubNew}
             </p>
-            <div className="vh-cta" style={{ justifyContent: rtl ? "flex-end" : "flex-start", flexDirection: rtl ? "row-reverse" : "row" }}>
+            <div className="vh-cta" style={{ justifyContent: rtl ? "flex-end" : "flex-start", flexDirection: rtl ? "row-reverse" : "row", marginInlineEnd: "auto" }}>
               <Button variant="primary" size="lg" style={{ height: 44, padding: "0 24px", fontSize: 14.5, fontWeight: 600 }}>{d.ctaPrimary}</Button>
               <Button variant="secondary" size="md" iconLeft={<Icon name="upload" size={15} stroke={1.7} />} style={{ height: 38, padding: "0 14px", fontSize: 13.5 }}>{d.ctaSecondary}</Button>
             </div>
-            <div className="vh-chips" dir={rtl ? "rtl" : "ltr"} style={{ marginInlineStart: rtl ? "auto" : 0 }}>
+            <div className="vh-chips" dir={rtl ? "rtl" : "ltr"} style={{ marginInlineEnd: "auto" }}>
               {d.heroChips.map((c, i) => (
                 <span key={i} className="vh-chip">
                   <Icon name="check" size={13} stroke={2.4} />
