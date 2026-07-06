@@ -4982,23 +4982,29 @@ function MockupPlaceholder() {
   return /*#__PURE__*/React.createElement("div", {
     className: "vh-mockup",
     style: {
-      width: "100%",
+      width: "min(100%, 720px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "4px 0"
+      aspectRatio: "1635 / 962",
+      padding: 0
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: mockupSrc,
     alt: "Vidora video learning interface with Persian subtitles, summary and key takeaways",
+    width: 1635,
+    height: 962,
+    loading: "eager",
+    fetchPriority: "high",
+    decoding: "sync",
     style: {
       display: "block",
       width: "100%",
-      maxWidth: 620,
+      maxWidth: 720,
       height: "auto",
       objectFit: "contain",
       filter: "none",
-      boxShadow: "0 18px 38px -30px rgba(0,0,0,0.35)"
+      boxShadow: "0 20px 42px -34px rgba(0,0,0,0.38)"
     }
   }));
 }
@@ -5200,9 +5206,9 @@ function EditorialHero() {
   const rtl = lang === "fa";
   const align = rtl ? "right" : "left";
   const css = `
-    .vh-wrap{ max-width:1440px; margin:0 auto; padding:56px 56px 40px; }
-    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:30px; align-items:center; }
-    .vh-center{ display:flex; align-items:center; justify-content:center; }
+    .vh-wrap{ max-width:1440px; margin:0 auto; padding:52px 40px 40px; }
+    .vh-grid{ display:grid; grid-template-columns:minmax(390px,.95fr) minmax(560px,1.3fr) 320px; gap:24px; align-items:center; }
+    .vh-center{ display:flex; align-items:center; justify-content:center; min-height:430px; }
     .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
     .vh-cardslot{ display:flex; }
     .vh-cardslot > div{ width:100%; min-height:102px; }
@@ -5210,15 +5216,16 @@ function EditorialHero() {
     .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
     .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
     .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
-    @media (max-width:1100px){
+    @media (max-width:1320px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
-      .vh-center{ order:2; grid-column:1 / -1; }
+      .vh-center{ order:2; grid-column:1 / -1; min-height:380px; }
       .vh-left{ order:1; } .vh-right{ order:3; grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; }
       .vh-right .vh-cardslot{ flex:1 1 240px; } .vh-right .vh-catcta{ flex:1 1 100%; }
     }
     @media (max-width:760px){
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
+      .vh-center{ min-height:260px; }
       .vh-right{ flex-direction:column; }
       .vh-cta,.vh-chips{ width:100%; }
     }
@@ -7883,24 +7890,30 @@ function MockupPlaceholder() {
     <div
       className="vh-mockup"
       style={{
-        width: "100%",
+        width: "min(100%, 720px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "4px 0",
+        aspectRatio: "1635 / 962",
+        padding: 0,
       }}
     >
       <img
         src={mockupSrc}
         alt="Vidora video learning interface with Persian subtitles, summary and key takeaways"
+        width={1635}
+        height={962}
+        loading="eager"
+        fetchPriority="high"
+        decoding="sync"
         style={{
           display: "block",
           width: "100%",
-          maxWidth: 620,
+          maxWidth: 720,
           height: "auto",
           objectFit: "contain",
           filter: "none",
-          boxShadow: "0 18px 38px -30px rgba(0,0,0,0.35)",
+          boxShadow: "0 20px 42px -34px rgba(0,0,0,0.38)",
         }}
       />
     </div>
@@ -7996,9 +8009,9 @@ function EditorialHero() {
   const align = rtl ? "right" : "left";
 
   const css = `
-    .vh-wrap{ max-width:1440px; margin:0 auto; padding:56px 56px 40px; }
-    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:30px; align-items:center; }
-    .vh-center{ display:flex; align-items:center; justify-content:center; }
+    .vh-wrap{ max-width:1440px; margin:0 auto; padding:52px 40px 40px; }
+    .vh-grid{ display:grid; grid-template-columns:minmax(390px,.95fr) minmax(560px,1.3fr) 320px; gap:24px; align-items:center; }
+    .vh-center{ display:flex; align-items:center; justify-content:center; min-height:430px; }
     .vh-right{ display:flex; flex-direction:column; gap:12px; align-self:center; }
     .vh-cardslot{ display:flex; }
     .vh-cardslot > div{ width:100%; min-height:102px; }
@@ -8006,15 +8019,16 @@ function EditorialHero() {
     .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
     .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
     .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
-    @media (max-width:1100px){
+    @media (max-width:1320px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
-      .vh-center{ order:2; grid-column:1 / -1; }
+      .vh-center{ order:2; grid-column:1 / -1; min-height:380px; }
       .vh-left{ order:1; } .vh-right{ order:3; grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; }
       .vh-right .vh-cardslot{ flex:1 1 240px; } .vh-right .vh-catcta{ flex:1 1 100%; }
     }
     @media (max-width:760px){
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
+      .vh-center{ min-height:260px; }
       .vh-right{ flex-direction:column; }
       .vh-cta,.vh-chips{ width:100%; }
     }
