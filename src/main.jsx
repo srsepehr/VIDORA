@@ -5209,11 +5209,12 @@ function EditorialHero() {
   const align = rtl ? "right" : "left";
   const css = `
     .vh-wrap{ max-width:1440px; margin:0 auto; padding:48px 56px 40px; }
-    .vh-grid{ display:grid; grid-template-columns: 1.05fr 1.45fr 320px; gap:44px; align-items:center; }
+    .vh-grid{ display:grid; grid-template-columns: 1.25fr 1.2fr 320px; gap:36px; align-items:center; }
     .vh-center{ display:flex; align-items:center; justify-content:center; }
     .vh-right{ display:flex; flex-direction:column; gap:14px; }
-    .vh-cta{ display:flex; gap:12px; margin-top:32px; flex-wrap:wrap; }
-    .vh-chips{ display:flex; gap:10px; margin-top:26px; flex-wrap:wrap; }
+    .vh-cta{ display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; align-items:center; }
+    .vh-chips{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; width:min(100%,560px); margin-top:24px; }
+    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 8px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:11.5px; font-weight:500; line-height:1.25; color:var(--ed-ink); text-align:center; }
     @media (max-width:1100px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
       .vh-center{ order:2; grid-column:1 / -1; }
@@ -5224,6 +5225,7 @@ function EditorialHero() {
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
       .vh-right{ flex-direction:column; }
+      .vh-chips{ grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
   `;
   return /*#__PURE__*/React.createElement("section", {
@@ -5249,22 +5251,23 @@ function EditorialHero() {
     style: {
       margin: 0,
       fontFamily: "var(--font-sans)",
-      fontWeight: 800,
-      fontSize: "clamp(38px, 3.6vw, 58px)",
-      lineHeight: 1.12,
-      letterSpacing: "-0.02em",
-      color: "var(--ed-ink)"
+      fontWeight: 700,
+      fontSize: "clamp(34px, 3.15vw, 46px)",
+      lineHeight: 1.22,
+      letterSpacing: "-0.01em",
+      color: "var(--ed-ink)",
+      maxWidth: 560
     }
   }, d.heroTitle.map((l, i) => /*#__PURE__*/React.createElement(React.Fragment, {
     key: i
   }, i > 0 ? /*#__PURE__*/React.createElement("br", null) : null, l))), /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "24px 0 0",
+      margin: "22px 0 0",
       fontFamily: "var(--font-sans)",
       fontSize: 16,
-      lineHeight: 1.85,
+      lineHeight: 1.8,
       color: "var(--ed-body)",
-      maxWidth: 440,
+      maxWidth: 460,
       marginInlineStart: rtl ? "auto" : 0
     }
   }, d.heroSubNew), /*#__PURE__*/React.createElement("div", {
@@ -5275,38 +5278,35 @@ function EditorialHero() {
     }
   }, /*#__PURE__*/React.createElement(Button, {
     variant: "primary",
-    size: "lg"
+    size: "lg",
+    style: {
+      height: 44,
+      padding: "0 24px",
+      fontSize: 14.5,
+      fontWeight: 600
+    }
   }, d.ctaPrimary), /*#__PURE__*/React.createElement(Button, {
     variant: "secondary",
-    size: "lg",
+    size: "md",
     iconLeft: /*#__PURE__*/React.createElement(Icon, {
       name: "upload",
-      size: 16,
+      size: 15,
       stroke: 1.7
-    })
+    }),
+    style: {
+      height: 38,
+      padding: "0 14px",
+      fontSize: 13.5
+    }
   }, d.ctaSecondary)), /*#__PURE__*/React.createElement("div", {
     className: "vh-chips",
+    dir: rtl ? "rtl" : "ltr",
     style: {
-      justifyContent: rtl ? "flex-end" : "flex-start",
-      flexDirection: rtl ? "row-reverse" : "row"
+      marginInlineStart: rtl ? "auto" : 0
     }
   }, d.heroChips.map((c, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      flexDirection: rtl ? "row-reverse" : "row",
-      padding: "7px 12px",
-      borderRadius: "var(--radius-full)",
-      border: "1px solid var(--ed-line)",
-      background: "var(--ed-paper)",
-      fontFamily: "var(--font-sans)",
-      fontSize: 12.5,
-      fontWeight: 500,
-      color: "var(--ed-ink)",
-      whiteSpace: "nowrap"
-    }
+    className: "vh-chip"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "check",
     size: 13,
@@ -6448,11 +6448,11 @@ window.VIDORA_DICT = {
     startFree: "شروع رایگان",
     startMembership: "شروع عضویت",
     exploreLibrary: "کاوش در کتابخانه",
-    heroTitle: ["بهترین ویدیوهای آموزشی دنیا،", "حالا به زبان فارسی"],
-    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل فهم و کاربردی تبدیل می‌کنیم.",
+    heroTitle: ["ویدیوهای آموزشی دنیا،", "قابل‌فهم به زبان فارسی"],
+    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل‌فهم و کاربردی تبدیل می‌کنیم.",
     ctaPrimary: "شروع یادگیری",
     ctaSecondary: "ترجمه ویدیوی خودم",
-    heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند"],
+    heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند", "ترجمه ویدیوی خودت"],
     categories: [{
       title: "هوش مصنوعی و ابزارهای جدید",
       desc: "یادگیری AI، ابزارهای کاربردی، عملی در دنیای واقعی",
@@ -7559,11 +7559,11 @@ window.VIDORA_DICT = {
     startFree: "شروع رایگان",
     startMembership: "شروع عضویت",
     exploreLibrary: "کاوش در کتابخانه",
-    heroTitle: ["بهترین ویدیوهای آموزشی دنیا،", "حالا به زبان فارسی"],
-    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل فهم و کاربردی تبدیل می‌کنیم.",
+    heroTitle: ["ویدیوهای آموزشی دنیا،", "قابل‌فهم به زبان فارسی"],
+    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل‌فهم و کاربردی تبدیل می‌کنیم.",
     ctaPrimary: "شروع یادگیری",
     ctaSecondary: "ترجمه ویدیوی خودم",
-    heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند"],
+    heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند", "ترجمه ویدیوی خودت"],
     categories: [
       { title: "هوش مصنوعی و ابزارهای جدید", desc: "یادگیری AI، ابزارهای کاربردی، عملی در دنیای واقعی", icon: "sparkles" },
       { title: "ساخت محصول و برنامه‌نویسی", desc: "از ایده تا محصول، کدنویسی، طراحی محصول و رشد استارتاپ", icon: "cpu" },
@@ -8015,19 +8015,19 @@ function EditorialHero() {
         <div className="vh-grid">
           {/* LEFT — headline / paragraph / CTAs / chips */}
           <div className="vh-left" dir={rtl ? "rtl" : "ltr"} style={{ textAlign: align }}>
-            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "clamp(38px, 3.6vw, 58px)", lineHeight: 1.12, letterSpacing: "-0.02em", color: "var(--ed-ink)" }}>
+            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "clamp(34px, 3.15vw, 46px)", lineHeight: 1.22, letterSpacing: "-0.01em", color: "var(--ed-ink)", maxWidth: 560 }}>
               {d.heroTitle.map((l, i) => (<React.Fragment key={i}>{i > 0 ? <br /> : null}{l}</React.Fragment>))}
             </h1>
-            <p style={{ margin: "24px 0 0", fontFamily: "var(--font-sans)", fontSize: 16, lineHeight: 1.85, color: "var(--ed-body)", maxWidth: 440, marginInlineStart: rtl ? "auto" : 0 }}>
+            <p style={{ margin: "22px 0 0", fontFamily: "var(--font-sans)", fontSize: 16, lineHeight: 1.8, color: "var(--ed-body)", maxWidth: 460, marginInlineStart: rtl ? "auto" : 0 }}>
               {d.heroSubNew}
             </p>
             <div className="vh-cta" style={{ justifyContent: rtl ? "flex-end" : "flex-start", flexDirection: rtl ? "row-reverse" : "row" }}>
-              <Button variant="primary" size="lg">{d.ctaPrimary}</Button>
-              <Button variant="secondary" size="lg" iconLeft={<Icon name="upload" size={16} stroke={1.7} />}>{d.ctaSecondary}</Button>
+              <Button variant="primary" size="lg" style={{ height: 44, padding: "0 24px", fontSize: 14.5, fontWeight: 600 }}>{d.ctaPrimary}</Button>
+              <Button variant="secondary" size="md" iconLeft={<Icon name="upload" size={15} stroke={1.7} />} style={{ height: 38, padding: "0 14px", fontSize: 13.5 }}>{d.ctaSecondary}</Button>
             </div>
-            <div className="vh-chips" style={{ justifyContent: rtl ? "flex-end" : "flex-start", flexDirection: rtl ? "row-reverse" : "row" }}>
+            <div className="vh-chips" dir={rtl ? "rtl" : "ltr"} style={{ marginInlineStart: rtl ? "auto" : 0 }}>
               {d.heroChips.map((c, i) => (
-                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, flexDirection: rtl ? "row-reverse" : "row", padding: "7px 12px", borderRadius: "var(--radius-full)", border: "1px solid var(--ed-line)", background: "var(--ed-paper)", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 500, color: "var(--ed-ink)", whiteSpace: "nowrap" }}>
+                <span key={i} className="vh-chip">
                   <Icon name="check" size={13} stroke={2.4} />
                   {c}
                 </span>
