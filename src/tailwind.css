@@ -12,6 +12,11 @@
    with dark: variants stay light for dark-OS visitors too. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* The UA's default 8px body margin was never reset (no preflight); it is
+   invisible on the white landing page but shows as a white frame around
+   the full-viewport dark auth pages. */
+body { margin: 0; }
+
 /* shadcn-style semantic tokens, mapped to the Vidora black & white design
    system (zinc scale). Light by default; a `.dark` class on a subtree (the
    auth pages) flips it to the black theme. Vars are vd-prefixed so they

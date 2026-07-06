@@ -8405,7 +8405,9 @@ function useAuthLang() {
   return { t, rtl: lang === "fa" };
 }
 
-const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/vidora_learning_woman_photo.jpg`;
+// Fluted-glass B&W texture (the user's chosen auth backdrop) — Unsplash
+// photo by Milad Fakurian, desaturated to grayscale by the panel's filter.
+const AUTH_HERO_IMAGE = () => "https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80";
 
 function LoginPage() {
   React.useEffect(() => {

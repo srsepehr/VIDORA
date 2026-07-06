@@ -175,8 +175,8 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
 
       {/* Right column: hero image + testimonials */}
       {heroImageSrc && (
-        <section className="hidden md:block flex-1 relative p-4">
-          <div className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center grayscale" style={{ backgroundImage: `url(${heroImageSrc})` }}></div>
+        <section className="hidden md:block flex-1 relative">
+          <div className="animate-slide-right animate-delay-300 absolute inset-0 bg-cover bg-center grayscale" style={{ backgroundImage: `url(${heroImageSrc})` }}></div>
           {testimonials.length > 0 && (
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4 px-8 w-full justify-center">
               <TestimonialCard testimonial={testimonials[0]} delay="animate-delay-1200" dir={dir} />
