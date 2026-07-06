@@ -1,0 +1,7 @@
+/* Vidora typefaces — Geist (UI/display) + Geist Mono (code, timestamps, metadata).
+   Geist is the brand's actual typeface and ships on Google Fonts, so it is loaded
+   from the Google Fonts CDN rather than self-hosted binaries. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+/* Vazirmatn — Persian/Arabic-script webfont, used when the UI is in Persian
+   (activated via the `.lang-fa` scope in typography.css). */
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap');

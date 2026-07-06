@@ -1,0 +1,49 @@
+/* ============================================================
+   VIDORA · EFFECTS
+   Shadows, blur, gradients, motion. Soft and low-contrast —
+   elevation is suggested, never heavy. Brand-blue glow reserved
+   for AI / focus moments.
+   ============================================================ */
+
+:root {
+  /* ---- Elevation (soft, tight — from brand kit: 1px offset, low opacity) ---- */
+  --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.06);
+  --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.08), 0 1px 3px 0 hsl(0 0% 0% / 0.06);
+  --shadow-md: 0 2px 4px -1px hsl(0 0% 0% / 0.08), 0 4px 12px -2px hsl(0 0% 0% / 0.08);
+  --shadow-lg: 0 8px 24px -6px hsl(0 0% 0% / 0.12), 0 2px 6px -2px hsl(0 0% 0% / 0.08);
+  --shadow-xl: 0 24px 48px -12px hsl(0 0% 0% / 0.18);
+  --shadow-inset: inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+
+  /* ---- Brand glow (AI / focus / active media) ---- */
+  --glow-brand: 0 0 0 4px oklch(0.55 0.22 264.53 / 0.16);
+  --glow-brand-lg: 0 8px 32px -8px oklch(0.55 0.22 264.53 / 0.4);
+
+  /* ---- Blur (glass chrome over media) ---- */
+  --blur-sm: 8px;   /* @kind other */
+  --blur-md: 16px;  /* @kind other */
+  --blur-lg: 28px;  /* @kind other */
+
+  /* ---- Gradients ---- */
+  /* Subtle AI brand wash — used behind hero art & empty states */
+  --gradient-brand: linear-gradient(135deg, oklch(0.55 0.22 264.53) 0%, oklch(0.6 0.19 292) 100%); /* @kind other */
+  --gradient-brand-soft: linear-gradient(180deg, oklch(0.95 0.03 264.53) 0%, oklch(0.99 0 0) 100%); /* @kind other */
+  /* Media scrim — legibility of controls & titles over thumbnails */
+  --gradient-scrim-bottom: linear-gradient(to top, hsl(0 0% 0% / 0.85) 0%, hsl(0 0% 0% / 0) 60%); /* @kind other */
+  --gradient-scrim-top: linear-gradient(to bottom, hsl(0 0% 0% / 0.55) 0%, hsl(0 0% 0% / 0) 100%); /* @kind other */
+  /* Poster row fade for horizontal scrollers */
+  --gradient-fade-right: linear-gradient(to right, transparent, var(--background)); /* @kind other */
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);      /* @kind other */
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);    /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);        /* @kind other */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);    /* @kind other */
+
+  --duration-fast: 120ms;    /* @kind other */
+  --duration-base: 200ms;    /* @kind other */
+  --duration-slow: 320ms;    /* @kind other */
+  --duration-slower: 480ms;  /* @kind other */
+
+  /* ---- Focus ---- */
+  --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--brand-ring);
+}

@@ -1,0 +1,133 @@
+/* ============================================================
+   VIDORA · COLORS
+   Monochrome foundation (black / white / true grays) with a
+   single brand-blue accent reserved for AI, links, focus and
+   key interactive moments. Content-first: color is used
+   sparingly so video thumbnails and imagery carry the palette.
+   Authored in OKLCH. Light is the default; .dark overrides.
+   ============================================================ */
+
+:root {
+  /* ---- Base surfaces & text ---- */
+  --background: oklch(0.99 0 0);      /* app canvas */
+  --foreground: oklch(0 0 0);         /* primary text */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(0.99 0 0);
+  --popover-foreground: oklch(0 0 0);
+
+  /* ---- Primary (monochrome ink) ---- */
+  --primary: oklch(0 0 0);
+  --primary-foreground: oklch(1 0 0);
+
+  /* ---- Secondary / muted / accent (neutral grays) ---- */
+  --secondary: oklch(0.94 0 0);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.44 0 0);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0 0 0);
+
+  /* ---- Brand blue (AI / interactive accent) ---- */
+  --brand: oklch(0.55 0.22 264.53);
+  --brand-foreground: oklch(1 0 0);
+  --brand-hover: oklch(0.5 0.22 264.53);
+  --brand-subtle: oklch(0.95 0.03 264.53);   /* tinted fills */
+  --brand-subtle-foreground: oklch(0.45 0.2 264.53);
+  --brand-ring: oklch(0.55 0.22 264.53);
+
+  /* ---- Feedback ---- */
+  --destructive: oklch(0.63 0.19 23.03);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.6 0.14 155);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.81 0.17 75.35);
+  --warning-foreground: oklch(0.2 0 0);
+
+  /* ---- Lines & fields ---- */
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.94 0 0);
+  --ring: oklch(0 0 0);
+
+  /* ---- Data-viz ---- */
+  --chart-1: oklch(0.81 0.17 75.35);
+  --chart-2: oklch(0.55 0.22 264.53);
+  --chart-3: oklch(0.72 0 0);
+  --chart-4: oklch(0.92 0 0);
+  --chart-5: oklch(0.56 0 0);
+
+  /* ---- Sidebar / app chrome ---- */
+  --sidebar: oklch(0.99 0 0);
+  --sidebar-foreground: oklch(0 0 0);
+  --sidebar-primary: oklch(0 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.94 0 0);
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.94 0 0);
+  --sidebar-ring: oklch(0 0 0);
+
+  /* ---- Player / media chrome (always dark, both themes) ---- */
+  --player-scrim: oklch(0.145 0 0 / 0.72);
+  --player-surface: oklch(0.18 0 0);
+  --player-foreground: oklch(1 0 0);
+  --player-track: oklch(1 0 0 / 0.28);
+  --player-progress: var(--brand);
+}
+
+.dark {
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.14 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(1 0 0);
+
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0 0 0);
+
+  --secondary: oklch(0.25 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.23 0 0);
+  --muted-foreground: oklch(0.72 0 0);
+  --accent: oklch(0.32 0 0);
+  --accent-foreground: oklch(1 0 0);
+
+  --brand: oklch(0.62 0.2 262);
+  --brand-foreground: oklch(1 0 0);
+  --brand-hover: oklch(0.68 0.19 262);
+  --brand-subtle: oklch(0.28 0.07 264);
+  --brand-subtle-foreground: oklch(0.82 0.11 264);
+  --brand-ring: oklch(0.62 0.2 262);
+
+  --destructive: oklch(0.69 0.2 23.91);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.7 0.15 155);
+  --success-foreground: oklch(0.12 0 0);
+  --warning: oklch(0.81 0.17 75.35);
+  --warning-foreground: oklch(0.2 0 0);
+
+  --border: oklch(0.26 0 0);
+  --input: oklch(0.32 0 0);
+  --ring: oklch(0.72 0 0);
+
+  --chart-1: oklch(0.81 0.17 75.35);
+  --chart-2: oklch(0.58 0.21 260.84);
+  --chart-3: oklch(0.56 0 0);
+  --chart-4: oklch(0.44 0 0);
+  --chart-5: oklch(0.92 0 0);
+
+  --sidebar: oklch(0.18 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(1 0 0);
+  --sidebar-primary-foreground: oklch(0 0 0);
+  --sidebar-accent: oklch(0.32 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.32 0 0);
+  --sidebar-ring: oklch(0.72 0 0);
+
+  --player-scrim: oklch(0 0 0 / 0.72);
+  --player-surface: oklch(0.18 0 0);
+  --player-foreground: oklch(1 0 0);
+  --player-track: oklch(1 0 0 / 0.28);
+  --player-progress: var(--brand);
+}

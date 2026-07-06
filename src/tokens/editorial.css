@@ -1,0 +1,40 @@
+/* ============================================================
+   VIDORA · EDITORIAL / MARKETING CAMPAIGN LAYER
+   Scoped variant for the homepage & campaign surfaces ONLY.
+   The product (app, player, forms) keeps the core tokens.
+   Apply by wrapping campaign pages in `.vd-editorial`.
+   Campaign DNA: oversized ALL-CAPS display type, square
+   corners, B&W photography, electric ultramarine CTA
+   (sampled from the approved landing mock: #2405FC).
+   ============================================================ */
+
+.vd-editorial {
+  /* ---- Campaign accent (CTA only) ---- */
+  --ed-accent: #2405fc;
+  --ed-accent-hover: #1b03d6;
+  --ed-accent-foreground: #ffffff;
+
+  /* ---- Ink & surfaces ---- */
+  --ed-ink: #0a0a0a;            /* near-black bands & buttons */
+  --ed-paper: #ffffff;
+  --ed-surface: #f2f2f0;        /* warm-gray section bg */
+  --ed-photo-fallback: #e9e9e7; /* slot bg before photos land */
+  --ed-line: #e5e5e3;           /* hairline dividers on light */
+  --ed-line-inverse: rgba(255, 255, 255, 0.16);
+  --ed-text-muted: #5c5c58;
+  --ed-text-muted-inverse: rgba(255, 255, 255, 0.72);
+  --ed-body: #2e2e2b;              /* long-form paragraph ink on light */
+
+  /* ---- Shape: square, editorial ---- */
+  --ed-radius: 2px;             /* buttons, chips, thumbs */
+
+  /* ---- Display type (ALL CAPS) ---- */
+  --ed-display-weight: 750;
+  --ed-display-leading: 0.95;
+  --ed-display-tracking: -0.02em;
+  --ed-caps-tracking: 0.08em;      /* labels, buttons, nav */
+  --ed-caps-tracking-wide: 0.14em; /* eyebrows, utility bar */
+
+  /* ---- Photography treatment (B&W editorial) ---- */
+  --ed-photo-filter: grayscale(1) contrast(1.05) brightness(1.01); /* @kind other */
+}
