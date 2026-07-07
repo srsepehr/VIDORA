@@ -1,0 +1,173 @@
+{
+  "dock": {
+    "dashboard": "داشبورد",
+    "newVideo": "ویدیوی جدید",
+    "library": "کتابخانه",
+    "saved": "ذخیره‌شده‌ها",
+    "support": "پشتیبانی",
+    "settings": "تنظیمات"
+  },
+  "sections": {
+    "primary": "اصلی",
+    "saved": "ذخیره‌شده‌ها",
+    "account": "حساب",
+    "help": "راهنما"
+  },
+  "nav": {
+    "dashboard": "داشبورد",
+    "vidoraLibrary": "کتابخانه Vidora",
+    "newTranslation": "ترجمه جدید",
+    "myVideos": "ویدیوهای من",
+    "saved": "ذخیره‌شده",
+    "subscription": "اشتراک",
+    "support": "پشتیبانی",
+    "logout": "خروج"
+  },
+  "titles": {
+    "dashboard": ["داشبورد", "ویدیوها را ترجمه کنید، زیرنویس بسازید و خروجی‌های یادگیری را یک‌جا نگه دارید."],
+    "new-video": ["ترجمه جدید", "برای شروع، ویدیو آپلود کنید یا لینک یوتیوب را وارد کنید."],
+    "library": ["ویدیوهای من", "ویدیوهای ترجمه‌شده را جست‌وجو، فیلتر و مدیریت کنید."],
+    "saved": ["ذخیره‌شده‌ها", "ویدیوهای پسندیده، فهرست تماشا و یادداشت‌ها در یک فضای ساده."],
+    "profile": ["پروفایل", "اطلاعات حساب و هویت ویدورای خود را مدیریت کنید."],
+    "subscription": ["اشتراک", "پلن، مصرف، پرداخت‌ها و ارتقا را در یک‌جا بررسی کنید."],
+    "support": ["پشتیبانی", "برای آپلود، پرداخت یا سوال‌های محصول پیام بفرستید."],
+    "settings": ["تنظیمات", "ترجیحات ترجمه و ابزارهای یادگیری را تنظیم کنید."]
+  },
+  "filters": {
+    "All": "همه",
+    "Processing": "در حال پردازش",
+    "Ready": "آماده",
+    "Failed": "ناموفق"
+  },
+  "status": {
+    "Ready": "آماده",
+    "Processing": "در حال پردازش",
+    "Failed": "ناموفق",
+    "Saved": "ذخیره‌شده"
+  },
+  "actions": {
+    "open": "باز کردن",
+    "viewProgress": "مشاهده وضعیت",
+    "retry": "تلاش مجدد",
+    "uploadVideo": "آپلود ویدیو",
+    "pasteYoutube": "لینک یوتیوب",
+    "start": "شروع",
+    "startingTranslation": "در حال شروع ترجمه...",
+    "clear": "پاک کردن",
+    "startTranslation": "شروع ترجمه",
+    "manageSubscription": "مدیریت اشتراک",
+    "saveChanges": "ذخیره تغییرات",
+    "send": "ارسال",
+    "cancel": "انصراف",
+    "logout": "خروج",
+    "deleteAccount": "حذف حساب",
+    "download": "دانلود",
+    "updatePayment": "به‌روزرسانی پرداخت",
+    "uploadPhoto": "آپلود عکس جدید",
+    "continueWatching": "ادامه تماشا"
+  },
+  "dashboard": {
+    "minutesRemaining": "دقیقه باقی‌مانده",
+    "currentPlan": "پلن فعلی",
+    "plan": "پلن",
+    "monthlyMinutes": "دقیقه ماهانه",
+    "renewal": "تمدید",
+    "startTitle": "شروع ترجمه جدید",
+    "startText": "فایل ویدیو را آپلود کنید یا لینک یوتیوب را وارد کنید. ویدورا زبان را تشخیص می‌دهد و خروجی فارسی می‌سازد.",
+    "recentVideos": "ویدیوهای اخیر"
+  },
+  "upload": {
+    "fileTitle": "آپلود فایل ویدیو",
+    "fileText": "فایل ویدیوی خود را اینجا رها کنید یا از دستگاه انتخاب کنید.",
+    "drop": "ویدیو را اینجا رها کنید",
+    "formats": "MP4، MOV یا WebM تا ۲ گیگابایت",
+    "youtubeTitle": "لینک یوتیوب",
+    "youtubeText": "لینک ویدیوی یوتیوب را وارد کنید.",
+    "youtubePlaceholder": "https://youtube.com/watch?v=...",
+    "autoHelper": "زبان ویدیو به‌صورت خودکار تشخیص داده می‌شود و خروجی به فارسی ساخته خواهد شد.",
+    "auto": "تشخیص خودکار",
+    "english": "انگلیسی",
+    "persian": "فارسی",
+    "started": "پردازش شروع شد. ویدیو در بخش ویدیوهای من نمایش داده می‌شود."
+  },
+  "library": {
+    "search": "جست‌وجوی ویدیوها",
+    "direction": "انگلیسی ← فارسی",
+    "processingMeta": "در حال پردازش · ۷۰٪",
+    "remaining": "۱۲ دقیقه باقی‌مانده",
+    "failedReason": "فرمت پشتیبانی نمی‌شود",
+    "uploaded": "آپلود شده در ۱۶ تیر"
+  },
+  "savedPage": {
+    "liked": "ویدیوهای پسندیده",
+    "watchlist": "فهرست تماشا",
+    "notes": "یادداشت‌های ذخیره‌شده",
+    "emptyTitle": "هنوز ویدیوی پسندیده‌ای ندارید.",
+    "emptyText": "ویدیوها را ذخیره کنید تا بعدا اینجا پیدا شوند.",
+    "searchNotes": "جست‌وجوی یادداشت‌ها"
+  },
+  "subscription": {
+    "usage": "مصرف",
+    "billing": "پرداخت‌ها",
+    "free": "رایگان",
+    "pro": "حرفه‌ای",
+    "team": "تیمی",
+    "minutes120": "۱۲۰ دقیقه",
+    "minutes2000": "۲۰۰۰ دقیقه",
+    "minutes8000": "۸۰۰۰ دقیقه",
+    "freeFeature": "شروع با امکانات پایه ویدورا",
+    "proFeature": "پلن فعلی",
+    "teamFeature": "فضای کاری مشترک",
+    "upgradePro": "ارتقا به حرفه‌ای",
+    "buyPlan": "خرید پلن",
+    "paid": "پرداخت‌شده",
+    "minutesUsed": "دقیقه مصرف‌شده این ماه",
+    "videosProcessed": "ویدیوهای پردازش‌شده",
+    "summariesGenerated": "خلاصه‌های ساخته‌شده",
+    "notesSaved": "یادداشت‌های ذخیره‌شده",
+    "paymentMethod": "روش پرداخت",
+    "cardLabel": "کارت",
+    "card": "Visa با پایان 4242",
+    "invoices": "فاکتورها",
+    "used": "مصرف‌شده"
+  },
+  "support": {
+    "contact": "تماس با پشتیبانی",
+    "uploadIssue": "گزارش مشکل آپلود",
+    "billingQuestion": "سوال پرداخت",
+    "featureRequest": "درخواست قابلیت",
+    "subject": "موضوع",
+    "subjectPlaceholder": "چه کمکی نیاز دارید؟",
+    "responseTime": "زمان پاسخ",
+    "under24": "کمتر از ۲۴ ساعت",
+    "message": "پیام",
+    "messagePlaceholder": "پیام خود را بنویسید"
+  },
+  "settings": {
+    "defaultOutput": "خروجی پیش‌فرض",
+    "autoSubtitles": "ساخت خودکار زیرنویس",
+    "autoSummaries": "ساخت خودکار خلاصه",
+    "saveNotes": "ذخیره خودکار یادداشت‌ها"
+  },
+  "profile": {
+    "name": "نام",
+    "email": "ایمیل",
+    "saved": "تغییرات ذخیره شد."
+  },
+  "modal": {
+    "logoutTitle": "از ویدورا خارج شوید؟",
+    "logoutText": "هر زمان می‌توانید دوباره وارد حساب شوید."
+  },
+  "toast": {
+    "translationStarted": "ترجمه شروع شد",
+    "retryQueued": "تلاش مجدد در صف قرار گرفت",
+    "moreActions": "گزینه‌های بیشتر باز شد",
+    "videoOpened": "ویدیو باز شد",
+    "noteOpened": "یادداشت باز شد",
+    "profileSaved": "پروفایل ذخیره شد",
+    "paymentOpened": "فرم پرداخت باز شد",
+    "invoiceDownloaded": "فاکتور دانلود شد",
+    "supportSent": "پیام پشتیبانی ارسال شد",
+    "deleteRequested": "درخواست حذف حساب ثبت شد"
+  }
+}

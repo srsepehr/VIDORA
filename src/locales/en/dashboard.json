@@ -1,0 +1,173 @@
+{
+  "dock": {
+    "dashboard": "Dashboard",
+    "newVideo": "New Video",
+    "library": "Library",
+    "saved": "Saved",
+    "support": "Support",
+    "settings": "Settings"
+  },
+  "sections": {
+    "primary": "PRIMARY",
+    "saved": "SAVED",
+    "account": "ACCOUNT",
+    "help": "HELP"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "vidoraLibrary": "Vidora Library",
+    "newTranslation": "New Translation",
+    "myVideos": "My Videos",
+    "saved": "Saved",
+    "subscription": "Subscription",
+    "support": "Support",
+    "logout": "Logout"
+  },
+  "titles": {
+    "dashboard": ["Dashboard", "Translate videos, generate subtitles, and keep learning outputs in one place."],
+    "new-video": ["New Translation", "Upload a video or paste a YouTube link to start."],
+    "library": ["My Videos", "Search, filter, and continue work on every translated video."],
+    "saved": ["Saved", "Liked videos, watchlist items, and notes in one quiet place."],
+    "profile": ["Profile", "Manage your Vidora identity and contact information."],
+    "subscription": ["Subscription", "Review your plan, usage, billing, and available upgrades."],
+    "support": ["Support", "Get help with uploads, billing, or product questions."],
+    "settings": ["Settings", "Set your default translation and learning preferences."]
+  },
+  "filters": {
+    "All": "All",
+    "Processing": "Processing",
+    "Ready": "Ready",
+    "Failed": "Failed"
+  },
+  "status": {
+    "Ready": "Ready",
+    "Processing": "Processing",
+    "Failed": "Failed",
+    "Saved": "Saved"
+  },
+  "actions": {
+    "open": "Open",
+    "viewProgress": "View progress",
+    "retry": "Retry",
+    "uploadVideo": "Upload Video",
+    "pasteYoutube": "Paste YouTube Link",
+    "start": "Start",
+    "startingTranslation": "Starting translation...",
+    "clear": "Clear",
+    "startTranslation": "Start Translation",
+    "manageSubscription": "Manage subscription",
+    "saveChanges": "Save changes",
+    "send": "Send",
+    "cancel": "Cancel",
+    "logout": "Log out",
+    "deleteAccount": "Delete account",
+    "download": "Download",
+    "updatePayment": "Update payment method",
+    "uploadPhoto": "Upload new photo",
+    "continueWatching": "Continue watching"
+  },
+  "dashboard": {
+    "minutesRemaining": "Minutes Remaining",
+    "currentPlan": "Current Plan",
+    "plan": "Plan",
+    "monthlyMinutes": "Monthly minutes",
+    "renewal": "Renewal",
+    "startTitle": "Start a new translation",
+    "startText": "Upload a video file or paste a YouTube link. Vidora will detect the language and generate the Persian output.",
+    "recentVideos": "Recent Videos"
+  },
+  "upload": {
+    "fileTitle": "Upload video file",
+    "fileText": "Drop your video file here or choose it from your device.",
+    "drop": "Drop your video here",
+    "formats": "MP4, MOV, or WebM up to 2GB",
+    "youtubeTitle": "YouTube link",
+    "youtubeText": "Paste the YouTube video link.",
+    "youtubePlaceholder": "https://youtube.com/watch?v=...",
+    "autoHelper": "The video language is detected automatically and the output will be generated in Persian.",
+    "auto": "Auto-detect",
+    "english": "English",
+    "persian": "Persian",
+    "started": "Processing started. Your video will appear in My Videos."
+  },
+  "library": {
+    "search": "Search videos",
+    "direction": "English → Persian",
+    "processingMeta": "Processing · 70%",
+    "remaining": "12 min remaining",
+    "failedReason": "Unsupported format",
+    "uploaded": "Uploaded Jul 6"
+  },
+  "savedPage": {
+    "liked": "Liked Videos",
+    "watchlist": "Watchlist",
+    "notes": "Saved Notes",
+    "emptyTitle": "No liked videos yet.",
+    "emptyText": "Like videos to find them here later.",
+    "searchNotes": "Search notes"
+  },
+  "subscription": {
+    "usage": "Usage",
+    "billing": "Billing",
+    "free": "Free",
+    "pro": "Pro",
+    "team": "Team",
+    "minutes120": "120 minutes",
+    "minutes2000": "2,000 minutes",
+    "minutes8000": "8,000 minutes",
+    "freeFeature": "Try Vidora basics",
+    "proFeature": "Current Plan",
+    "teamFeature": "Shared workspace",
+    "upgradePro": "Upgrade to Pro",
+    "buyPlan": "Buy Plan",
+    "paid": "Paid",
+    "minutesUsed": "Minutes used this month",
+    "videosProcessed": "Videos processed",
+    "summariesGenerated": "Summaries generated",
+    "notesSaved": "Notes saved",
+    "paymentMethod": "Payment method",
+    "cardLabel": "Card",
+    "card": "Visa ending 4242",
+    "invoices": "Invoices",
+    "used": "Used"
+  },
+  "support": {
+    "contact": "Contact support",
+    "uploadIssue": "Report upload issue",
+    "billingQuestion": "Billing question",
+    "featureRequest": "Feature request",
+    "subject": "Subject",
+    "subjectPlaceholder": "What do you need help with?",
+    "responseTime": "Response time",
+    "under24": "Under 24 hours",
+    "message": "Message",
+    "messagePlaceholder": "Write your message"
+  },
+  "settings": {
+    "defaultOutput": "Default output",
+    "autoSubtitles": "Auto-generate subtitles",
+    "autoSummaries": "Auto-generate summaries",
+    "saveNotes": "Save notes by default"
+  },
+  "profile": {
+    "name": "Name",
+    "email": "Email",
+    "saved": "Changes saved."
+  },
+  "modal": {
+    "logoutTitle": "Log out of Vidora?",
+    "logoutText": "You can come back anytime by signing in again."
+  },
+  "toast": {
+    "translationStarted": "Translation started",
+    "retryQueued": "Retry queued",
+    "moreActions": "More actions opened",
+    "videoOpened": "Video opened",
+    "noteOpened": "Note opened",
+    "profileSaved": "Profile saved",
+    "paymentOpened": "Payment form opened",
+    "invoiceDownloaded": "Invoice downloaded",
+    "supportSent": "Support message sent",
+    "deleteRequested": "Delete account requested"
+  }
+}
