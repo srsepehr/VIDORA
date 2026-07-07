@@ -28,6 +28,7 @@ import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } fro
 import { Card } from "@/components/ui/heroui-card";
 import { SignInPage } from "@/components/ui/sign-in";
 import { SignUpPage } from "@/components/ui/sign-up";
+import { LibraryPage, WatchPage } from "./library.jsx";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -7842,7 +7843,7 @@ function EditorialHeader() {
         {!isMobile ? (
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             {links.map((label, i) => (
-              <Button key={i} variant="ghost" onClick={(e) => e.preventDefault()}>{label}</Button>
+              <Button key={i} variant="ghost" onClick={(e) => { e.preventDefault(); if (i === 1) window.location.hash = "#/library"; }}>{label}</Button>
             ))}
             <div style={{ width: 8 }} />
             <LanguageToggle />
@@ -7885,7 +7886,7 @@ function EditorialHeader() {
         >
           <div style={{ display: "grid", gap: 8 }}>
             {links.map((label, i) => (
-              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start" }} onClick={() => setOpen(false)}>
+              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start" }} onClick={() => { setOpen(false); if (i === 1) window.location.hash = "#/library"; }}>
                 {label}
               </Button>
             ))}
@@ -8824,7 +8825,13 @@ function LoginPage() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     console.log("Sign In submitted:", data);
-    window.location.hash = "#/dashboard";
+    // Mock session: signing in grants full library access, and honors a
+    // ?redirect=/watch/[slug] param so gated videos resume where the user was.
+    try {
+      window.localStorage.setItem("vidora-viewer", "subscriber");
+    } catch (e) {/* ignore */}
+    const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
+    window.location.hash = redirect ? `#${redirect}` : "#/dashboard";
   };
 
   return (
@@ -8887,6 +8894,8 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
+  if (hash.startsWith("#/library")) return <LibraryPage />;
+  if (hash.startsWith("#/watch/")) return <WatchPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;

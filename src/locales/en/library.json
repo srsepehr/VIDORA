@@ -1,0 +1,102 @@
+{
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "categories": "Categories",
+    "new": "New",
+    "myList": "My List",
+    "login": "Log in",
+    "search": "Search",
+    "menu": "Menu",
+    "close": "Close"
+  },
+  "hero": {
+    "label": "Featured Learning Video",
+    "watch": "Watch",
+    "save": "Save",
+    "saved": "Saved",
+    "preview": "Preview",
+    "slide": "Slide {n}"
+  },
+  "trending": {
+    "title": "Trending Now",
+    "filters": { "popular": "Popular", "new": "New", "featured": "Featured" },
+    "more": "More",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "categories": {
+    "all": "All",
+    "ai": "Artificial Intelligence",
+    "aiShort": "AI",
+    "startup": "Startups",
+    "business": "Business",
+    "tech": "Technology",
+    "biography": "Biography",
+    "companies": "Company Stories",
+    "product": "Product Design",
+    "language": "Language Learning",
+    "worldnews": "World News",
+    "science": "Science"
+  },
+  "types": {
+    "all": "All",
+    "course": "Courses",
+    "interview": "Interviews",
+    "documentary": "Documentaries",
+    "news": "News",
+    "biography": "Biographies"
+  },
+  "library": {
+    "title": "Library",
+    "searchPlaceholder": "Search videos",
+    "loadMore": "Load More",
+    "emptyCategory": "No videos in this category yet.",
+    "emptySearch": "No videos match your search.",
+    "error": "We couldn't load the videos.",
+    "retry": "Try again"
+  },
+  "sort": {
+    "newest": "Newest",
+    "popular": "Most popular",
+    "views": "Most viewed",
+    "alpha": "A–Z",
+    "allDurations": "All durations",
+    "under15": "Under 15 min",
+    "d15to30": "15–30 min",
+    "d30to60": "30–60 min",
+    "over60": "Over 60 min"
+  },
+  "access": { "free": "Free", "preview": "Preview", "subscription": "Subscription" },
+  "card": {
+    "minutes": "{minutes} min",
+    "views": "{count}K views",
+    "watching": "Continue watching",
+    "save": "Save",
+    "unsave": "Remove from saved",
+    "play": "Play"
+  },
+  "banner": {
+    "tabs": { "overview": "Overview", "chapters": "Chapters", "similar": "Similar" }
+  },
+  "similar": { "title": "Similar Videos" },
+  "watch": {
+    "back": "Library",
+    "about": "About this video",
+    "chapters": "Chapters",
+    "includes": "Includes",
+    "subtitles": "Persian subtitles",
+    "transcript": "Transcript",
+    "summary": "Smart summary",
+    "playPreview": "Play preview",
+    "playing": "Playing…",
+    "guestGate": "Sign in to watch the full video.",
+    "guestCta": "Log in or sign up",
+    "memberGate": "Get a subscription to watch this full video.",
+    "memberCta": "View plans",
+    "previewNote": "You're watching a preview. The full video requires an account.",
+    "loginToSave": "Sign in to save videos.",
+    "savedToast": "Added to your list",
+    "unsavedToast": "Removed from your list"
+  }
+}
