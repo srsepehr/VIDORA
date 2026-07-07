@@ -6,15 +6,12 @@ import {
   Download,
   Gauge,
   Heart,
-  HelpCircle,
-  Home,
   Library,
   Link2,
   LogOut,
   MessageCircle,
   MoreHorizontal,
   Search,
-  Settings,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -8337,15 +8334,6 @@ const dashboardViewAliases = {
   billing: "subscription",
 };
 
-const dockItems = [
-  { icon: Home, labelKey: "dashboard", view: "dashboard" },
-  { icon: Upload, labelKey: "newVideo", view: "new-video" },
-  { icon: Library, labelKey: "library", view: "library" },
-  { icon: Heart, labelKey: "saved", view: "saved" },
-  { icon: HelpCircle, labelKey: "support", view: "support" },
-  { icon: Settings, labelKey: "settings", view: "settings", bottom: true },
-];
-
 const sidebarGroups = [
   {
     labelKey: "primary",
@@ -8422,7 +8410,7 @@ function VidoraDashboard() {
     return dashboardViews.has(view) ? view : "dashboard";
   };
   const [activeView, setActiveView] = React.useState(getInitialView);
-  const [showLinkInput, setShowLinkInput] = React.useState(false);
+  const [selectedFileName, setSelectedFileName] = React.useState("");
   const [youtubeUrl, setYoutubeUrl] = React.useState("");
   const [videoFilter, setVideoFilter] = React.useState("All");
   const [noteQuery, setNoteQuery] = React.useState("");
@@ -8451,7 +8439,10 @@ function VidoraDashboard() {
   };
 
   const openFilePicker = () => fileInputRef.current?.click();
+  const canStartTranslation = Boolean(selectedFileName || youtubeUrl.trim());
+
   const startTranslation = () => {
+    if (!canStartTranslation) return;
     setTranslationStarted(true);
     showToast(t.toast.translationStarted);
   };
@@ -8472,14 +8463,39 @@ function VidoraDashboard() {
     <div className={`vd-drop ${large ? "is-large" : ""}`}>
       <div>
         <span className="vd-drop-icon"><Upload size={26} strokeWidth={1.7} /></span>
-        <h3>{t.upload.drop}</h3>
+        <h3>{t.upload.fileTitle}</h3>
+        <p>{t.upload.fileText}</p>
         <p>{t.upload.formats}</p>
         <div className="vd-actions">
           <button className="vd-primary" onClick={openFilePicker}><Upload size={17} /> {t.actions.uploadVideo}</button>
-          <button className="vd-secondary" onClick={() => setShowLinkInput((value) => !value)}><Link2 size={17} /> {t.actions.pasteYoutube}</button>
         </div>
+        {selectedFileName ? <p className="vd-selected-file">{selectedFileName}</p> : null}
       </div>
     </div>
+  );
+
+  const renderYoutubeSection = () => (
+    <section className="vd-youtube-section">
+      <div className="vd-youtube-copy">
+        <span className="vd-inline-icon"><Link2 size={18} /></span>
+        <div>
+          <h3>{t.upload.youtubeTitle}</h3>
+          <p>{t.upload.youtubeText}</p>
+        </div>
+      </div>
+      <input className="vd-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} type="url" placeholder={t.upload.youtubePlaceholder} />
+    </section>
+  );
+
+  const renderTranslationPanel = (large = false) => (
+    <article className="vd-card vd-upload">
+      <div className="vd-upload-head"><div><h2>{t.dashboard.startTitle}</h2><p>{t.dashboard.startText}</p></div></div>
+      <p className="vd-helper">{t.upload.autoHelper}</p>
+      {renderDropzone(large)}
+      {renderYoutubeSection()}
+      <button className="vd-primary vd-start vd-start-full" disabled={!canStartTranslation} onClick={startTranslation}>{translationStarted ? t.actions.startingTranslation : t.actions.startTranslation}</button>
+      {translationStarted ? <p className="vd-success"><CheckCircle2 size={16} /> {t.upload.started}</p> : null}
+    </article>
   );
 
   const videoMeta = (video) => {
@@ -8505,9 +8521,7 @@ function VidoraDashboard() {
   const renderDashboard = () => (
     <>
       <div className="vd-top-grid">
-        <div className="vd-stats three">
-          <article className="vd-card vd-stat"><span>{t.dashboard.videosUploaded}</span><strong>24</strong></article>
-          <article className="vd-card vd-stat"><span>{t.dashboard.readyTranslations}</span><strong>18</strong></article>
+        <div className="vd-stats single">
           <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>720</strong></article>
         </div>
         <aside className="vd-card vd-plan-card">
@@ -8519,28 +8533,14 @@ function VidoraDashboard() {
           <button className="vd-secondary" onClick={() => selectView("subscription")}>{t.actions.manageSubscription}</button>
         </aside>
       </div>
-      <article className="vd-card vd-upload">
-        <div className="vd-upload-head"><div><h2>{t.dashboard.startTitle}</h2><p>{t.dashboard.startText}</p></div></div>
-        {renderDropzone()}
-        {showLinkInput ? <div className="vd-link-input"><input value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} type="url" placeholder={t.upload.youtubePlaceholder} /><button className="vd-primary" onClick={startTranslation}>{t.actions.start}</button></div> : null}
-      </article>
+      {renderTranslationPanel()}
       <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2><div className="vd-video-list">{recentVideos.map(renderVideoRow)}</div></section>
     </>
   );
 
   const renderNewTranslation = () => (
-    <section className="vd-card vd-upload vd-wide">
-      {renderDropzone(true)}
-      <div className="vd-form-grid">
-        <label>{t.upload.source}<select className="vd-input" defaultValue="Auto-detect"><option value="Auto-detect">{t.upload.auto}</option><option value="English">{t.upload.english}</option></select></label>
-        <label>{t.upload.output}<select className="vd-input" defaultValue="Persian"><option value="Persian">{t.upload.persian}</option><option value="English">{t.upload.english}</option></select></label>
-      </div>
-      <div className="vd-link-input"><input value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} type="url" placeholder={t.upload.youtubePlaceholder} /><button className="vd-secondary" onClick={() => setYoutubeUrl("")}>{t.actions.clear}</button></div>
-      <div className="vd-toggle-grid">
-        {[t.upload.subtitles, t.upload.summary, t.upload.notes].map((label) => <label className="vd-toggle is-on" key={label}><span />{label}</label>)}
-      </div>
-      <button className="vd-primary vd-start" onClick={startTranslation}>{t.actions.startTranslation}</button>
-      {translationStarted ? <p className="vd-success"><CheckCircle2 size={16} /> {t.upload.started}</p> : null}
+    <section className="vd-wide">
+      {renderTranslationPanel(true)}
     </section>
   );
 
@@ -8636,40 +8636,29 @@ function VidoraDashboard() {
     <main className={`vd-page ${isFa ? "is-fa" : ""}`}>
       <style dangerouslySetInnerHTML={{ __html: `
         .vd-page{min-height:100vh;background:radial-gradient(circle at 14% 8%,rgba(255,255,255,.7),transparent 32%),linear-gradient(135deg,#d8d8d5 0%,#c4c5c1 48%,#dededb 100%);display:flex;align-items:center;justify-content:center;padding:32px;font-family:var(--font-sans);color:#111;overflow:hidden}
-        .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:88px 310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden}
-        .vd-dock{border-radius:24px;background:rgba(247,248,245,.4);border:1px solid rgba(255,255,255,.48);box-shadow:inset 0 1px 0 rgba(255,255,255,.44),0 18px 38px rgba(35,35,33,.1);display:flex;flex-direction:column;align-items:center;padding:16px 10px;gap:10px}.vd-mark{width:52px;height:62px;border-radius:18px;background:#1f1f1f;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 24px rgba(0,0,0,.16);margin-bottom:12px}.vd-mark span{font-size:34px;font-weight:200;line-height:1}.vd-dock-btn{width:50px;height:50px;border:0;background:transparent;color:#3d3e3c;border-radius:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s ease,color .18s ease,transform .18s ease}.vd-dock-btn:hover{background:rgba(255,255,255,.42);transform:translateY(-1px)}.vd-dock-btn.is-active{background:#202020;color:#fff;box-shadow:0 14px 24px rgba(0,0,0,.16)}.vd-dock-spacer{flex:1}
-        .vd-sidebar{border-radius:28px;background:rgba(243,244,241,.55);border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:24px 20px;overflow:auto}.vd-user{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:14px;margin-bottom:24px;text-align:left;cursor:pointer;color:#111}.is-fa .vd-user{text-align:right}.vd-avatar{width:54px;height:54px;border-radius:999px;background:linear-gradient(145deg,#fafafa,#d9dad6);border:1px solid rgba(255,255,255,.7);box-shadow:0 10px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#202020}.vd-avatar.large{width:82px;height:82px;font-size:30px}.vd-user h2{margin:0;font-size:19px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6d6f6b;font-size:14px}.vd-section{padding:14px 0}.vd-section+.vd-section{border-top:1px solid rgba(30,30,28,.1)}.vd-label{font-size:12px;color:#858782;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+        .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden}
+        .vd-sidebar{border-radius:28px;background:rgba(243,244,241,.55);border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:24px 20px;overflow:auto;display:flex;flex-direction:column}.vd-user{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:14px;margin-bottom:24px;text-align:left;cursor:pointer;color:#111}.vd-sidebar-profile{margin-top:auto;margin-bottom:0;border-top:1px solid rgba(30,30,28,.1);padding:18px 13px 0}.vd-sidebar-profile>div:nth-child(2){min-width:0;flex:1}.vd-sidebar-profile svg{color:#696b67;flex:0 0 auto}.is-fa .vd-user{text-align:right}.vd-avatar{width:54px;height:54px;border-radius:999px;background:linear-gradient(145deg,#fafafa,#d9dad6);border:1px solid rgba(255,255,255,.7);box-shadow:0 10px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#202020;flex:0 0 auto}.vd-avatar.large{width:82px;height:82px;font-size:30px}.vd-user h2{margin:0;font-size:19px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6d6f6b;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vd-section{padding:14px 0}.vd-section+.vd-section{border-top:1px solid rgba(30,30,28,.1)}.vd-label{font-size:12px;color:#858782;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
         .vd-nav-list{display:grid;gap:5px}.vd-nav-item{height:44px;width:100%;border:0;border-radius:14px;background:transparent;color:#191a18;display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:12px;padding:0 13px;text-align:left;font-size:14px;font-weight:650;cursor:pointer;letter-spacing:0;transition:background .18s ease,box-shadow .18s ease}.is-fa .vd-nav-item{text-align:right}.vd-nav-item svg{color:#2d2e2c}.vd-nav-item:hover{background:rgba(255,255,255,.32)}.vd-nav-item.is-active{height:50px;border:1px solid rgba(255,255,255,.62);background:rgba(255,255,255,.42);box-shadow:0 14px 28px rgba(110,114,109,.18),inset 0 1px 0 rgba(255,255,255,.66)}.vd-count{min-width:26px;height:24px;border-radius:999px;background:rgba(255,255,255,.45);display:inline-flex;align-items:center;justify-content:center;color:#777976;font-size:12px;font-weight:750}
-        .vd-main{border-radius:30px;background:rgba(241,242,239,.52);border:1px solid rgba(255,255,255,.52);box-shadow:inset 0 1px 0 rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:38px;overflow:auto}.vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:24px}.vd-head h1{margin:0;font-size:42px;line-height:1.05;font-weight:720;letter-spacing:0;color:#101010}.vd-head p{margin:10px 0 0;color:#727570;font-size:17px;line-height:1.45;max-width:720px}
-        .vd-card{border-radius:22px;border:1px solid rgba(255,255,255,.56);background:rgba(255,255,255,.34);box-shadow:0 16px 42px rgba(65,66,62,.1),inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.vd-top-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.42fr);gap:18px;margin-bottom:20px}.vd-stats{display:grid;gap:16px}.vd-stats.three{grid-template-columns:repeat(3,1fr)}.vd-stats.two{grid-template-columns:repeat(2,1fr)}.vd-stat{min-height:132px;padding:22px}.vd-stat span{display:block;color:#555854;font-size:13px;font-weight:750;letter-spacing:.01em}.vd-stat strong{display:block;font-size:50px;line-height:.95;font-weight:560;letter-spacing:-.03em;margin-top:22px;color:#222321}
+        .vd-main{border-radius:30px;background:rgba(241,242,239,.52);border:1px solid rgba(255,255,255,.52);box-shadow:inset 0 1px 0 rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:38px;overflow:auto}.vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:24px}.vd-head h1{margin:0;font-size:42px;line-height:1.05;font-weight:720;letter-spacing:0;color:#101010}.vd-head p{margin:10px 0 0;color:#727570;font-size:17px;line-height:1.45;max-width:720px}.is-fa .vd-head,.is-fa .vd-head p,.is-fa .vd-head h1{text-align:right}
+        .vd-card{border-radius:22px;border:1px solid rgba(255,255,255,.56);background:rgba(255,255,255,.34);box-shadow:0 16px 42px rgba(65,66,62,.1),inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.vd-top-grid{display:grid;grid-template-columns:minmax(220px,.34fr) minmax(320px,1fr);gap:18px;margin-bottom:20px}.vd-stats{display:grid;gap:16px}.vd-stats.single{grid-template-columns:1fr}.vd-stats.three{grid-template-columns:repeat(3,1fr)}.vd-stats.two{grid-template-columns:repeat(2,1fr)}.vd-stat{min-height:132px;padding:22px}.vd-stat span{display:block;color:#555854;font-size:13px;font-weight:750;letter-spacing:.01em}.vd-stat strong{display:block;font-size:50px;line-height:.95;font-weight:560;letter-spacing:-.03em;margin-top:22px;color:#222321}
         .vd-plan-card,.vd-upload,.vd-recent,.vd-profile{padding:24px}.vd-plan-card{display:grid;gap:15px}.vd-plan-card h2,.vd-upload h2,.vd-recent h2,.vd-profile h2{margin:0;color:#151515;font-size:22px;line-height:1.15}.vd-plan-line{display:flex;justify-content:space-between;gap:16px;color:#6f716d;font-size:14px}.vd-plan-line strong{color:#171817}.vd-meter{height:8px;border-radius:999px;background:rgba(0,0,0,.1);overflow:hidden}.vd-meter span{display:block;width:64%;height:100%;background:#202020;border-radius:inherit}
-        .vd-upload{margin-bottom:22px}.vd-wide{margin-bottom:0}.vd-upload-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}.vd-upload p,.vd-muted{margin:8px 0 0;color:#6d706c;font-size:15px;line-height:1.65;max-width:680px}.vd-drop{min-height:184px;border:1.5px dashed rgba(35,35,33,.24);border-radius:22px;background:rgba(255,255,255,.22);display:grid;place-items:center;text-align:center;padding:28px}.vd-drop.is-large{min-height:260px}.vd-drop-icon{width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.58);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;color:#1f1f1f}.vd-drop h3{margin:0;font-size:18px}.vd-drop p{margin:6px 0 0;color:#777a76;font-size:13px}.vd-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;justify-content:center}.vd-primary,.vd-secondary,.vd-open{border-radius:13px;border:1px solid transparent;font-weight:720;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer}.vd-primary,.vd-secondary{height:42px;padding:0 15px}.vd-primary{background:#1f1f1f;color:#fff;box-shadow:0 12px 22px rgba(0,0,0,.13)}.vd-secondary,.vd-open{background:rgba(255,255,255,.42);border-color:rgba(35,35,35,.14);color:#151515}.vd-open{height:34px;padding:0 13px}.vd-secondary.danger{color:#3a1717}.vd-link-input{margin-top:16px;display:flex;gap:10px}.vd-input,.vd-link-input input,.vd-controls input{height:42px;flex:1;min-width:0;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.42);padding:0 14px;font:inherit;outline:none;color:#151515}.vd-textarea{height:124px;padding:12px 14px;resize:vertical}.vd-start{margin-top:18px}.vd-success{display:flex;align-items:center;gap:8px;margin:14px 0 0;color:#2f4035;font-weight:700;font-size:14px}
+        .vd-upload{margin-bottom:22px}.vd-wide{margin-bottom:0}.vd-upload-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}.vd-upload p,.vd-muted{margin:8px 0 0;color:#6d706c;font-size:15px;line-height:1.65;max-width:680px}.vd-helper{margin:0 0 18px!important;color:#5f625e!important}.vd-drop{min-height:184px;border:1.5px dashed rgba(35,35,33,.24);border-radius:22px;background:rgba(255,255,255,.22);display:grid;place-items:center;text-align:center;padding:28px}.vd-drop.is-large{min-height:260px}.vd-drop-icon{width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.58);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;color:#1f1f1f}.vd-drop h3{margin:0;font-size:18px}.vd-drop p{margin:6px auto 0;color:#777a76;font-size:13px}.vd-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;justify-content:center}.vd-selected-file{font-weight:720;color:#232421!important}.vd-youtube-section{margin-top:14px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.24);padding:16px;display:grid;grid-template-columns:minmax(220px,.46fr) minmax(0,1fr);gap:14px;align-items:center}.vd-youtube-copy{display:flex;align-items:center;gap:12px}.vd-inline-icon{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.42);border:1px solid rgba(35,35,35,.1);display:inline-flex;align-items:center;justify-content:center;color:#202020;flex:0 0 auto}.vd-youtube-copy h3{margin:0;font-size:16px}.vd-youtube-copy p{margin:4px 0 0;font-size:13px;color:#777a76}.vd-primary,.vd-secondary,.vd-open{border-radius:13px;border:1px solid transparent;font-weight:720;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer}.vd-primary,.vd-secondary{height:42px;padding:0 15px}.vd-primary{background:#1f1f1f;color:#fff;box-shadow:0 12px 22px rgba(0,0,0,.13)}.vd-primary:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}.vd-secondary,.vd-open{background:rgba(255,255,255,.42);border-color:rgba(35,35,35,.14);color:#151515}.vd-open{height:34px;padding:0 13px}.vd-secondary.danger{color:#3a1717}.vd-link-input{margin-top:16px;display:flex;gap:10px}.vd-input,.vd-link-input input,.vd-controls input{height:42px;flex:1;min-width:0;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.42);padding:0 14px;font:inherit;outline:none;color:#151515}.is-fa .vd-input,.is-fa .vd-link-input input,.is-fa .vd-controls input{text-align:right}.vd-textarea{height:124px;padding:12px 14px;resize:vertical}.vd-start{margin-top:18px}.vd-start-full{width:100%;height:46px}.vd-success{display:flex;align-items:center;gap:8px;margin:14px 0 0;color:#2f4035;font-weight:700;font-size:14px}
         .vd-video-list{display:grid;gap:10px;margin-top:16px}.vd-video{min-height:74px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.28);display:grid;grid-template-columns:62px minmax(0,1fr) auto auto auto;align-items:center;gap:12px;padding:12px}.vd-thumb{width:62px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2c2d2d,#777872);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}.vd-thumb.wide{width:100%;height:120px}.vd-video h3,.vd-mini-card h3{margin:0;font-size:16px;line-height:1.2}.vd-video p,.vd-mini-card p{margin:5px 0 0;color:#747672;font-size:13px}.vd-video-meta{font-size:12px!important;color:#8a8c88!important}.vd-status{height:28px;border-radius:999px;padding:0 10px;background:rgba(255,255,255,.42);display:flex;align-items:center;font-size:12px;font-weight:750;color:#555754}.vd-status.is-ready{color:#263529}.vd-status.is-processing{color:#4d4c43}.vd-status.is-failed{color:#553333}.vd-icon-action{width:34px;height:34px;border-radius:10px;border:1px solid rgba(30,30,28,.14);background:rgba(255,255,255,.28);display:grid;place-items:center;cursor:pointer;color:#191919}
         .vd-controls{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.vd-controls label{height:42px;min-width:250px;display:flex;align-items:center;gap:9px;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.34);padding:0 12px}.vd-controls input{border:0;background:transparent;padding:0}.vd-controls div{display:flex;gap:8px}.vd-controls button{height:36px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.28);padding:0 13px;font-weight:700;cursor:pointer}.vd-controls button.is-active{background:#202020;color:#fff}.vd-form-grid,.vd-toggle-grid,.vd-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.vd-form-grid label{display:grid;gap:8px;color:#555854;font-weight:700;font-size:13px}.vd-toggle{height:44px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.32);display:flex;align-items:center;gap:10px;padding:0 14px;font-weight:720;color:#202020}.vd-toggle span{width:24px;height:24px;border-radius:999px;background:#202020;box-shadow:inset 0 0 0 7px #fff}.vd-mini-card,.vd-plan-option{padding:18px;border-radius:18px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}.vd-tags{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}.vd-tags span{height:26px;border-radius:999px;background:rgba(255,255,255,.45);padding:0 9px;display:inline-flex;align-items:center;font-size:12px;font-weight:700;color:#555854}.vd-empty{min-height:360px;display:grid;place-items:center;text-align:center;padding:44px}.vd-empty h2{margin:12px 0 0}.vd-empty p{margin:6px 0 0;color:#70736f}.vd-note-date{font-size:12px;color:#777a76}.vd-mini-card blockquote{margin:14px 0;color:#31322f;line-height:1.6}.vd-profile{display:grid;gap:18px}.vd-profile-head{display:flex;align-items:center;gap:18px}.vd-plan-option{display:grid;gap:12px}.vd-plan-option strong{font-size:38px;font-weight:560}.vd-plan-option.is-current{box-shadow:0 18px 38px rgba(65,66,62,.12),inset 0 0 0 1px rgba(0,0,0,.08)}.vd-view-stack{display:grid;gap:18px}.vd-table{display:grid;gap:8px;margin-top:16px}.vd-table>div{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:center;border-radius:14px;background:rgba(255,255,255,.28);padding:10px 12px;color:#555854;font-size:14px}.vd-support-card{width:100%;min-height:90px;border:1px solid rgba(255,255,255,.55);cursor:pointer;display:flex;align-items:center;gap:12px;color:#171817;font-weight:750}.vd-danger-zone{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(35,35,35,.1);padding-top:18px}
         .vd-modal{position:fixed;inset:0;background:rgba(30,31,29,.28);display:grid;place-items:center;z-index:50}.vd-modal-card{width:min(420px,calc(100% - 32px));border-radius:24px;border:1px solid rgba(255,255,255,.58);background:rgba(242,243,240,.9);box-shadow:0 28px 80px rgba(0,0,0,.2);padding:24px;backdrop-filter:blur(18px)}.vd-modal-card h2{margin:0;font-size:24px}.vd-modal-card p{color:#666965;line-height:1.6}.vd-modal-actions{display:flex;justify-content:flex-end;gap:10px}.vd-toast{position:fixed;right:34px;bottom:34px;border-radius:15px;background:#202020;color:#fff;padding:12px 16px;font-weight:720;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:60}
-        @media(max-width:1180px){.vd-page{padding:18px;overflow:auto}.vd-shell{height:auto;min-height:0;grid-template-columns:78px minmax(250px,300px);overflow:visible}.vd-main{grid-column:1/-1}.vd-top-grid{grid-template-columns:1fr}.vd-stats.three{grid-template-columns:repeat(3,1fr)}}
-        @media(max-width:760px){.vd-page{align-items:flex-start;padding:10px}.vd-shell{grid-template-columns:1fr;padding:10px;border-radius:26px}.vd-dock{display:none}.vd-sidebar{border-radius:22px;padding:18px}.vd-main{border-radius:22px;padding:22px}.vd-head{display:block}.vd-head h1{font-size:34px}.vd-head p{font-size:16px}.vd-stats,.vd-stats.three,.vd-stats.two,.vd-form-grid,.vd-toggle-grid,.vd-card-grid{grid-template-columns:1fr}.vd-upload-head{display:block}.vd-video{grid-template-columns:54px minmax(0,1fr);align-items:start}.vd-status,.vd-open,.vd-icon-action{justify-self:start}.vd-link-input,.vd-controls{display:grid}.vd-table>div{grid-template-columns:1fr}.vd-profile-head{align-items:flex-start}.vd-controls label{min-width:0}}
+        @media(max-width:1180px){.vd-page{padding:18px;overflow:auto}.vd-shell{height:auto;min-height:0;grid-template-columns:minmax(250px,300px) minmax(0,1fr);overflow:visible}.vd-top-grid{grid-template-columns:1fr}.vd-stats.three{grid-template-columns:repeat(3,1fr)}}
+        @media(max-width:760px){.vd-page{align-items:flex-start;padding:10px}.vd-shell{grid-template-columns:1fr;padding:10px;border-radius:26px}.vd-sidebar{border-radius:22px;padding:18px;min-height:440px}.vd-main{border-radius:22px;padding:22px}.vd-head{display:block}.vd-head h1{font-size:34px}.vd-head p{font-size:16px}.vd-stats,.vd-stats.three,.vd-stats.two,.vd-form-grid,.vd-toggle-grid,.vd-card-grid,.vd-youtube-section{grid-template-columns:1fr}.vd-upload-head{display:block}.vd-video{grid-template-columns:54px minmax(0,1fr);align-items:start}.vd-status,.vd-open,.vd-icon-action{justify-self:start}.vd-link-input,.vd-controls{display:grid}.vd-table>div{grid-template-columns:1fr}.vd-profile-head{align-items:flex-start}.vd-controls label{min-width:0}}
       ` }} />
       <section className="vd-shell" aria-label="Vidora dashboard">
-        <aside className="vd-dock">
-          <div className="vd-mark" aria-label="Vidora"><span>*</span></div>
-          {dockItems.filter((item) => !item.bottom).map((item) => {
-            const DockIcon = item.icon;
-            return <button className={`vd-dock-btn ${activeView === item.view ? "is-active" : ""}`} key={item.labelKey} title={t.dock[item.labelKey]} aria-label={t.dock[item.labelKey]} onClick={() => selectView(item.view)}><DockIcon size={24} strokeWidth={1.8} /></button>;
-          })}
-          <div className="vd-dock-spacer" />
-          {dockItems.filter((item) => item.bottom).map((item) => {
-            const DockIcon = item.icon;
-            return <button className={`vd-dock-btn ${activeView === item.view ? "is-active" : ""}`} key={item.labelKey} title={t.dock[item.labelKey]} aria-label={t.dock[item.labelKey]} onClick={() => selectView(item.view)}><DockIcon size={24} strokeWidth={1.8} /></button>;
-          })}
-        </aside>
-
         <aside className="vd-sidebar" dir={isFa ? "rtl" : "ltr"}>
-          <button className="vd-user" onClick={() => selectView("profile")}>
+          <div>
+            {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
+          </div>
+          <button className="vd-user vd-sidebar-profile" onClick={() => selectView("profile")}>
             <div className="vd-avatar">S</div>
             <div><h2>Sepehr</h2><p>sepehrrahimpour8@gmail.com</p></div>
+            <MoreHorizontal size={17} />
           </button>
-          {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
         </aside>
 
         <section className="vd-main" dir={isFa ? "rtl" : "ltr"}>
@@ -8677,7 +8666,7 @@ function VidoraDashboard() {
           {renderActiveView()}
         </section>
       </section>
-      <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" hidden />
+      <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name || "")} hidden />
       {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={() => { setLogoutConfirm(false); window.location.hash = "#/login"; }}>{t.actions.logout}</button></div></div></div> : null}
       {toast ? <div className="vd-toast">{toast}</div> : null}
     </main>
