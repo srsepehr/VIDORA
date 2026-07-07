@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "title": "کتابخانه Vidora"
+  },
+  "nav": {
+    "home": "خانه",
+    "library": "کتابخانه",
+    "categories": "دسته‌بندی‌ها",
+    "new": "تازه‌ها",
+    "myList": "فهرست من",
+    "login": "ورود",
+    "profile": "پروفایل",
+    "notifications": "اعلان‌ها",
+    "openMenu": "باز کردن منو",
+    "closeMenu": "بستن منو"
+  },
+  "hero": {
+    "eyebrow": "ویدیوی آموزشی ویژه",
+    "watch": "تماشا",
+    "add": "افزودن به فهرست",
+    "liked": "پسندیده‌اند",
+    "slide": "اسلاید ویژه"
+  },
+  "sections": {
+    "trending": "محبوب‌ترین‌های این روزها",
+    "library": "کتابخانه",
+    "recommended": "پیشنهادهای مناسب مسیر یادگیری شما",
+    "secondaryEyebrow": "مجموعه ویژه",
+    "similar": "ویدیوهای مشابه",
+    "continue": "ادامه مرور"
+  },
+  "tabs": {
+    "popular": "محبوب",
+    "recent": "تازه منتشرشده",
+    "featured": "پیشنهاد ویژه"
+  },
+  "categories": {
+    "all": "همه",
+    "ai": "هوش مصنوعی",
+    "startup": "استارتاپ",
+    "business": "کسب‌وکار",
+    "technology": "فناوری",
+    "biography": "زندگی‌نامه",
+    "companies": "داستان شرکت‌ها",
+    "language": "آموزش زبان",
+    "world": "اخبار جهان",
+    "science": "علم",
+    "product": "طراحی محصول"
+  },
+  "types": {
+    "all": "همه",
+    "courses": "دوره‌ها",
+    "interviews": "مصاحبه‌ها",
+    "documentaries": "مستندها",
+    "news": "اخبار",
+    "biographies": "زندگی‌نامه‌ها"
+  },
+  "controls": {
+    "search": "جست‌وجو",
+    "sort": "مرتب‌سازی",
+    "duration": "مدت زمان",
+    "category": "دسته‌بندی",
+    "newest": "جدیدترین",
+    "popular": "محبوب‌ترین",
+    "az": "الفبا",
+    "allDurations": "همه زمان‌ها",
+    "short": "کمتر از ۲۰ دقیقه",
+    "medium": "۲۰ تا ۳۵ دقیقه",
+    "long": "بیشتر از ۳۵ دقیقه",
+    "loadMore": "نمایش بیشتر",
+    "retry": "تلاش دوباره",
+    "previous": "قبلی",
+    "next": "بعدی"
+  },
+  "card": {
+    "save": "ذخیره",
+    "saved": "ذخیره‌شده",
+    "play": "پخش",
+    "openDetails": "جزئیات",
+    "persian": "فارسی",
+    "minutes": "دقیقه",
+    "views": "بازدید",
+    "new": "جدید",
+    "inProgress": "در حال تماشا",
+    "watched": "تماشا شده"
+  },
+  "access": {
+    "free": "رایگان",
+    "preview": "پیش‌نمایش",
+    "subscriber": "اشتراکی",
+    "guestGate": "برای تماشای کامل وارد حساب شوید.",
+    "guestCta": "ورود یا ثبت‌نام",
+    "planGate": "برای تماشای کامل این ویدیو اشتراک تهیه کنید.",
+    "planCta": "مشاهده پلن‌ها",
+    "subscriberReady": "ویدیوی کامل در دسترس است"
+  },
+  "watch": {
+    "back": "بازگشت به کتابخانه",
+    "overview": "معرفی",
+    "chapters": "فصل‌ها",
+    "similar": "ویدیوهای مشابه",
+    "details": "جزئیات",
+    "subtitles": "زیرنویس فارسی",
+    "transcript": "متن کامل",
+    "summary": "خلاصه هوشمند",
+    "keyTakeaways": "نکات کلیدی",
+    "addNotes": "افزودن یادداشت",
+    "playerLabel": "پخش‌کننده ویدیوی ویدورا",
+    "detailsTitle": "ابزارهای یادگیری",
+    "duration": "مدت زمان",
+    "category": "دسته‌بندی",
+    "language": "زبان"
+  },
+  "states": {
+    "emptyCategory": "هنوز ویدیویی در این دسته‌بندی وجود ندارد.",
+    "noResults": "ویدیویی با این جست‌وجو پیدا نشد.",
+    "error": "کتابخانه بارگذاری نشد."
+  }
+}

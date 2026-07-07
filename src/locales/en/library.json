@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "title": "Vidora Library"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "categories": "Categories",
+    "new": "New",
+    "myList": "My List",
+    "login": "Log in",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "hero": {
+    "eyebrow": "Featured learning video",
+    "watch": "Watch",
+    "add": "Add to List",
+    "liked": "liked",
+    "slide": "Featured slide"
+  },
+  "sections": {
+    "trending": "Trending Now",
+    "library": "Library",
+    "recommended": "Recommended for your learning path",
+    "secondaryEyebrow": "Featured series",
+    "similar": "Similar Videos",
+    "continue": "Continue browsing"
+  },
+  "tabs": {
+    "popular": "Popular",
+    "recent": "Recently Added",
+    "featured": "Featured"
+  },
+  "categories": {
+    "all": "All",
+    "ai": "Artificial Intelligence",
+    "startup": "Startup",
+    "business": "Business",
+    "technology": "Technology",
+    "biography": "Biography",
+    "companies": "Company Stories",
+    "language": "Language Learning",
+    "world": "World News",
+    "science": "Science",
+    "product": "Product Design"
+  },
+  "types": {
+    "all": "All",
+    "courses": "Courses",
+    "interviews": "Interviews",
+    "documentaries": "Documentaries",
+    "news": "News",
+    "biographies": "Biographies"
+  },
+  "controls": {
+    "search": "Search videos",
+    "sort": "Sort",
+    "duration": "Duration",
+    "category": "Category",
+    "newest": "Newest",
+    "popular": "Most viewed",
+    "az": "A-Z",
+    "allDurations": "All durations",
+    "short": "Under 20 min",
+    "medium": "20-35 min",
+    "long": "35+ min",
+    "loadMore": "Load more",
+    "retry": "Try again",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "card": {
+    "save": "Save",
+    "saved": "Saved",
+    "play": "Play",
+    "openDetails": "Open details",
+    "persian": "Persian",
+    "minutes": "min",
+    "views": "views",
+    "new": "New",
+    "inProgress": "In progress",
+    "watched": "Watched"
+  },
+  "access": {
+    "free": "Free",
+    "preview": "Preview",
+    "subscriber": "Subscription",
+    "guestGate": "Sign in to watch the full video.",
+    "guestCta": "Log in or sign up",
+    "planGate": "Subscribe to watch this full video.",
+    "planCta": "View plans",
+    "subscriberReady": "Full video available"
+  },
+  "watch": {
+    "back": "Back to library",
+    "overview": "Overview",
+    "chapters": "Chapters",
+    "similar": "Similar Videos",
+    "details": "Details",
+    "subtitles": "Persian subtitles",
+    "transcript": "Transcript",
+    "summary": "Smart summary",
+    "keyTakeaways": "Key takeaways",
+    "addNotes": "Add notes",
+    "playerLabel": "Vidora video player",
+    "detailsTitle": "Learning tools",
+    "duration": "Duration",
+    "category": "Category",
+    "language": "Language"
+  },
+  "states": {
+    "emptyCategory": "No videos are available in this category yet.",
+    "noResults": "No videos matched your search.",
+    "error": "We could not load the library."
+  }
+}

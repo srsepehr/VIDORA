@@ -2,23 +2,41 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   BadgeDollarSign,
+  Bell,
+  Bookmark,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
   Download,
+  Filter,
   Gauge,
   Heart,
+  Info,
   Library,
   Link2,
+  ListPlus,
+  Lock,
   LogOut,
+  Menu,
   MessageCircle,
   MoreHorizontal,
+  Play,
+  Plus,
   Search,
+  Star,
   Trash2,
   Upload,
+  User,
+  X,
 } from "lucide-react";
 import "./styles.css";
 import "./tailwind.css";
 import dashboardEn from "./locales/en/dashboard.json";
 import dashboardFa from "./locales/fa/dashboard.json";
+import libraryEn from "./locales/en/library.json";
+import libraryFa from "./locales/fa/library.json";
+import { libraryCategoryIds, libraryTypeIds, libraryVideos } from "./data/library.js";
 import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/heroui-card";
 import { SignInPage } from "@/components/ui/sign-in";
@@ -4862,7 +4880,11 @@ function EditorialHeader() {
   }, [open]);
   const isMobile = vw < 768;
   const floating = scrolled && !open && !isMobile;
-  const links = [d.nav.product, d.nav.library, d.nav.pricing];
+  const links = [
+    { label: d.nav.product, onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+    { label: d.nav.library, onClick: () => { window.location.hash = "#/library"; } },
+    { label: d.nav.pricing, onClick: () => document.querySelector("[data-pricing]")?.scrollIntoView({ behavior: "smooth", block: "start" }) },
+  ];
   const wordmark = /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: "var(--font-sans)",
@@ -7836,8 +7858,8 @@ function EditorialHeader() {
 
         {!isMobile ? (
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {links.map((label, i) => (
-              <Button key={i} variant="ghost" onClick={(e) => e.preventDefault()}>{label}</Button>
+            {links.map((link, i) => (
+              <Button key={i} variant="ghost" onClick={link.onClick}>{link.label}</Button>
             ))}
             <div style={{ width: 8 }} />
             <LanguageToggle />
@@ -7879,9 +7901,9 @@ function EditorialHeader() {
           }}
         >
           <div style={{ display: "grid", gap: 8 }}>
-            {links.map((label, i) => (
-              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start" }} onClick={() => setOpen(false)}>
-                {label}
+            {links.map((link, i) => (
+              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start" }} onClick={() => { setOpen(false); link.onClick(); }}>
+                {link.label}
               </Button>
             ))}
           </div>
@@ -8324,6 +8346,500 @@ function EditorialFooter() {
 
 window.EditorialFooter = EditorialFooter;
 
+const libraryCopy = { en: libraryEn, fa: libraryFa };
+
+function libraryText(value, lang) {
+  if (!value || typeof value !== "object") return value || "";
+  return value[lang] || value.en || value.fa || "";
+}
+
+function libraryAsset(path) {
+  if (!path) return "";
+  if (/^(https?:|data:|blob:)/.test(path)) return path;
+  return `${import.meta.env.BASE_URL || "/"}${String(path).replace(/^\/+/, "")}`;
+}
+
+function libraryDuration(video, lang, t) {
+  const locale = lang === "fa" ? "fa-IR" : "en-US";
+  return `${new Intl.NumberFormat(locale).format(video.durationMinutes)} ${t.card.minutes}`;
+}
+
+function libraryVideoDate(video) {
+  return new Date(video.publishedAt).getTime();
+}
+
+function libraryOpenWatch(slug) {
+  window.location.hash = `#/watch/${slug}`;
+}
+
+function LibraryStyles() {
+  return (
+    <style dangerouslySetInnerHTML={{ __html: `
+      .vl-page{--vl-bg:#0c0c0f;--vl-surface:#141419;--vl-surface-2:#1b1b21;--vl-border:rgba(255,255,255,.08);--vl-border-strong:rgba(255,255,255,.14);--vl-text:#fff;--vl-muted:#a7a7b0;--vl-faint:#74747f;--vl-accent:#7c6cf6;min-height:100vh;background:radial-gradient(circle at 78% 8%,rgba(124,108,246,.16),transparent 26%),linear-gradient(180deg,#0b0b0e 0%,#0c0c0f 44%,#08080a 100%);color:var(--vl-text);font-family:var(--font-sans);direction:ltr;overflow-x:hidden}
+      .vl-page[dir="rtl"]{direction:rtl}.vl-page button,.vl-page input,.vl-page select{font:inherit}.vl-page button{letter-spacing:0}.vl-technical{direction:ltr;text-align:left;unicode-bidi:plaintext}.vl-shell{width:min(1500px,100%);margin:0 auto;padding:0 clamp(16px,3vw,42px)}
+      .vl-header{position:fixed;top:0;inset-inline:0;z-index:80;height:70px;display:flex;align-items:center;background:linear-gradient(180deg,rgba(12,12,15,.72),rgba(12,12,15,0));transition:background .22s ease,border-color .22s ease,backdrop-filter .22s ease}.vl-header.is-scrolled,.vl-header.is-open{background:rgba(12,12,15,.78);border-bottom:1px solid var(--vl-border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.vl-header-inner{width:min(1500px,100%);margin:0 auto;padding:0 clamp(16px,3vw,42px);display:flex;align-items:center;justify-content:space-between;gap:22px}.vl-brand{display:inline-flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:850;letter-spacing:.18em;font-size:17px}.vl-brand-mark{width:26px;height:26px;border-radius:9px;background:#fff;color:#0c0c0f;display:inline-flex;align-items:center;justify-content:center;font-weight:900;letter-spacing:0}.vl-header-nav{display:flex;align-items:center;gap:4px}.vl-header-nav button,.vl-header-action,.vl-icon-btn{height:38px;border-radius:999px;border:1px solid transparent;background:transparent;color:#d6d6dc;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 13px;cursor:pointer;transition:background .18s ease,color .18s ease,border-color .18s ease}.vl-header-nav button:hover,.vl-header-action:hover,.vl-icon-btn:hover{background:rgba(255,255,255,.08);color:#fff}.vl-header-nav button.is-active{color:#fff;background:rgba(124,108,246,.16);border-color:rgba(124,108,246,.28)}.vl-header-actions{display:flex;align-items:center;gap:8px}.vl-header-action.is-primary{background:#fff;color:#0c0c0f;font-weight:800}.vl-mobile-toggle{display:none}.vl-mobile-drawer{position:fixed;top:80px;left:16px;width:min(320px,calc(100vw - 32px));padding:12px;border-radius:22px;border:1px solid var(--vl-border);background:rgba(20,20,25,.92);box-shadow:0 26px 90px rgba(0,0,0,.4);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:none}.vl-page[dir="rtl"] .vl-mobile-drawer{right:16px;left:auto}.vl-mobile-drawer.is-open{display:grid;gap:8px}.vl-mobile-drawer button{height:44px;justify-content:flex-start;border-radius:14px;border:0;background:transparent;color:#fff;padding:0 14px;display:flex;align-items:center;gap:10px;cursor:pointer}.vl-page[dir="rtl"] .vl-mobile-drawer button{justify-content:flex-end}
+      .vl-hero{position:relative;min-height:78vh;padding-top:96px;display:grid;align-items:end;overflow:hidden;background-position:center;background-size:cover}.vl-hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,12,15,.92) 0%,rgba(12,12,15,.56) 36%,rgba(12,12,15,.14) 66%,rgba(12,12,15,.82) 100%)}.vl-hero:after{content:"";position:absolute;inset:auto 0 0;height:34%;background:linear-gradient(180deg,rgba(12,12,15,0),#0c0c0f 82%)}.vl-hero-content{position:relative;z-index:1;width:min(650px,100%);padding:0 0 92px;text-align:left}.vl-page[dir="rtl"] .vl-hero-content{text-align:right;margin-inline-start:auto}.vl-hero-kicker{display:flex;align-items:center;gap:10px;color:#d7d5ff;font-size:13px;font-weight:800;margin-bottom:16px}.vl-page[dir="rtl"] .vl-hero-kicker{justify-content:flex-start;flex-direction:row-reverse}.vl-hero h1{margin:0;font-size:clamp(44px,7vw,94px);line-height:.95;font-weight:850;letter-spacing:0;max-width:12ch}.vl-page[dir="rtl"] .vl-hero h1{line-height:1.18;max-width:10ch}.vl-hero p{margin:22px 0 0;color:#d7d7dd;font-size:clamp(16px,1.6vw,20px);line-height:1.8;max-width:640px}.vl-hero-meta{margin-top:20px;display:flex;flex-wrap:wrap;gap:10px;color:#d0d0d8}.vl-page[dir="rtl"] .vl-hero-meta{justify-content:flex-start;flex-direction:row-reverse}.vl-meta-pill{height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);display:inline-flex;align-items:center;gap:7px;padding:0 11px;font-size:13px;font-weight:750;backdrop-filter:blur(8px)}.vl-hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:28px}.vl-page[dir="rtl"] .vl-hero-actions{justify-content:flex-start;flex-direction:row-reverse}.vl-primary-cta,.vl-secondary-cta{height:48px;border-radius:999px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:0 20px;cursor:pointer;font-weight:850;transition:transform .18s ease,background .18s ease,border-color .18s ease}.vl-primary-cta{background:#fff;color:#0c0c0f}.vl-secondary-cta{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#fff}.vl-primary-cta:hover,.vl-secondary-cta:hover{transform:translateY(-1px)}.vl-slider-dots{display:flex;gap:8px;margin-top:34px}.vl-page[dir="rtl"] .vl-slider-dots{justify-content:flex-start}.vl-slider-dots button{width:30px;height:4px;border:0;border-radius:999px;background:rgba(255,255,255,.28);padding:0;cursor:pointer}.vl-slider-dots button.is-active{background:var(--vl-accent)}
+      .vl-section{position:relative;z-index:2;padding:26px 0}.vl-section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.vl-section-title{margin:0;font-size:clamp(25px,3vw,42px);line-height:1.15;font-weight:820;letter-spacing:0}.vl-page[dir="rtl"] .vl-section-head{text-align:right}.vl-mini-tabs,.vl-chip-row,.vl-type-tabs{display:flex;align-items:center;gap:8px;overflow:auto;scrollbar-width:none}.vl-mini-tabs::-webkit-scrollbar,.vl-chip-row::-webkit-scrollbar,.vl-type-tabs::-webkit-scrollbar{display:none}.vl-mini-tabs button,.vl-chip-row button,.vl-type-tabs button{height:36px;border-radius:999px;border:1px solid var(--vl-border);background:rgba(255,255,255,.04);color:var(--vl-muted);padding:0 13px;white-space:nowrap;cursor:pointer;font-weight:750;font-size:13px}.vl-mini-tabs button.is-active,.vl-chip-row button.is-active,.vl-type-tabs button.is-active{background:var(--vl-accent);border-color:rgba(124,108,246,.8);color:#fff}.vl-chip-row{margin:14px 0 8px}.vl-carousel-wrap{position:relative}.vl-carousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(210px,15vw);gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:8px 2px 18px;scrollbar-width:none}.vl-carousel::-webkit-scrollbar{display:none}.vl-carousel-btn{position:absolute;top:37%;z-index:4;width:42px;height:64px;border-radius:16px;border:1px solid var(--vl-border);background:rgba(12,12,15,.68);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.vl-carousel-btn.prev{left:-12px}.vl-carousel-btn.next{right:-12px}.vl-page[dir="rtl"] .vl-carousel-btn.prev{right:-12px;left:auto}.vl-page[dir="rtl"] .vl-carousel-btn.next{left:-12px;right:auto}
+      .vl-video-card{scroll-snap-align:start;min-width:0;position:relative;border-radius:18px;color:#fff}.vl-card-button{width:100%;border:0;background:transparent;color:inherit;text-align:inherit;padding:0;cursor:pointer}.vl-poster{position:relative;aspect-ratio:3/4;border-radius:18px;overflow:hidden;border:1px solid var(--vl-border);background:#222;box-shadow:0 18px 46px rgba(0,0,0,.28);transform:translateZ(0)}.vl-video-card.is-wide .vl-poster{aspect-ratio:16/9}.vl-poster:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 28% 22%,rgba(255,255,255,.28),transparent 24%),linear-gradient(180deg,rgba(0,0,0,0) 34%,rgba(0,0,0,.74) 100%);opacity:.9;transition:transform .22s ease}.vl-poster:after{content:"";position:absolute;inset:18px;border:1px solid rgba(255,255,255,.12);border-radius:14px;opacity:.7}.vl-card-open:hover .vl-poster:before{transform:scale(1.04)}.vl-play-float{position:absolute;left:14px;bottom:14px;width:42px;height:42px;border-radius:999px;background:rgba(255,255,255,.92);color:#0c0c0f;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 28px rgba(0,0,0,.28);z-index:2}.vl-page[dir="rtl"] .vl-play-float{right:14px;left:auto}.vl-save-btn{position:absolute;top:12px;left:12px;z-index:3;width:38px;height:38px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(12,12,15,.52);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}.vl-save-btn.is-saved{background:rgba(124,108,246,.9);border-color:rgba(124,108,246,.9)}.vl-page[dir="rtl"] .vl-save-btn{right:12px;left:auto}.vl-access{position:absolute;top:12px;right:12px;z-index:3;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(12,12,15,.5);color:#fff;display:inline-flex;align-items:center;gap:6px;padding:0 9px;font-size:11px;font-weight:850;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}.vl-page[dir="rtl"] .vl-access{left:12px;right:auto}.vl-hero-meta .vl-access{position:static!important;inset:auto!important;height:32px;font-size:13px;padding:0 11px}.vl-card-progress{position:absolute;left:14px;right:14px;bottom:70px;height:4px;border-radius:999px;background:rgba(255,255,255,.2);overflow:hidden;z-index:3}.vl-card-progress span{display:block;height:100%;background:var(--vl-accent);border-radius:inherit}.vl-card-body{padding:12px 2px 0}.vl-card-body h3{margin:0;font-size:15px;line-height:1.45;font-weight:820;letter-spacing:0;color:#fff}.vl-card-body p{margin:6px 0 0;color:var(--vl-muted);font-size:12px;line-height:1.55}.vl-card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.vl-page[dir="rtl"] .vl-card-meta{justify-content:flex-start;flex-direction:row-reverse}.vl-dot{width:4px;height:4px;border-radius:999px;background:var(--vl-faint);display:inline-block}
+      .vl-library-panel{margin-top:28px;border-radius:30px;border:1px solid var(--vl-border);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));padding:clamp(16px,2.2vw,28px);box-shadow:0 28px 90px rgba(0,0,0,.2)}.vl-library-top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}.vl-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:10px;align-items:center;margin-top:16px}.vl-search{height:44px;border-radius:999px;border:1px solid var(--vl-border);background:rgba(255,255,255,.055);display:flex;align-items:center;gap:9px;padding:0 14px;color:var(--vl-muted)}.vl-search input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#fff;height:100%}.vl-page[dir="rtl"] .vl-search input{text-align:right}.vl-select{height:44px;border-radius:999px;border:1px solid var(--vl-border);background:#141419;color:#fff;padding:0 14px;outline:0;min-width:150px}.vl-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px 14px;margin-top:24px}.vl-empty{min-height:220px;border-radius:22px;border:1px dashed var(--vl-border-strong);display:grid;place-items:center;text-align:center;color:var(--vl-muted);padding:28px}.vl-empty h3{margin:12px 0 0;color:#fff}.vl-load-more{display:flex;justify-content:center;margin-top:28px}.vl-featured-banner{position:relative;min-height:430px;border-radius:30px;border:1px solid var(--vl-border);overflow:hidden;background-position:center;background-size:cover;margin:34px 0 8px;box-shadow:0 30px 100px rgba(0,0,0,.28)}.vl-featured-banner:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,12,15,.9),rgba(12,12,15,.52) 50%,rgba(12,12,15,.16)),linear-gradient(180deg,rgba(0,0,0,0),rgba(12,12,15,.72))}.vl-page[dir="rtl"] .vl-featured-banner:before{background:linear-gradient(270deg,rgba(12,12,15,.9),rgba(12,12,15,.52) 50%,rgba(12,12,15,.16)),linear-gradient(180deg,rgba(0,0,0,0),rgba(12,12,15,.72))}.vl-banner-content{position:relative;z-index:1;width:min(570px,100%);padding:clamp(24px,4vw,52px);text-align:left}.vl-page[dir="rtl"] .vl-banner-content{text-align:right;margin-inline-start:auto}.vl-eyebrow{display:inline-flex;align-items:center;gap:8px;color:#d7d5ff;font-size:13px;font-weight:850;margin-bottom:12px}.vl-banner-content h2{font-size:clamp(34px,4.6vw,66px);line-height:1.05;margin:0}.vl-page[dir="rtl"] .vl-banner-content h2{line-height:1.2}.vl-banner-content p{color:#d4d4dc;line-height:1.8;font-size:16px;margin:16px 0 0}.vl-banner-tabs{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}.vl-page[dir="rtl"] .vl-banner-tabs{flex-direction:row-reverse}.vl-banner-tabs button{height:34px;border-radius:999px;border:1px solid var(--vl-border);background:rgba(255,255,255,.06);color:var(--vl-muted);padding:0 12px;cursor:pointer}.vl-banner-tabs button.is-active{background:rgba(255,255,255,.92);color:#111}.vl-banner-note{min-height:44px;margin-top:14px;color:#e8e8ee}
+      .vl-footer-continuation{padding:34px 0 54px;color:var(--vl-muted);display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--vl-border);margin-top:26px}.vl-footer-continuation strong{color:#fff}
+      .vl-watch-page{padding-top:86px}.vl-watch-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start;padding:28px 0 54px}.vl-page[dir="rtl"] .vl-watch-grid{grid-template-columns:360px minmax(0,1fr)}.vl-page[dir="rtl"] .vl-watch-main{grid-column:2}.vl-page[dir="rtl"] .vl-watch-aside{grid-column:1;grid-row:1}.vl-back-link{height:40px;border-radius:999px;border:1px solid var(--vl-border);background:rgba(255,255,255,.05);color:#fff;padding:0 14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.vl-player{position:relative;aspect-ratio:16/9;border-radius:28px;overflow:hidden;border:1px solid var(--vl-border);background:#111;box-shadow:0 28px 96px rgba(0,0,0,.34);margin-top:18px}.vl-player:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.23),transparent 23%),linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.78));}.vl-player-center{position:absolute;inset:0;display:grid;place-items:center;z-index:2}.vl-big-play{width:78px;height:78px;border-radius:999px;border:0;background:#fff;color:#0c0c0f;display:flex;align-items:center;justify-content:center;box-shadow:0 18px 50px rgba(0,0,0,.35)}.vl-player-caption{position:absolute;left:28px;right:28px;bottom:26px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:14px;color:#fff}.vl-player-bar{height:5px;flex:1;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden}.vl-player-bar span{display:block;width:38%;height:100%;background:var(--vl-accent)}.vl-gate{position:absolute;inset:auto 24px 24px;z-index:4;border-radius:20px;border:1px solid var(--vl-border);background:rgba(12,12,15,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:18px;display:flex;align-items:center;justify-content:space-between;gap:14px}.vl-watch-title h1{margin:22px 0 0;font-size:clamp(34px,4vw,58px);line-height:1.12}.vl-watch-title p{color:var(--vl-muted);line-height:1.85;font-size:16px;max-width:820px}.vl-tool-panel,.vl-chapter-panel{border-radius:24px;border:1px solid var(--vl-border);background:rgba(255,255,255,.04);padding:20px}.vl-tool-panel h2,.vl-chapter-panel h2{margin:0 0 16px;font-size:21px}.vl-tool-list,.vl-chapter-list{display:grid;gap:10px}.vl-tool-list li,.vl-chapter-list li{list-style:none;border-radius:16px;background:rgba(255,255,255,.045);border:1px solid var(--vl-border);min-height:48px;display:flex;align-items:center;gap:10px;padding:0 13px;color:#e8e8ee}.vl-page[dir="rtl"] .vl-tool-list li,.vl-page[dir="rtl"] .vl-chapter-list li{flex-direction:row-reverse;text-align:right}.vl-watch-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.vl-watch-meta div{border-radius:16px;border:1px solid var(--vl-border);background:rgba(255,255,255,.045);padding:13px}.vl-watch-meta span{display:block;color:var(--vl-muted);font-size:12px}.vl-watch-meta strong{display:block;margin-top:5px;color:#fff}
+      @media (max-width:1180px){.vl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.vl-carousel{grid-auto-columns:minmax(190px,22vw)}.vl-watch-grid,.vl-page[dir="rtl"] .vl-watch-grid{grid-template-columns:1fr}.vl-page[dir="rtl"] .vl-watch-main,.vl-page[dir="rtl"] .vl-watch-aside{grid-column:auto;grid-row:auto}.vl-watch-aside{display:grid;grid-template-columns:1fr 1fr;gap:14px}}@media (max-width:860px){.vl-header-nav,.vl-header-actions .vl-icon-btn,.vl-header-actions .vl-header-action:not(.is-primary){display:none}.vl-mobile-toggle{display:inline-flex}.vl-hero{min-height:74vh}.vl-hero-content{padding-bottom:72px}.vl-section-head,.vl-library-top{align-items:flex-start;flex-direction:column}.vl-controls{grid-template-columns:1fr}.vl-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.vl-carousel{grid-auto-columns:minmax(178px,42vw)}.vl-featured-banner{min-height:390px}.vl-watch-aside{grid-template-columns:1fr}.vl-gate{position:absolute;display:grid}}@media (max-width:560px){.vl-shell{padding:0 14px}.vl-header{height:64px}.vl-hero{min-height:78vh;padding-top:84px;background-position:center}.vl-hero h1{font-size:42px}.vl-hero p{font-size:15px}.vl-hero-actions{gap:9px}.vl-primary-cta,.vl-secondary-cta{width:100%;height:46px}.vl-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 10px}.vl-carousel{grid-auto-columns:72vw}.vl-section{padding:22px 0}.vl-library-panel{border-radius:24px;padding:14px}.vl-poster,.vl-video-card.is-wide .vl-poster{border-radius:15px}.vl-card-body h3{font-size:13px}.vl-card-body p{font-size:11px}.vl-carousel-btn{display:none}.vl-featured-banner{border-radius:24px}.vl-banner-content{padding:22px}.vl-footer-continuation{display:grid}.vl-player{border-radius:20px}.vl-watch-meta{grid-template-columns:1fr}.vl-gate{inset:auto 12px 12px;padding:14px}.vl-player-caption{left:14px;right:14px;bottom:16px}.vl-big-play{width:62px;height:62px}}
+      @media (prefers-reduced-motion:reduce){.vl-page *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+    ` }} />
+  );
+}
+
+function AccessBadge({ access, t }) {
+  const Icon = access === "subscriber" ? Lock : access === "preview" ? Info : Star;
+  return (
+    <span className="vl-access">
+      <Icon size={12} strokeWidth={2} />
+      {t.access[access]}
+    </span>
+  );
+}
+
+function CategoryChips({ value, onChange, t }) {
+  return (
+    <div className="vl-chip-row" id="library-categories">
+      {libraryCategoryIds.map((category) => (
+        <button key={category} className={value === category ? "is-active" : ""} onClick={() => onChange(category)}>
+          {t.categories[category]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TypeTabs({ value, onChange, t }) {
+  return (
+    <div className="vl-type-tabs">
+      {libraryTypeIds.map((type) => (
+        <button key={type} className={value === type ? "is-active" : ""} onClick={() => onChange(type)}>
+          {t.types[type]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LibraryHeader({ lang, t, viewerState }) {
+  const isFa = lang === "fa";
+  const [scrolled, setScrolled] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  React.useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  const goHome = () => { window.location.hash = "#/"; };
+  const goLibrary = () => { window.location.hash = "#/library"; };
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const navItems = [
+    { key: "home", action: goHome },
+    { key: "library", action: goLibrary, active: true },
+    { key: "categories", action: () => scrollTo("library-categories") },
+    { key: "new", action: () => scrollTo("library-grid") },
+    { key: "myList", action: () => scrollTo("recommended-row") },
+  ];
+
+  const navButton = (item) => (
+    <button key={item.key} className={item.active ? "is-active" : ""} onClick={() => { setOpen(false); item.action(); }}>
+      {t.nav[item.key]}
+    </button>
+  );
+
+  return (
+    <header className={`vl-header ${scrolled ? "is-scrolled" : ""} ${open ? "is-open" : ""}`}>
+      <div className="vl-header-inner">
+        <button className="vl-brand" onClick={goHome} aria-label="Vidora">
+          <span className="vl-brand-mark">V</span>
+          VIDORA
+        </button>
+        <nav className="vl-header-nav" aria-label={t.meta.title}>
+          {navItems.map(navButton)}
+        </nav>
+        <div className="vl-header-actions">
+          <button className="vl-icon-btn" onClick={() => scrollTo("library-grid")} aria-label={t.controls.search}><Search size={18} /></button>
+          {viewerState !== "guest" ? <button className="vl-icon-btn" aria-label={t.nav.notifications}><Bell size={18} /></button> : null}
+          {viewerState !== "guest" ? (
+            <button className="vl-header-action"><User size={16} /> {t.nav.profile}</button>
+          ) : (
+            <button className="vl-header-action is-primary" onClick={() => { window.location.hash = "#/login"; }}>{t.nav.login}</button>
+          )}
+          <button className="vl-icon-btn vl-mobile-toggle" onClick={() => setOpen((value) => !value)} aria-label={open ? t.nav.closeMenu : t.nav.openMenu}>
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        <div className={`vl-mobile-drawer ${open ? "is-open" : ""}`} dir={isFa ? "rtl" : "ltr"}>
+          {navItems.map(navButton)}
+          <button onClick={() => { setOpen(false); window.location.hash = "#/login"; }}>{t.nav.login}</button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function FeaturedHero({ lang, t, videos, savedIds, onSave }) {
+  const featured = videos.filter((video) => video.isFeatured);
+  const [active, setActive] = React.useState(0);
+  const video = featured[active] || videos[0];
+  const style = video.heroImage
+    ? { backgroundImage: `url("${libraryAsset(video.heroImage)}")` }
+    : { background: video.thumbnailTone };
+
+  return (
+    <section className="vl-hero" style={style}>
+      <div className="vl-shell">
+        <div className="vl-hero-content">
+          <div className="vl-hero-kicker"><Star size={16} fill="currentColor" /> {t.hero.eyebrow}</div>
+          <h1>{libraryText(video.title, lang)}</h1>
+          <p>{libraryText(video.description, lang)}</p>
+          <div className="vl-hero-meta">
+            <span className="vl-meta-pill"><Clock3 size={14} /> {libraryDuration(video, lang, t)}</span>
+            <span className="vl-meta-pill">{t.categories[video.category]}</span>
+            <span className="vl-meta-pill">{video.rating} {t.hero.liked}</span>
+            <AccessBadge access={video.access} t={t} />
+          </div>
+          <div className="vl-hero-actions">
+            <button className="vl-primary-cta" onClick={() => libraryOpenWatch(video.slug)}><Play size={18} fill="currentColor" /> {t.hero.watch}</button>
+            <button className="vl-secondary-cta" onClick={() => onSave(video.id)}><ListPlus size={18} /> {savedIds.has(video.id) ? t.card.saved : t.hero.add}</button>
+          </div>
+          <div className="vl-slider-dots" aria-label={t.hero.slide}>
+            {featured.map((item, index) => (
+              <button key={item.id} className={index === active ? "is-active" : ""} onClick={() => setActive(index)} aria-label={`${t.hero.slide} ${index + 1}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VideoCard({ video, lang, t, saved, onSave, wide = false }) {
+  const progress = Number(video.progress || 0);
+  return (
+    <article className={`vl-video-card ${wide ? "is-wide" : ""}`}>
+      <button className="vl-card-button vl-card-open" onClick={() => libraryOpenWatch(video.slug)} aria-label={`${t.card.openDetails}: ${libraryText(video.title, lang)}`}>
+        <div className="vl-poster" style={{ background: video.thumbnailTone }}>
+          <span className="vl-play-float"><Play size={18} fill="currentColor" /></span>
+          <AccessBadge access={video.access} t={t} />
+          {progress > 0 ? <span className="vl-card-progress"><span style={{ width: `${Math.min(progress, 100)}%` }} /></span> : null}
+        </div>
+        <div className="vl-card-body">
+          <h3>{libraryText(video.title, lang)}</h3>
+          <p className="vl-card-meta">
+            <span>{t.categories[video.category]}</span>
+            <span className="vl-dot" />
+            <span>{libraryDuration(video, lang, t)}</span>
+            <span className="vl-dot" />
+            <span>{t.card.persian}</span>
+          </p>
+          <p>{progress >= 90 ? t.card.watched : progress > 0 ? t.card.inProgress : video.views + " " + t.card.views}</p>
+        </div>
+      </button>
+      <button className={`vl-save-btn ${saved ? "is-saved" : ""}`} onClick={(event) => { event.stopPropagation(); onSave(video.id); }} aria-label={saved ? t.card.saved : t.card.save}>
+        <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
+      </button>
+    </article>
+  );
+}
+
+function VideoCarousel({ id, videos, lang, t, savedIds, onSave, wide = false }) {
+  const ref = React.useRef(null);
+  const isFa = lang === "fa";
+  const scroll = (direction) => {
+    const element = ref.current;
+    if (!element) return;
+    const amount = Math.min(760, element.clientWidth * 0.72);
+    element.scrollBy({ left: direction * amount * (isFa ? -1 : 1), behavior: "smooth" });
+  };
+
+  return (
+    <div className="vl-carousel-wrap" id={id}>
+      <button className="vl-carousel-btn prev" onClick={() => scroll(-1)} aria-label={t.controls.previous}><ChevronLeft size={22} /></button>
+      <div className="vl-carousel" ref={ref}>
+        {videos.map((video) => (
+          <VideoCard key={video.id} video={video} lang={lang} t={t} saved={savedIds.has(video.id)} onSave={onSave} wide={wide} />
+        ))}
+      </div>
+      <button className="vl-carousel-btn next" onClick={() => scroll(1)} aria-label={t.controls.next}><ChevronRight size={22} /></button>
+    </div>
+  );
+}
+
+function FeaturedBanner({ video, lang, t, savedIds, onSave }) {
+  const [tab, setTab] = React.useState("overview");
+  const bgStyle = video.heroImage
+    ? { backgroundImage: `url("${libraryAsset(video.heroImage)}")` }
+    : { background: video.thumbnailTone };
+  const tabText = {
+    overview: libraryText(video.description, lang),
+    chapters: (video.chapters?.[lang] || []).join(" · "),
+    similar: t.sections.similar,
+    details: `${t.watch.subtitles} · ${t.watch.transcript} · ${t.watch.summary}`,
+  };
+
+  return (
+    <section className="vl-featured-banner" style={bgStyle}>
+      <div className="vl-banner-content">
+        <span className="vl-eyebrow"><Star size={15} fill="currentColor" /> {t.sections.secondaryEyebrow}</span>
+        <h2>{libraryText(video.title, lang)}</h2>
+        <p>{libraryText(video.description, lang)}</p>
+        <div className="vl-hero-meta">
+          <span className="vl-meta-pill"><Clock3 size={14} /> {libraryDuration(video, lang, t)}</span>
+          <span className="vl-meta-pill">{t.categories[video.category]}</span>
+          <AccessBadge access={video.access} t={t} />
+        </div>
+        <div className="vl-hero-actions">
+          <button className="vl-primary-cta" onClick={() => libraryOpenWatch(video.slug)}><Play size={18} fill="currentColor" /> {t.hero.watch}</button>
+          <button className="vl-secondary-cta" onClick={() => onSave(video.id)}><Plus size={18} /> {savedIds.has(video.id) ? t.card.saved : t.hero.add}</button>
+        </div>
+        <div className="vl-banner-tabs">
+          {["overview", "chapters", "similar", "details"].map((key) => (
+            <button key={key} className={tab === key ? "is-active" : ""} onClick={() => setTab(key)}>{t.watch[key]}</button>
+          ))}
+        </div>
+        <p className="vl-banner-note">{tabText[tab]}</p>
+      </div>
+    </section>
+  );
+}
+
+function VidoraLibraryPage() {
+  const { lang } = window.useLang();
+  const t = libraryCopy[lang] || libraryCopy.fa;
+  const isFa = lang === "fa";
+  const [trendTab, setTrendTab] = React.useState("popular");
+  const [category, setCategory] = React.useState("all");
+  const [type, setType] = React.useState("all");
+  const [query, setQuery] = React.useState("");
+  const [sort, setSort] = React.useState("newest");
+  const [duration, setDuration] = React.useState("all");
+  const [visibleCount, setVisibleCount] = React.useState(12);
+  const [savedIds, setSavedIds] = React.useState(() => new Set(libraryVideos.filter((video) => video.isSaved).map((video) => video.id)));
+  const viewerState = window.localStorage?.getItem("vidoraViewerState") || "guest";
+
+  const toggleSave = (id) => {
+    setSavedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const trendingVideos = React.useMemo(() => {
+    if (trendTab === "featured") return libraryVideos.filter((video) => video.isFeatured || video.access === "preview").slice(0, 10);
+    if (trendTab === "recent") return [...libraryVideos].sort((a, b) => libraryVideoDate(b) - libraryVideoDate(a)).slice(0, 10);
+    return libraryVideos.filter((video) => video.isTrending).slice(0, 10);
+  }, [trendTab]);
+
+  const filteredVideos = React.useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    let rows = libraryVideos.filter((video) => {
+      const matchesCategory = category === "all" || video.category === category;
+      const matchesType = type === "all" || video.type === type;
+      const matchesQuery = !normalized || `${libraryText(video.title, lang)} ${libraryText(video.description, lang)} ${t.categories[video.category]}`.toLowerCase().includes(normalized);
+      const matchesDuration =
+        duration === "all" ||
+        (duration === "short" && video.durationMinutes < 20) ||
+        (duration === "medium" && video.durationMinutes >= 20 && video.durationMinutes <= 35) ||
+        (duration === "long" && video.durationMinutes > 35);
+      return matchesCategory && matchesType && matchesQuery && matchesDuration;
+    });
+    if (sort === "popular") rows = rows.sort((a, b) => Number.parseInt(b.views, 10) - Number.parseInt(a.views, 10));
+    if (sort === "az") rows = rows.sort((a, b) => libraryText(a.title, lang).localeCompare(libraryText(b.title, lang), lang === "fa" ? "fa" : "en"));
+    if (sort === "newest") rows = rows.sort((a, b) => libraryVideoDate(b) - libraryVideoDate(a));
+    return rows;
+  }, [category, duration, lang, query, sort, t.categories, type]);
+
+  const featuredSecondary = libraryVideos.find((video) => video.isFeatured && video.id !== "ai-future-now") || libraryVideos[3];
+  const relatedVideos = libraryVideos.filter((video) => video.category === featuredSecondary.category && video.id !== featuredSecondary.id).concat(libraryVideos.filter((video) => video.id !== featuredSecondary.id)).slice(0, 9);
+  const visibleVideos = filteredVideos.slice(0, visibleCount);
+
+  React.useEffect(() => {
+    setVisibleCount(12);
+  }, [category, duration, query, sort, type]);
+
+  return (
+    <main className="vl-page" dir={isFa ? "rtl" : "ltr"}>
+      <LibraryStyles />
+      <LibraryHeader lang={lang} t={t} viewerState={viewerState} />
+      <FeaturedHero lang={lang} t={t} videos={libraryVideos} savedIds={savedIds} onSave={toggleSave} />
+
+      <section className="vl-section">
+        <div className="vl-shell">
+          <div className="vl-section-head">
+            <h2 className="vl-section-title">{t.sections.trending}</h2>
+            <div className="vl-mini-tabs">
+              {["popular", "recent", "featured"].map((key) => (
+                <button key={key} className={trendTab === key ? "is-active" : ""} onClick={() => setTrendTab(key)}>{t.tabs[key]}</button>
+              ))}
+            </div>
+          </div>
+          <CategoryChips value={category} onChange={setCategory} t={t} />
+          <VideoCarousel videos={trendingVideos} lang={lang} t={t} savedIds={savedIds} onSave={toggleSave} />
+        </div>
+      </section>
+
+      <section className="vl-section" id="library-grid">
+        <div className="vl-shell">
+          <div className="vl-library-panel">
+            <div className="vl-library-top">
+              <h2 className="vl-section-title">{t.sections.library}</h2>
+              <TypeTabs value={type} onChange={setType} t={t} />
+            </div>
+            <CategoryChips value={category} onChange={setCategory} t={t} />
+            <div className="vl-controls">
+              <label className="vl-search">
+                <Search size={18} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.controls.search} />
+              </label>
+              <select className="vl-select" value={sort} onChange={(event) => setSort(event.target.value)} aria-label={t.controls.sort}>
+                <option value="newest">{t.controls.newest}</option>
+                <option value="popular">{t.controls.popular}</option>
+                <option value="az">{t.controls.az}</option>
+              </select>
+              <select className="vl-select" value={duration} onChange={(event) => setDuration(event.target.value)} aria-label={t.controls.duration}>
+                <option value="all">{t.controls.allDurations}</option>
+                <option value="short">{t.controls.short}</option>
+                <option value="medium">{t.controls.medium}</option>
+                <option value="long">{t.controls.long}</option>
+              </select>
+            </div>
+            {visibleVideos.length ? (
+              <div className="vl-grid">
+                {visibleVideos.map((video) => (
+                  <VideoCard key={video.id} video={video} lang={lang} t={t} saved={savedIds.has(video.id)} onSave={toggleSave} />
+                ))}
+              </div>
+            ) : (
+              <div className="vl-empty">
+                <div>
+                  <Filter size={28} />
+                  <h3>{query ? t.states.noResults : t.states.emptyCategory}</h3>
+                </div>
+              </div>
+            )}
+            {visibleCount < filteredVideos.length ? (
+              <div className="vl-load-more">
+                <button className="vl-secondary-cta" onClick={() => setVisibleCount((count) => count + 6)}>{t.controls.loadMore}</button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="vl-section">
+        <div className="vl-shell">
+          <FeaturedBanner video={featuredSecondary} lang={lang} t={t} savedIds={savedIds} onSave={toggleSave} />
+        </div>
+      </section>
+
+      <section className="vl-section" id="recommended-row">
+        <div className="vl-shell">
+          <div className="vl-section-head">
+            <h2 className="vl-section-title">{t.sections.similar}</h2>
+          </div>
+          <VideoCarousel videos={relatedVideos} lang={lang} t={t} savedIds={savedIds} onSave={toggleSave} wide />
+          <div className="vl-footer-continuation">
+            <span><strong>{t.sections.continue}</strong> · {t.sections.recommended}</span>
+            <button className="vl-secondary-cta" onClick={() => document.getElementById("library-grid")?.scrollIntoView({ behavior: "smooth" })}>{t.controls.loadMore}</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function VidoraWatchPage({ slug }) {
+  const { lang } = window.useLang();
+  const t = libraryCopy[lang] || libraryCopy.fa;
+  const isFa = lang === "fa";
+  const video = libraryVideos.find((item) => item.slug === slug) || libraryVideos[0];
+  const viewerState = window.localStorage?.getItem("vidoraViewerState") || "guest";
+  const needsLogin = viewerState === "guest" && video.access !== "free";
+  const needsPlan = viewerState !== "subscriber" && video.access === "subscriber" && !needsLogin;
+  const gateText = needsLogin ? t.access.guestGate : needsPlan ? t.access.planGate : t.access.subscriberReady;
+  const gateCta = needsLogin ? t.access.guestCta : needsPlan ? t.access.planCta : t.hero.watch;
+  const related = libraryVideos.filter((item) => item.category === video.category && item.id !== video.id).concat(libraryVideos.filter((item) => item.id !== video.id)).slice(0, 8);
+  const playerStyle = video.heroImage
+    ? { backgroundImage: `url("${libraryAsset(video.heroImage)}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: video.thumbnailTone };
+
+  return (
+    <main className="vl-page vl-watch-page" dir={isFa ? "rtl" : "ltr"}>
+      <LibraryStyles />
+      <LibraryHeader lang={lang} t={t} viewerState={viewerState} />
+      <div className="vl-shell">
+        <button className="vl-back-link" onClick={() => { window.location.hash = "#/library"; }}>{isFa ? <ArrowRight size={17} /> : <ArrowLeft size={17} />} {t.watch.back}</button>
+        <div className="vl-watch-grid">
+          <section className="vl-watch-main">
+            <div className="vl-player" style={playerStyle} aria-label={t.watch.playerLabel}>
+              <div className="vl-player-center"><button className="vl-big-play"><Play size={28} fill="currentColor" /></button></div>
+              <div className="vl-player-caption">
+                <span className="vl-technical">05:36 / {video.durationMinutes}:00</span>
+                <span className="vl-player-bar"><span /></span>
+              </div>
+              {(needsLogin || needsPlan) ? (
+                <div className="vl-gate">
+                  <span>{gateText}</span>
+                  <button className="vl-primary-cta" onClick={() => { window.location.hash = needsLogin ? "#/login" : "#/dashboard/subscription"; }}>{gateCta}</button>
+                </div>
+              ) : null}
+            </div>
+            <div className="vl-watch-title">
+              <h1>{libraryText(video.title, lang)}</h1>
+              <p>{libraryText(video.description, lang)}</p>
+              <div className="vl-hero-actions">
+                <button className="vl-primary-cta"><Play size={18} fill="currentColor" /> {t.hero.watch}</button>
+                <button className="vl-secondary-cta"><Bookmark size={18} /> {t.hero.add}</button>
+                <button className="vl-secondary-cta"><Plus size={18} /> {t.watch.addNotes}</button>
+              </div>
+            </div>
+            <section className="vl-section">
+              <div className="vl-section-head">
+                <h2 className="vl-section-title">{t.watch.similar}</h2>
+              </div>
+              <VideoCarousel videos={related} lang={lang} t={t} savedIds={new Set()} onSave={() => {}} wide />
+            </section>
+          </section>
+          <aside className="vl-watch-aside">
+            <section className="vl-tool-panel">
+              <h2>{t.watch.detailsTitle}</h2>
+              <ul className="vl-tool-list">
+                {[t.watch.subtitles, t.watch.transcript, t.watch.summary, t.watch.keyTakeaways].map((item) => <li key={item}><CheckCircle2 size={17} /> {item}</li>)}
+              </ul>
+              <div className="vl-watch-meta">
+                <div><span>{t.watch.duration}</span><strong>{libraryDuration(video, lang, t)}</strong></div>
+                <div><span>{t.watch.category}</span><strong>{t.categories[video.category]}</strong></div>
+                <div><span>{t.watch.language}</span><strong>{t.card.persian}</strong></div>
+                <div><span>{t.card.views}</span><strong>{video.views}</strong></div>
+              </div>
+            </section>
+            <section className="vl-chapter-panel" style={{ marginTop: 14 }}>
+              <h2>{t.watch.chapters}</h2>
+              <ul className="vl-chapter-list">
+                {(video.chapters?.[lang] || []).map((chapter, index) => <li key={chapter}><span className="vl-technical">{String(index + 1).padStart(2, "0")}</span> {chapter}</li>)}
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 const dashboardCopy = { en: dashboardEn, fa: dashboardFa };
 const dashboardViews = new Set(["dashboard", "new-video", "library", "saved", "profile", "subscription", "support", "settings"]);
 const dashboardViewAliases = {
@@ -8339,6 +8855,7 @@ const sidebarGroups = [
     labelKey: "primary",
     items: [
       { icon: Gauge, labelKey: "dashboard", view: "dashboard" },
+      { icon: Library, labelKey: "vidoraLibrary", externalHash: "#/library" },
       { icon: Upload, labelKey: "newTranslation", view: "new-video" },
       { icon: Library, labelKey: "myVideos", view: "library", count: "24" },
     ],
@@ -8622,7 +9139,17 @@ function VidoraDashboard() {
   const renderSidebarItem = (item) => {
     const ItemIcon = item.icon;
     const isActive = item.view === activeView;
-    const onClick = () => item.action === "logout" ? setLogoutConfirm(true) : selectView(item.view);
+    const onClick = () => {
+      if (item.externalHash) {
+        window.location.hash = item.externalHash;
+        return;
+      }
+      if (item.action === "logout") {
+        setLogoutConfirm(true);
+        return;
+      }
+      selectView(item.view);
+    };
     return (
       <button className={`vd-nav-item ${isActive ? "is-active" : ""}`} key={item.labelKey} onClick={onClick}>
         <ItemIcon size={18} strokeWidth={1.8} />
@@ -8853,6 +9380,14 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
+  const normalizedPath = path.replace(/\/+$/, "") || "/";
+  const watchSlug = hash.startsWith("#/watch/")
+    ? hash.replace(/^#\/watch\/?/, "").split(/[?#]/)[0].replace(/\/+$/, "")
+    : normalizedPath.includes("/watch/")
+      ? normalizedPath.split("/watch/")[1].split(/[?#/]/)[0]
+      : "";
+  if (watchSlug) return <VidoraWatchPage slug={decodeURIComponent(watchSlug)} />;
+  if (hash.startsWith("#/library") || hash.startsWith("#/explore") || normalizedPath === "/library" || normalizedPath === "/explore" || normalizedPath.endsWith("/library") || normalizedPath.endsWith("/explore")) return <VidoraLibraryPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;

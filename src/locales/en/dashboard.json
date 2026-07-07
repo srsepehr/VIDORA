@@ -15,6 +15,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "vidoraLibrary": "Vidora Library",
     "newTranslation": "New Translation",
     "myVideos": "My Videos",
     "saved": "Saved",
