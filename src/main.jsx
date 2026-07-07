@@ -8860,7 +8860,7 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
-  if (hash.startsWith("#/library")) return <LibraryPage />;
+  if (hash.startsWith("#/library") || hash.startsWith("#/search")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
   if (hash.startsWith("#/login")) return <LoginPage />;

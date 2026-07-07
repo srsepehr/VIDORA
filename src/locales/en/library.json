@@ -1,14 +1,20 @@
 {
   "nav": {
     "home": "Home",
-    "library": "Library",
-    "categories": "Categories",
     "new": "New",
     "myList": "My List",
     "login": "Log in",
     "search": "Search",
     "menu": "Menu",
     "close": "Close"
+  },
+  "search": {
+    "placeholder": "Search videos",
+    "results": "Search results",
+    "recent": "Recent searches",
+    "suggestions": "Suggestions",
+    "empty": "No videos matched your search.",
+    "openRoute": "View all results"
   },
   "hero": {
     "label": "Featured Learning Video",
@@ -25,6 +31,14 @@
     "prev": "Previous",
     "next": "Next"
   },
+  "sections": {
+    "continueWatching": "Continue Watching",
+    "browseCategories": "Browse by Category",
+    "newReleases": "New on Vidora",
+    "editorsPick": "Editor’s Pick",
+    "allVideos": "All Videos",
+    "footerText": "A library for understanding English educational videos with Persian subtitles, summaries, and learning tools."
+  },
   "categories": {
     "all": "All",
     "ai": "Artificial Intelligence",
@@ -38,6 +52,14 @@
     "language": "Language Learning",
     "worldnews": "World News",
     "science": "Science"
+  },
+  "categoryCards": {
+    "ai": "12 videos",
+    "startup": "9 videos",
+    "companies": "8 videos",
+    "biography": "7 videos",
+    "science": "6 videos",
+    "product": "10 videos"
   },
   "types": {
     "all": "All",
@@ -72,6 +94,7 @@
     "minutes": "{minutes} min",
     "views": "{count}K views",
     "watching": "Continue watching",
+    "remaining": "min left",
     "save": "Save",
     "unsave": "Remove from saved",
     "play": "Play"

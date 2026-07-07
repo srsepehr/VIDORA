@@ -1,14 +1,20 @@
 {
   "nav": {
     "home": "خانه",
-    "library": "کتابخانه",
-    "categories": "دسته‌بندی‌ها",
     "new": "تازه‌ها",
     "myList": "فهرست من",
     "login": "ورود",
     "search": "جستجو",
     "menu": "منو",
     "close": "بستن"
+  },
+  "search": {
+    "placeholder": "جست‌وجوی ویدیوها",
+    "results": "نتایج جست‌وجو",
+    "recent": "جست‌وجوهای اخیر",
+    "suggestions": "پیشنهادها",
+    "empty": "ویدیویی با این جست‌وجو پیدا نشد.",
+    "openRoute": "نمایش همه نتایج"
   },
   "hero": {
     "label": "ویدیوی آموزشی ویژه",
@@ -25,6 +31,14 @@
     "prev": "قبلی",
     "next": "بعدی"
   },
+  "sections": {
+    "continueWatching": "ادامه تماشا",
+    "browseCategories": "مرور دسته‌بندی‌ها",
+    "newReleases": "تازه‌های Vidora",
+    "editorsPick": "منتخب سردبیر",
+    "allVideos": "همه ویدیوها",
+    "footerText": "کتابخانه‌ای برای فهم بهتر ویدیوهای آموزشی انگلیسی با زیرنویس فارسی، خلاصه و ابزارهای یادگیری."
+  },
   "categories": {
     "all": "همه",
     "ai": "هوش مصنوعی",
@@ -38,6 +52,14 @@
     "language": "آموزش زبان",
     "worldnews": "اخبار جهان",
     "science": "علم"
+  },
+  "categoryCards": {
+    "ai": "۱۲ ویدیو",
+    "startup": "۹ ویدیو",
+    "companies": "۸ ویدیو",
+    "biography": "۷ ویدیو",
+    "science": "۶ ویدیو",
+    "product": "۱۰ ویدیو"
   },
   "types": {
     "all": "همه",
@@ -72,6 +94,7 @@
     "minutes": "{minutes} دقیقه",
     "views": "{count} هزار بازدید",
     "watching": "در حال تماشا",
+    "remaining": "دقیقه باقی‌مانده",
     "save": "ذخیره",
     "unsave": "حذف از ذخیره‌شده‌ها",
     "play": "پخش"
