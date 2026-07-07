@@ -3,6 +3,7 @@
     "home": "Home",
     "new": "New",
     "myList": "My List",
+    "translateMyVideo": "Translate My Video",
     "login": "Log in",
     "search": "Search",
     "menu": "Menu",
@@ -43,23 +44,38 @@
     "all": "All",
     "ai": "Artificial Intelligence",
     "aiShort": "AI",
-    "startup": "Startups",
+    "startup": "Startups & Business",
     "business": "Business",
     "tech": "Technology",
-    "biography": "Biography",
+    "biography": "Founders",
     "companies": "Company Stories",
     "product": "Product Design",
     "language": "Language Learning",
     "worldnews": "World News",
-    "science": "Science"
+    "science": "Science & Future"
   },
   "categoryCards": {
     "ai": "12 videos",
     "startup": "9 videos",
+    "tech": "7 videos",
     "companies": "8 videos",
     "biography": "7 videos",
     "science": "6 videos",
-    "product": "10 videos"
+    "product": "10 videos",
+    "language": "5 videos"
+  },
+  "categoryDescriptions": {
+    "ai": "Videos about AI tools, companies, research, and the future of artificial intelligence.",
+    "startup": "Lessons on building businesses, pricing, growth, and product decisions.",
+    "tech": "Trends in technology, new tools, and changes in the digital world.",
+    "product": "Product design, user experience, and how successful products are made.",
+    "companies": "Stories of how influential companies were built and grew.",
+    "biography": "Founder journeys and the decisions that shaped their paths.",
+    "science": "Science, the future, space, and big ideas explained clearly.",
+    "language": "Language learning through real videos and understandable educational content."
+  },
+  "actions": {
+    "viewAll": "View All"
   },
   "types": {
     "all": "All",

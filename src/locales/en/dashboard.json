@@ -18,10 +18,17 @@
     "vidoraLibrary": "Vidora Library",
     "newTranslation": "New Translation",
     "myVideos": "My Videos",
+    "publicLibrary": "Library",
     "saved": "Saved",
     "subscription": "Subscription",
     "support": "Support",
     "logout": "Logout"
+  },
+  "profileMenu": {
+    "account": "Account",
+    "settings": "Settings",
+    "backToWebsite": "Back to Website",
+    "logout": "Log Out"
   },
   "titles": {
     "dashboard": ["Dashboard", "Translate videos, generate subtitles, and keep learning outputs in one place."],

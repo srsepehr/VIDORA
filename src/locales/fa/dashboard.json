@@ -18,10 +18,17 @@
     "vidoraLibrary": "کتابخانه Vidora",
     "newTranslation": "ترجمه جدید",
     "myVideos": "ویدیوهای من",
+    "publicLibrary": "کتابخانه",
     "saved": "ذخیره‌شده",
     "subscription": "اشتراک",
     "support": "پشتیبانی",
     "logout": "خروج"
+  },
+  "profileMenu": {
+    "account": "حساب کاربری",
+    "settings": "تنظیمات",
+    "backToWebsite": "بازگشت به سایت",
+    "logout": "خروج از حساب"
   },
   "titles": {
     "dashboard": ["داشبورد", "ویدیوها را ترجمه کنید، زیرنویس بسازید و خروجی‌های یادگیری را یک‌جا نگه دارید."],

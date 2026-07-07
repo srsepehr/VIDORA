@@ -267,8 +267,10 @@ const CSS = `
 .lib-sec-spacer{flex:1}
 .lib-toplinks{display:flex;gap:4px}
 .lib-toplinks button{height:32px;padding-inline:13px;border-radius:999px;font-size:12.5px;font-weight:650;color:var(--mut);display:inline-flex;align-items:center;gap:7px}
-.lib-toplinks button:hover{color:#fff}
-.lib-toplinks button.is-active{background:#fff;color:#000}
+	.lib-toplinks button:hover{color:#fff}
+	.lib-toplinks button.is-active{background:#fff;color:#000}
+	.lib-viewall{height:32px;border-radius:999px;border:1px solid var(--line2);padding-inline:13px;display:inline-flex;align-items:center;color:#d6d6dd;font-size:12.5px;font-weight:700}
+	.lib-viewall:hover{background:#fff;color:#000;border-color:#fff}
 
 /* chips + pills */
 .lib-chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:22px;padding-block:2px}
@@ -339,7 +341,11 @@ const CSS = `
 .lib-cat-card h3{font-size:15px;font-weight:800;line-height:1.4}
 .lib-cat-card p{font-size:12px;color:var(--mut);margin-top:5px}
 .lib-footer{border-top:1px solid var(--line);padding-block:34px 46px;color:var(--mut);font-size:13px;line-height:1.8;margin-top:16px}
-.lib-footer strong{color:#fff}
+	.lib-footer strong{color:#fff}
+	.lib-category-intro{padding-block:72px 18px}
+	.lib-category-kicker{color:var(--mut);font-size:12px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+	.lib-category-title{font-size:clamp(34px,4vw,58px);font-weight:820;line-height:1.08;letter-spacing:-.02em;margin-top:12px!important;display:flex;align-items:center;gap:14px}
+	.lib-category-desc{color:#cfcfd6;font-size:15px;line-height:1.9;max-width:680px;margin-top:18px!important}
 
 /* secondary banner */
 .lib-banner{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-top:100px}
@@ -520,10 +526,10 @@ function SearchOverlay({ query, results, activeIndex, setActiveIndex, onPick, on
                     <span className="lib-search-thumb"><Icon size={24} /></span>
                     <span>
                       <strong>{video.title[lang] || video.title.en}</strong>
-                      <span>{catName(video.category)} · {t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-                    </span>
-                    <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
-                  </button>
+	                    <span>{catName(video.category)} · {t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
+	                  </span>
+	                    <span>{t("card.play")}</span>
+	                  </button>
                 );
               })}
               <button className="lib-search-result" onClick={onSubmit}>
@@ -558,9 +564,7 @@ function SearchOverlay({ query, results, activeIndex, setActiveIndex, onPick, on
 }
 
 function LibraryHeader() {
-  const { t, lang, catName } = useLib();
-  const [drawer, setDrawer] = React.useState(false);
-  const [logoBroken, setLogoBroken] = React.useState(false);
+  const { t, lang, rtl, catName, viewer } = useLib();
   const [searchOpen, setSearchOpen] = React.useState(() => window.location.hash.startsWith("#/search"));
   const [query, setQuery] = React.useState(() => {
     const q = window.location.hash.includes("?") ? new URLSearchParams(window.location.hash.split("?")[1]).get("q") : "";
@@ -568,10 +572,15 @@ function LibraryHeader() {
   });
   const [activeIndex, setActiveIndex] = React.useState(0);
   const inputRef = React.useRef(null);
+  const translateRoute = "/dashboard/new-translation";
+  const goTranslate = () => {
+    window.location.hash = viewer === "guest" ? `#/login?redirect=${encodeURIComponent(translateRoute)}` : `#${translateRoute}`;
+  };
   const items = [
-    { key: "home", label: t("nav.home"), go: () => (window.location.hash = "#/") },
-    { key: "new", label: t("nav.new"), go: () => document.getElementById("lib-new")?.scrollIntoView({ behavior: "smooth" }) },
-    { key: "mylist", label: t("nav.myList"), go: () => document.getElementById("lib-continue")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: t("nav.home"), onClick: () => (window.location.hash = "#/") },
+    { label: t("sections.browseCategories"), onClick: () => document.getElementById("lib-categories")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: t("nav.new"), onClick: () => document.getElementById("lib-new")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: t("nav.translateMyVideo"), onClick: goTranslate },
   ];
   const results = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -615,68 +624,38 @@ function LibraryHeader() {
     }
   };
 
+  const SharedHeader = window.EditorialHeader;
+  if (!SharedHeader) return null;
   return (
-    <header className="lib-head">
-      <div className="lib-wrap lib-head-in" dir="ltr">
-        <a className="lib-logo" href="#/" aria-label="Vidora" style={{ gap: 9 }}>
-          {logoBroken ? null : <img src={`${BASE()}assets/logos/vidora-mark-white.png`} alt="" onError={() => setLogoBroken(true)} />}
-          <span>VIDORA</span>
-        </a>
-        {searchOpen ? (
-          <div className="lib-header-search" dir={lang === "fa" ? "rtl" : "ltr"}>
-            <label className="lib-header-searchbox">
-              <Search size={17} />
-              <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }} onKeyDown={handleKeyDown} placeholder={t("search.placeholder")} />
-            </label>
-            <button className="lib-search-close" onClick={() => setSearchOpen(false)}>{t("nav.close")}</button>
-          </div>
-        ) : (
-          <>
-            <nav className="lib-nav" aria-label={t("nav.menu")} dir={lang === "fa" ? "rtl" : "ltr"}>
-              {items.map((item) => (
-                <button key={item.key} onClick={item.go}>
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-            <div className="lib-head-actions">
-              <button className="lib-iconbtn" aria-label={t("nav.search")} onClick={() => setSearchOpen(true)}>
-                <Search size={17} />
-              </button>
-              <a className="lib-login" href="#/login">
-                {t("nav.login")}
-              </a>
-              <button className="lib-iconbtn lib-burger" aria-label={t("nav.menu")} onClick={() => setDrawer(true)}>
-                <MenuIcon size={19} />
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-      {searchOpen ? (
-        <SearchOverlay
-          query={query}
-          results={results}
-          activeIndex={activeIndex}
-          setActiveIndex={setActiveIndex}
-          onPick={(video) => { window.location.hash = `#/watch/${video.slug}`; }}
-          onSuggestion={(value) => { setQuery(value); inputRef.current?.focus(); }}
-          onSubmit={commitSearch}
-        />
-      ) : null}
-      {drawer ? <div className="lib-drawer-veil" onClick={() => setDrawer(false)} /> : null}
-      <div className={`lib-drawer${drawer ? " is-open" : ""}`}>
-        <button onClick={() => setDrawer(false)} aria-label={t("nav.close")} style={{ justifyContent: "flex-end" }}>
-          <X size={18} />
-        </button>
-        {items.map((item) => (
-          <button key={item.key} className={item.active ? "is-active" : ""} onClick={() => { setDrawer(false); item.go(); }}>
-            {item.label}
-          </button>
-        ))}
-        <button onClick={() => (window.location.hash = "#/login")}>{t("nav.login")}</button>
-      </div>
-    </header>
+    <SharedHeader
+      mode="library"
+      tone="dark"
+      navItems={items}
+      search={{
+        open: searchOpen,
+        rtl,
+        query,
+        inputRef,
+        placeholder: t("search.placeholder"),
+        searchLabel: t("nav.search"),
+        closeLabel: t("nav.close"),
+        onOpen: () => setSearchOpen(true),
+        onClose: () => setSearchOpen(false),
+        onChange: (event) => { setQuery(event.target.value); setActiveIndex(0); },
+        onKeyDown: handleKeyDown,
+        panel: (
+          <SearchOverlay
+            query={query}
+            results={results}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            onPick={(video) => { window.location.hash = `#/watch/${video.slug}`; }}
+            onSuggestion={(value) => { setQuery(value); inputRef.current?.focus(); }}
+            onSubmit={commitSearch}
+          />
+        ),
+      }}
+    />
   );
 }
 
@@ -684,45 +663,10 @@ function LibraryHeader() {
 // Primitives
 // ---------------------------------------------------------------------------
 
-function AccessBadge({ video }) {
-  const { t } = useLib();
-  if (video.access === "subscription") {
-    return (
-      <span className="lib-badge">
-        <Lock size={10} /> {t("access.subscription")}
-      </span>
-    );
-  }
-  return <span className="lib-badge">{t(`access.${video.access}`)}</span>;
-}
-
-function SaveButton({ video }) {
-  const { t, saved, toggleSave } = useLib();
-  const isSaved = saved.includes(video.slug);
-  return (
-    <button
-      className="lib-save"
-      aria-label={t(isSaved ? "card.unsave" : "card.save")}
-      aria-pressed={isSaved}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleSave(video.slug);
-      }}
-    >
-      <Bookmark size={15} fill={isSaved ? "#fff" : "none"} />
-    </button>
-  );
-}
-
 function VideoCard({ video }) {
   const { t, lang, catName, title } = useLib();
   const Icon = CAT_ICONS[video.category] || Sparkles;
-  const extra = video.progress
-    ? t("card.watching")
-    : video.viewsK >= 40
-      ? t("card.views", { count: fmtNum(lang, video.viewsK) })
-      : null;
+  const extra = video.viewsK >= 40 ? t("card.views", { count: fmtNum(lang, video.viewsK) }) : null;
   return (
     <a className="lib-card" href={`#/watch/${video.slug}`} aria-label={title(video)}>
       <span className="lib-thumb">
@@ -730,18 +674,11 @@ function VideoCard({ video }) {
           <Icon size={72} strokeWidth={1.1} />
         </span>
         <span className="lib-thumb-shade" />
-        <AccessBadge video={video} />
-        <SaveButton video={video} />
         <span className="lib-play-overlay">
           <span className="lib-play-circle">
             <Play size={19} style={{ marginInlineStart: 2 }} />
           </span>
         </span>
-        {video.progress ? (
-          <span className="lib-progress" dir="ltr">
-            <span style={{ width: `${video.progress}%` }} />
-          </span>
-        ) : null}
       </span>
       <span className="lib-card-title">{title(video)}</span>
       <span className="lib-card-meta">
@@ -818,7 +755,7 @@ function CategoryChips({ active, onChange, keys }) {
 // ---------------------------------------------------------------------------
 
 function FeaturedHero({ loading }) {
-  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
+  const { t, lang, title, desc, catName, viewer } = useLib();
   const [slide, setSlide] = React.useState(0);
   const items = HERO_SLUGS.map(bySlug);
   const video = items[slide];
@@ -836,7 +773,8 @@ function FeaturedHero({ loading }) {
       </div>
     );
   }
-  const isSaved = saved.includes(video.slug);
+  const translateRoute = "/dashboard/new-translation";
+  const translateHref = viewer === "guest" ? `#/login?redirect=${encodeURIComponent(translateRoute)}` : `#${translateRoute}`;
   return (
     <section className="lib-hero" aria-label={t("hero.label")}>
       <div className="lib-hero-media" style={{ backgroundImage: `url(${BASE()}${HERO_IMAGES[video.slug]})` }} />
@@ -850,16 +788,12 @@ function FeaturedHero({ loading }) {
             <span>{catName(video.category)}</span>
             <span>·</span>
             <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            <span>·</span>
-            <span>{t(`access.${video.access}`)}</span>
           </div>
           <div className="lib-hero-cta">
             <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
               <Play size={16} /> {t("hero.watch")}
             </a>
-            <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-              <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-            </button>
+            <a className="lib-btn is-ghost" href={translateHref}>{t("nav.translateMyVideo")}</a>
           </div>
         </div>
       </div>
@@ -876,11 +810,21 @@ function FeaturedHero({ loading }) {
 // Library page
 // ---------------------------------------------------------------------------
 
-const TREND_CATS = ["ai", "startup", "business", "tech", "biography", "companies"];
-const BROWSE_CATS = ["ai", "startup", "companies", "biography", "science", "product"];
-const ALL_CATS = ["ai", "startup", "business", "tech", "biography", "companies", "product", "language", "worldnews", "science"];
-const TYPES = ["course", "interview", "documentary", "news", "biography"];
-const GRID_STEP = 10;
+const BROWSE_CATS = ["ai", "startup", "tech", "product", "companies", "biography", "science", "language"];
+const MAIN_COLLECTION_CATS = ["ai", "startup", "companies", "biography"];
+const CATEGORY_SLUGS = {
+  ai: "artificial-intelligence",
+  startup: "startups-business",
+  tech: "technology",
+  product: "product-design",
+  companies: "company-stories",
+  biography: "founders",
+  science: "science-future",
+  language: "language-learning",
+};
+const CATEGORY_BY_SLUG = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([key, slug]) => [slug, key]));
+const slugForCat = (key) => CATEGORY_SLUGS[key] || key;
+const catFromSlug = (slug) => CATEGORY_BY_SLUG[slug] || BROWSE_CATS.find((key) => key === slug) || "ai";
 
 function ProgressCard({ video }) {
   const { t, lang, title } = useLib();
@@ -898,84 +842,76 @@ function ProgressCard({ video }) {
   );
 }
 
-function BrowseCategoryGrid({ onPick }) {
+function BrowseCategoryGrid() {
   const { t, catName } = useLib();
   return (
     <div className="lib-cat-grid">
       {BROWSE_CATS.map((key) => {
         const Icon = CAT_ICONS[key] || Sparkles;
         return (
-          <button key={key} className="lib-cat-card" onClick={() => onPick(key)}>
+          <a key={key} className="lib-cat-card" href={`#/library/category/${slugForCat(key)}`}>
             <span className="lib-cat-icon"><Icon size={24} /></span>
             <span>
               <h3>{catName(key)}</h3>
               <p>{t(`categoryCards.${key}`)}</p>
             </span>
-          </button>
+          </a>
         );
       })}
     </div>
   );
 }
 
+function CollectionSection({ id, title, icon, videos, loading, viewAll }) {
+  const IconEl = icon || Sparkles;
+  const { t } = useLib();
+  return (
+    <section className="lib-section lib-wrap" id={id} aria-label={title}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <IconEl size={20} /> {title}
+        </h2>
+        <span className="lib-sec-spacer" />
+        {viewAll ? <a className="lib-viewall" href={viewAll}>{t("actions.viewAll")}</a> : null}
+      </div>
+      <VideoCarousel videos={videos} loading={loading} ariaLabel={title} />
+    </section>
+  );
+}
+
 function LibraryPageInner() {
-  const { t, lang, viewer } = useLib();
+  const { t, viewer, catName } = useLib();
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     const timer = window.setTimeout(() => setLoading(false), 650);
     return () => window.clearTimeout(timer);
   }, []);
 
-  // trending state
-  const [trendFilter, setTrendFilter] = React.useState("popular");
-  const [trendCat, setTrendCat] = React.useState("all");
-  const trending = React.useMemo(() => {
-    let list = [...VIDEOS];
-    if (trendCat !== "all") list = list.filter((v) => v.category === trendCat);
-    if (trendFilter === "new") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    else if (trendFilter === "featured") list = [...list.filter((v) => v.featured || v.banner), ...list.filter((v) => !v.featured && !v.banner)];
-    else list.sort((a, b) => b.viewsK - a.viewsK);
-    return list.slice(0, 10);
-  }, [trendFilter, trendCat]);
-
-  // library state
-  const [type, setType] = React.useState("all");
-  const [cat, setCat] = React.useState("all");
-  const [sort, setSort] = React.useState("newest");
-  const [duration, setDuration] = React.useState("all");
-  const [limit, setLimit] = React.useState(GRID_STEP);
-
-  const filtered = React.useMemo(() => {
-    let list = VIDEOS.filter((v) => {
-      if (type !== "all" && v.type !== type) return false;
-      if (cat !== "all" && v.category !== cat) return false;
-      if (duration === "under15" && v.durationMin >= 15) return false;
-      if (duration === "d15to30" && (v.durationMin < 15 || v.durationMin > 30)) return false;
-      if (duration === "d30to60" && (v.durationMin < 30 || v.durationMin > 60)) return false;
-      if (duration === "over60" && v.durationMin <= 60) return false;
-      return true;
-    });
-    if (sort === "newest") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    if (sort === "popular" || sort === "views") list.sort((a, b) => b.viewsK - a.viewsK);
-    if (sort === "alpha") list.sort((a, b) => (a.title[lang] || a.title.en).localeCompare(b.title[lang] || b.title.en, lang === "fa" ? "fa" : "en"));
-    return list;
-  }, [type, cat, sort, duration, lang]);
-
-  React.useEffect(() => setLimit(GRID_STEP), [type, cat, sort, duration]);
-
   const banner = bySlug(BANNER_SLUG);
   const continueVideos = viewer === "guest" ? [] : VIDEOS.filter((video) => video.progress > 0 && video.progress < 96).slice(0, 4);
+  const trending = React.useMemo(() => [...VIDEOS].sort((a, b) => b.viewsK - a.viewsK).slice(0, 10), []);
   const newVideos = React.useMemo(() => [...VIDEOS].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 10), []);
-  const pickCategory = (key) => {
-    setCat(key);
-    window.location.hash = `#/library?topic=${encodeURIComponent(key)}`;
-    window.setTimeout(() => document.getElementById("lib-all")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  };
+  const collectionVideos = React.useMemo(() => {
+    const used = new Set([...trending.slice(0, 4), ...newVideos.slice(0, 4)].map((video) => video.slug));
+    return Object.fromEntries(MAIN_COLLECTION_CATS.map((key) => {
+      const list = VIDEOS.filter((video) => video.category === key && !used.has(video.slug)).slice(0, 10);
+      return [key, list.length ? list : VIDEOS.filter((video) => video.category === key).slice(0, 10)];
+    }));
+  }, [trending, newVideos]);
 
   return (
     <>
       <LibraryHeader />
       <FeaturedHero loading={loading} />
+
+      <section className="lib-section lib-wrap" id="lib-categories" aria-label={t("sections.browseCategories")} style={{ marginTop: 72 }}>
+        <div className="lib-sec-head">
+          <h2 className="lib-sec-title">
+            <Sparkles size={19} /> {t("sections.browseCategories")}
+          </h2>
+        </div>
+        <BrowseCategoryGrid />
+      </section>
 
       {continueVideos.length ? (
         <section className="lib-section lib-wrap" id="lib-continue" aria-label={t("sections.continueWatching")}>
@@ -990,118 +926,24 @@ function LibraryPageInner() {
         </section>
       ) : null}
 
-      {/* Trending */}
-      <section className="lib-section lib-wrap" id="lib-trending" aria-label={t("trending.title")}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <TrendingUp size={20} /> {t("trending.title")}
-          </h2>
-          <span className="lib-sec-spacer" />
-          <div className="lib-toplinks" role="tablist">
-            {["popular", "new", "featured"].map((key) => (
-              <button key={key} role="tab" aria-selected={trendFilter === key} className={trendFilter === key ? "is-active" : ""} onClick={() => setTrendFilter(key)}>
-                {t(`trending.filters.${key}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <CategoryChips active={trendCat} onChange={setTrendCat} keys={TREND_CATS} />
-        {trending.length === 0 && !loading ? (
-          <div className="lib-empty">
-            <ListVideo size={30} />
-            <p>{t("library.emptyCategory")}</p>
-          </div>
-        ) : (
-          <VideoCarousel videos={trending} loading={loading} ariaLabel={t("trending.title")} />
-        )}
-      </section>
+      <CollectionSection id="lib-trending" title={t("trending.title")} icon={TrendingUp} videos={trending} loading={loading} />
+      <CollectionSection id="lib-new" title={t("sections.newReleases")} icon={ListVideo} videos={newVideos} loading={loading} />
 
-      <section className="lib-section lib-wrap" id="lib-categories" aria-label={t("sections.browseCategories")}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <Sparkles size={19} /> {t("sections.browseCategories")}
-          </h2>
-        </div>
-        <BrowseCategoryGrid onPick={pickCategory} />
-      </section>
-
-      <section className="lib-section lib-wrap" id="lib-new" aria-label={t("sections.newReleases")}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <ListVideo size={20} /> {t("sections.newReleases")}
-          </h2>
-        </div>
-        <VideoCarousel videos={newVideos} loading={loading} ariaLabel={t("sections.newReleases")} />
-      </section>
+      {MAIN_COLLECTION_CATS.map((key) => (
+        <CollectionSection
+          key={key}
+          id={`lib-${key}`}
+          title={catName(key)}
+          icon={CAT_ICONS[key] || Sparkles}
+          videos={collectionVideos[key] || []}
+          loading={loading}
+          viewAll={`#/library/category/${slugForCat(key)}`}
+        />
+      ))}
 
       <div className="lib-wrap" id="lib-editor">
         <FeaturedBanner video={banner} compact />
       </div>
-
-      {/* All videos */}
-      <section className="lib-section lib-wrap" id="lib-all" aria-label={t("sections.allVideos")} style={{ marginTop: 104 }}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <ListVideo size={20} /> {t("sections.allVideos")}
-          </h2>
-        </div>
-        <div className="lib-chips" role="tablist" style={{ marginTop: 18 }}>
-          {["all", ...TYPES].map((key) => (
-            <button key={key} className={`lib-chip${type === key ? " is-active" : ""}`} role="tab" aria-selected={type === key} onClick={() => setType(key)}>
-              {t(`types.${key}`)}
-            </button>
-          ))}
-        </div>
-        <div className="lib-controls-row">
-          <CategoryChips active={cat} onChange={setCat} keys={ALL_CATS} />
-        </div>
-        <div className="lib-controls-row">
-          <span className="lib-sorts">
-            <select className="lib-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label={t("sort.newest")}>
-              {["newest", "popular", "views", "alpha"].map((key) => (
-                <option key={key} value={key}>
-                  {t(`sort.${key}`)}
-                </option>
-              ))}
-            </select>
-            <select className="lib-select" value={duration} onChange={(e) => setDuration(e.target.value)} aria-label={t("sort.allDurations")}>
-              <option value="all">{t("sort.allDurations")}</option>
-              {["under15", "d15to30", "d30to60", "over60"].map((key) => (
-                <option key={key} value={key}>
-                  {t(`sort.${key}`)}
-                </option>
-              ))}
-            </select>
-          </span>
-        </div>
-        {loading ? (
-          <div className="lib-grid">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="lib-empty">
-            <ListVideo size={30} />
-            <p>{t("library.emptyCategory")}</p>
-          </div>
-        ) : (
-          <>
-            <div className="lib-grid">
-              {filtered.slice(0, limit).map((video) => (
-                <VideoCard key={video.slug} video={video} />
-              ))}
-            </div>
-            {filtered.length > limit ? (
-              <div className="lib-loadmore">
-                <button className="lib-btn is-ghost" onClick={() => setLimit((n) => n + GRID_STEP)}>
-                  {t("library.loadMore")}
-                </button>
-              </div>
-            ) : null}
-          </>
-        )}
-      </section>
 
       <footer className="lib-wrap lib-footer">
         <strong>VIDORA</strong> · {t("sections.footerText")}
@@ -1111,9 +953,8 @@ function LibraryPageInner() {
 }
 
 function FeaturedBanner({ video, compact = false }) {
-  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
+  const { t, lang, title, desc, catName } = useLib();
   const [tab, setTab] = React.useState("overview");
-  const isSaved = saved.includes(video.slug);
   const durationSec = video.durationMin * 60;
   const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const similarTitles = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category).slice(0, 3);
@@ -1130,16 +971,11 @@ function FeaturedBanner({ video, compact = false }) {
             <span>{catName(video.category)}</span>
             <span>·</span>
             <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            <span>·</span>
-            <span>{t(`access.${video.access}`)}</span>
           </div>
           <div className="lib-hero-cta">
             <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
               <Play size={16} /> {t("hero.watch")}
             </a>
-            <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-              <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-            </button>
           </div>
           {!compact ? (
             <>
@@ -1316,14 +1152,75 @@ function WatchPageInner() {
   );
 }
 
+function CategoryPageInner({ categoryKey }) {
+  const { t, catName } = useLib();
+  const [loading, setLoading] = React.useState(true);
+  const [limit, setLimit] = React.useState(10);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setLoading(false), 450);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const videos = React.useMemo(() => VIDEOS.filter((video) => video.category === categoryKey).sort((a, b) => b.addedAt.localeCompare(a.addedAt)), [categoryKey]);
+  const featured = videos[0] || VIDEOS[0];
+  const Icon = CAT_ICONS[categoryKey] || Sparkles;
+
+  return (
+    <>
+      <LibraryHeader />
+      <section className="lib-wrap lib-category-intro" aria-label={catName(categoryKey)}>
+        <p className="lib-category-kicker">{t("sections.browseCategories")}</p>
+        <h1 className="lib-category-title"><Icon size={34} /> {catName(categoryKey)}</h1>
+        <p className="lib-category-desc">{t(`categoryDescriptions.${categoryKey}`)}</p>
+      </section>
+
+      {featured ? (
+        <div className="lib-wrap">
+          <FeaturedBanner video={featured} compact />
+        </div>
+      ) : null}
+
+      <section className="lib-section lib-wrap" aria-label={catName(categoryKey)}>
+        {loading ? (
+          <div className="lib-grid">
+            {Array.from({ length: 10 }).map((_, index) => <SkeletonCard key={index} />)}
+          </div>
+        ) : videos.length ? (
+          <>
+            <div className="lib-grid">
+              {videos.slice(0, limit).map((video) => <VideoCard key={video.slug} video={video} />)}
+            </div>
+            {videos.length > limit ? (
+              <div className="lib-loadmore">
+                <button className="lib-btn is-ghost" onClick={() => setLimit((value) => value + 10)}>{t("library.loadMore")}</button>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="lib-empty">
+            <ListVideo size={30} />
+            <p>{t("library.emptyCategory")}</p>
+          </div>
+        )}
+      </section>
+
+      <footer className="lib-wrap lib-footer">
+        <strong>VIDORA</strong> · {t("sections.footerText")}
+      </footer>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
 export function LibraryPage() {
+  const categoryMatch = window.location.hash.match(/^#\/library\/category\/([^?]+)/);
+  const categoryKey = categoryMatch ? catFromSlug(decodeURIComponent(categoryMatch[1])) : null;
   return (
     <LibraryProvider>
-      <LibraryPageInner />
+      {categoryKey ? <CategoryPageInner categoryKey={categoryKey} /> : <LibraryPageInner />}
     </LibraryProvider>
   );
 }
