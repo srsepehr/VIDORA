@@ -7911,36 +7911,36 @@ window.EditorialHeader = EditorialHeader;
 // per-block dir. Premium B&W, DS Button, tokens only.
 
 function MockupPlaceholder() {
-  const mockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-mockup.png`;
+  const mockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-transparent-crisp.png`;
 
   return (
     <div
       className="vh-mockup"
       style={{
-        width: "min(100%, 820px)",
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        aspectRatio: "1635 / 962",
+        aspectRatio: "1375 / 827",
         padding: 0,
       }}
     >
       <img
         src={mockupSrc}
         alt="Vidora video learning interface with Persian subtitles, summary and key takeaways"
-        width={1635}
-        height={962}
+        width={1375}
+        height={827}
         loading="eager"
         fetchPriority="high"
         decoding="sync"
         style={{
           display: "block",
           width: "100%",
-          maxWidth: 820,
           height: "auto",
           objectFit: "contain",
-          filter: "none",
-          boxShadow: "0 20px 42px -34px rgba(0,0,0,0.38)",
+          // transparent PNG — drop-shadow follows the laptop's silhouette
+          // (box-shadow would draw a rectangle around the whole image box)
+          filter: "drop-shadow(0 26px 38px rgba(0,0,0,0.30))",
         }}
       />
     </div>
