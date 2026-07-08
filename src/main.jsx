@@ -7769,8 +7769,8 @@ function MenuToggleIcon({ open, size = 20, duration = 300 }) {
   );
 }
 
-function EditorialHeader() {
-  const { Button, IconButton, LanguageToggle } = window.VidoraDesignSystem_0f84f2;
+function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light" } = {}) {
+  const { Button, IconButton } = window.VidoraDesignSystem_0f84f2;
   const { d } = window.useLang();
   const [open, setOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
@@ -7794,10 +7794,23 @@ function EditorialHeader() {
 
   const isMobile = vw < 768;
   const floating = scrolled && !open && !isMobile;
-  const links = [d.nav.product, d.nav.library, d.nav.pricing];
+  const dark = tone === "dark";
+  const searchOpen = Boolean(search?.open);
+  const defaultLinks = [
+    { label: d.nav.product },
+    { label: d.nav.library, onClick: () => { window.location.hash = "#/library"; } },
+    { label: d.nav.pricing },
+  ];
+  const links = navItems || defaultLinks;
+  const headerBg = dark
+    ? open || floating || scrolled ? "rgba(8,8,10,0.86)" : "rgba(8,8,10,0.78)"
+    : open ? "rgba(255,255,255,0.92)" : floating ? "rgba(255,255,255,0.6)" : "transparent";
+  const headerInk = dark ? "#fff" : "var(--ed-ink)";
+  const headerMuted = dark ? "#d4d4d8" : "var(--ed-text-muted)";
+  const borderColor = dark ? "rgba(255,255,255,.12)" : "var(--border)";
 
   const wordmark = (
-    <span style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: 17, letterSpacing: "0.16em", color: "var(--ed-ink)", userSelect: "none" }}>
+    <span style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: 17, letterSpacing: "0.16em", color: headerInk, userSelect: "none" }}>
       VIDORA
     </span>
   );
@@ -7813,11 +7826,11 @@ function EditorialHeader() {
         width: "100%",
         maxWidth: floating ? 896 : 1024,
         borderRadius: floating ? "var(--radius-md)" : 0,
-        border: floating ? "1px solid var(--border)" : "1px solid transparent",
-        borderBottomColor: (scrolled || open) && !floating ? "var(--border)" : (floating ? "var(--border)" : "transparent"),
-        background: open ? "rgba(255,255,255,0.92)" : floating ? "rgba(255,255,255,0.6)" : "transparent",
-        backdropFilter: floating || open ? "blur(14px)" : "none",
-        WebkitBackdropFilter: floating || open ? "blur(14px)" : "none",
+        border: floating ? `1px solid ${borderColor}` : "1px solid transparent",
+        borderBottomColor: (scrolled || open || dark) && !floating ? borderColor : (floating ? borderColor : "transparent"),
+        background: headerBg,
+        backdropFilter: floating || open || dark ? "blur(14px)" : "none",
+        WebkitBackdropFilter: floating || open || dark ? "blur(14px)" : "none",
         boxShadow: floating ? "var(--shadow-sm)" : "none",
         transition: "max-width 260ms var(--ease-standard), top 260ms var(--ease-standard), background 200ms var(--ease-standard), box-shadow 200ms var(--ease-standard), border-radius 260ms var(--ease-standard), border-color 200ms var(--ease-standard)",
       }}
@@ -7835,29 +7848,96 @@ function EditorialHeader() {
       >
         {wordmark}
 
-        {!isMobile ? (
+        {!isMobile && searchOpen ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, marginInlineStart: 28 }}>
+            <label style={{ height: 42, borderRadius: "var(--radius-full)", border: `1px solid ${dark ? "rgba(255,255,255,.18)" : "var(--border)"}`, background: dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.82)", display: "flex", alignItems: "center", gap: 10, paddingInline: 15, minWidth: 0, flex: 1, color: headerMuted }}>
+              <Search size={17} />
+              <input
+                ref={search.inputRef}
+                value={search.query}
+                onChange={search.onChange}
+                onKeyDown={search.onKeyDown}
+                placeholder={search.placeholder}
+                style={{ height: "100%", minWidth: 0, flex: 1, border: 0, outline: 0, background: "transparent", color: headerInk, font: "inherit", fontWeight: 650, textAlign: search.rtl ? "right" : "left" }}
+                dir={search.rtl ? "rtl" : "ltr"}
+              />
+            </label>
+            <Button variant={dark ? "secondary" : "ghost"} onClick={search.onClose} style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)" } : undefined}>
+              {search.closeLabel}
+            </Button>
+          </div>
+        ) : !isMobile ? (
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {links.map((label, i) => (
-              <Button key={i} variant="ghost" onClick={(e) => { e.preventDefault(); if (i === 1) window.location.hash = "#/library"; }}>{label}</Button>
+            {links.map((item, i) => (
+              <Button
+                key={i}
+                variant="ghost"
+                onClick={(e) => {
+                  e.preventDefault();
+                  item.onClick?.();
+                }}
+                style={dark ? { color: headerMuted } : undefined}
+              >
+                {item.label}
+              </Button>
             ))}
             <div style={{ width: 8 }} />
-            <LanguageToggle />
-            <div style={{ width: 1, height: 24, background: "var(--border)", margin: "0 4px" }} />
+            {mode === "library" && search ? (
+              <IconButton
+                variant="secondary"
+                label={search.searchLabel}
+                onClick={search.onOpen}
+                icon={<Search size={17} />}
+                style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "transparent" } : undefined}
+              />
+            ) : null}
+            <div style={{ width: 1, height: 24, background: dark ? "rgba(255,255,255,.14)" : "var(--border)", margin: "0 4px" }} />
             <Button variant="secondary" onClick={() => { window.location.hash = "#/login"; }}>{d.login}</Button>
-            <Button variant="primary" onClick={() => { window.location.hash = "#/signup"; }}>{d.startFree}</Button>
+            {mode === "landing" ? <Button variant="primary" onClick={() => { window.location.hash = "#/signup"; }}>{d.startFree}</Button> : null}
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LanguageToggle />
+            {mode === "library" && search ? (
+              <IconButton
+                variant="secondary"
+                label={search.searchLabel}
+                onClick={search.onOpen}
+                icon={<Search size={17} />}
+                style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "transparent" } : undefined}
+              />
+            ) : null}
             <IconButton
               variant="secondary"
               label={open ? "Close menu" : "Open menu"}
               onClick={() => setOpen((v) => !v)}
               icon={<MenuToggleIcon open={open} size={20} duration={300} />}
+              style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "transparent" } : undefined}
             />
           </div>
         )}
       </nav>
+
+      {isMobile && searchOpen ? (
+        <div style={{ padding: "0 16px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+          <label style={{ height: 42, borderRadius: "var(--radius-full)", border: `1px solid ${dark ? "rgba(255,255,255,.18)" : "var(--border)"}`, background: dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.82)", display: "flex", alignItems: "center", gap: 10, paddingInline: 15, minWidth: 0, flex: 1, color: headerMuted }}>
+            <Search size={17} />
+            <input
+              ref={search.inputRef}
+              value={search.query}
+              onChange={search.onChange}
+              onKeyDown={search.onKeyDown}
+              placeholder={search.placeholder}
+              style={{ height: "100%", minWidth: 0, flex: 1, border: 0, outline: 0, background: "transparent", color: headerInk, font: "inherit", fontWeight: 650, textAlign: search.rtl ? "right" : "left" }}
+              dir={search.rtl ? "rtl" : "ltr"}
+            />
+          </label>
+          <Button variant={dark ? "secondary" : "ghost"} onClick={search.onClose} style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)" } : undefined}>
+            {search.closeLabel}
+          </Button>
+        </div>
+      ) : null}
+
+      {searchOpen ? search.panel : null}
 
       {isMobile ? (
         <div
@@ -7873,16 +7953,16 @@ function EditorialHeader() {
             justifyContent: "space-between",
             gap: 8,
             padding: 16,
-            background: "rgba(255,255,255,0.96)",
+            background: dark ? "rgba(8,8,10,0.96)" : "rgba(255,255,255,0.96)",
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
-            borderTop: "1px solid var(--border)",
+            borderTop: `1px solid ${borderColor}`,
           }}
         >
           <div style={{ display: "grid", gap: 8 }}>
-            {links.map((label, i) => (
-              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start" }} onClick={() => { setOpen(false); if (i === 1) window.location.hash = "#/library"; }}>
-                {label}
+            {links.map((item, i) => (
+              <Button key={i} variant="ghost" fullWidth style={{ justifyContent: "flex-start", ...(dark ? { color: headerInk } : {}) }} onClick={() => { setOpen(false); item.onClick?.(); }}>
+                {item.label}
               </Button>
             ))}
           </div>
@@ -7970,51 +8050,22 @@ function CategoryCard({ item, rtl }) {
 }
 
 function StatsBar({ d, rtl }) {
-  const avatars = ["#d8d8d4", "#cfcfca", "#dededa", "#c8c8c3"];
   return (
     <div
+      className="vh-card-row"
+      dir={rtl ? "rtl" : "ltr"}
       style={{
         marginTop: 40,
-        display: "flex",
-        alignItems: "center",
-        gap: 28,
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        padding: "22px 28px",
+        display: "grid",
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gap: 14,
+        padding: 0,
         borderRadius: "var(--radius-2xl)",
-        border: "1px solid var(--ed-line)",
-        background: "var(--ed-paper)",
-        boxShadow: "var(--shadow-sm)",
       }}
     >
-      {/* social proof cluster */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ display: "flex", flexDirection: "row-reverse" }}>
-          {avatars.map((c, i) => (
-            <div key={i} style={{ width: 38, height: 38, borderRadius: "var(--radius-full)", background: c, border: "2px solid var(--ed-paper)", marginInlineStart: i === 0 ? 0 : -12 }} />
-          ))}
-          <div style={{ width: 38, height: 38, borderRadius: "var(--radius-full)", background: "var(--ed-ink)", color: "#fff", border: "2px solid var(--ed-paper)", marginInlineStart: -12, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-mono)", fontSize: 10.5, fontWeight: 600 }}>+10K</div>
-        </div>
-        <div dir={rtl ? "rtl" : "ltr"} style={{ textAlign: rtl ? "right" : "left" }}>
-          <div style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600, color: "var(--ed-ink)" }}>{d.joinTitle}</div>
-          <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexDirection: rtl ? "row-reverse" : "row" }}>
-            <span style={{ display: "inline-flex", color: "var(--ed-ink)" }}>
-              {[0, 1, 2, 3, 4].map((s) => <Icon key={s} name="star" size={12} fill />)}
-            </span>
-            <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--ed-text-muted)" }}>{d.rating}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* stat columns */}
-      <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
-        {d.stats.map((st, i) => (
-          <div key={i} style={{ padding: "0 26px", borderInlineStart: i > 0 ? "1px solid var(--ed-line)" : "none", textAlign: "center" }}>
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ed-ink)" }}>{st.num}</div>
-            <div style={{ marginTop: 4, fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--ed-text-muted)" }}>{st.label}</div>
-          </div>
-        ))}
-      </div>
+      {d.categories.map((cat, i) => (
+        <div key={i} className="vh-cardslot"><CategoryCard item={cat} rtl={rtl} /></div>
+      ))}
     </div>
   );
 }
@@ -8027,9 +8078,9 @@ function EditorialHero() {
 
   const css = `
     .vh-wrap{ max-width:1440px; margin:0 auto; padding:52px 40px 40px; }
-    .vh-grid{ display:grid; grid-template-columns:minmax(380px,.95fr) minmax(560px,1.5fr) 292px; gap:20px; align-items:center; }
-    .vh-center{ display:flex; align-items:center; justify-content:center; min-height:460px; }
-    .vh-right{ display:flex; flex-direction:column; gap:16px; align-self:center; }
+    .vh-grid{ display:grid; grid-template-columns:minmax(380px,.92fr) minmax(560px,1.45fr); gap:44px; align-items:center; }
+    .vh-right{ display:flex; align-items:center; justify-content:center; align-self:center; min-height:440px; }
+    .vh-right .vh-mockup{ max-width:720px; }
     .vh-cardslot{ display:flex; }
     .vh-cardslot > div{ width:100%; min-height:118px; }
     /* Category cards (components/ui/heroui-card) — calm grayscale tuning via
@@ -8037,22 +8088,22 @@ function EditorialHero() {
     .vh-cardslot > [data-slot="card"]{ --radius-3xl:16px; box-sizing:border-box; justify-content:center; }
     .vh-cardslot [data-slot="card-title"]{ margin:0; font-size:16px; font-weight:700; line-height:1.5; }
     .vh-cardslot [data-slot="card-description"]{ margin:0; font-size:12px; line-height:1.7; }
-    .vh-catcta{ margin-top:4px; display:flex; justify-content:flex-start; }
+    .vh-card-row .vh-cardslot > div{ min-height:142px; }
     .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
     .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
     .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
     @media (max-width:1320px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
-      .vh-center{ order:2; grid-column:1 / -1; min-height:380px; }
-      .vh-left{ order:1; } .vh-right{ order:3; grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; }
-      .vh-right .vh-cardslot{ flex:1 1 240px; } .vh-right .vh-catcta{ flex:1 1 100%; }
+      .vh-left{ order:1; }
+      .vh-right{ order:2; min-height:360px; }
+      .vh-card-row{ grid-template-columns:repeat(2,minmax(0,1fr))!important; }
     }
     @media (max-width:760px){
       .vh-wrap{ padding:28px 20px; }
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
-      .vh-center{ min-height:260px; }
-      .vh-right{ flex-direction:column; }
-      .vh-right .vh-cardslot{ flex:1 1 auto; }
+      .vh-right{ min-height:260px; }
+      .vh-card-row{ display:flex!important; overflow-x:auto; gap:12px; padding-bottom:4px; scroll-snap-type:x mandatory; }
+      .vh-card-row .vh-cardslot{ min-width:282px; scroll-snap-align:start; }
       .vh-cta,.vh-chips{ width:100%; }
     }
   `;
@@ -8084,29 +8135,9 @@ function EditorialHero() {
             </div>
           </div>
 
-          {/* CENTER — empty mockup placeholder (user replaces with an image later) */}
-          <div className="vh-center">
-            <MockupPlaceholder />
-          </div>
-
-          {/* RIGHT — category cards + CTA */}
+          {/* RIGHT — Mac mockup in the former floating-card area */}
           <div className="vh-right">
-            {d.categories.map((cat, i) => (
-              <div key={i} className="vh-cardslot"><CategoryCard item={cat} rtl={rtl} /></div>
-            ))}
-            <div className="vh-catcta">
-              <button
-                type="button"
-                dir={rtl ? "rtl" : "ltr"}
-                className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-full border border-zinc-200 bg-white px-6 text-[13px] font-semibold text-zinc-900 shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
-                style={{ fontFamily: "inherit" }}
-              >
-                {d.categoriesCta}
-                {rtl
-                  ? <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
-                  : <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />}
-              </button>
-            </div>
+            <MockupPlaceholder />
           </div>
         </div>
 
@@ -8329,10 +8360,16 @@ const dashboardCopy = { en: dashboardEn, fa: dashboardFa };
 const dashboardViews = new Set(["dashboard", "new-video", "library", "saved", "profile", "subscription", "support", "settings"]);
 const dashboardViewAliases = {
   completed: "library",
+  videos: "library",
+  "new-translation": "new-video",
   watchlist: "saved",
   notes: "saved",
   usage: "subscription",
   billing: "subscription",
+};
+const dashboardRouteSegments = {
+  "new-video": "new-translation",
+  library: "videos",
 };
 
 const sidebarGroups = [
@@ -8342,6 +8379,7 @@ const sidebarGroups = [
       { icon: Gauge, labelKey: "dashboard", view: "dashboard" },
       { icon: Upload, labelKey: "newTranslation", view: "new-video" },
       { icon: Library, labelKey: "myVideos", view: "library", count: "24" },
+      { icon: Library, labelKey: "publicLibrary", externalHash: "#/library" },
     ],
   },
   {
@@ -8360,7 +8398,6 @@ const sidebarGroups = [
     labelKey: "help",
     items: [
       { icon: MessageCircle, labelKey: "support", view: "support" },
-      { icon: LogOut, labelKey: "logout", action: "logout" },
     ],
   },
 ];
@@ -8419,6 +8456,7 @@ function VidoraDashboard() {
   const [profileSaved, setProfileSaved] = React.useState(false);
   const [supportSent, setSupportSent] = React.useState(false);
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
   const [toast, setToast] = React.useState("");
 
   React.useEffect(() => {
@@ -8431,7 +8469,19 @@ function VidoraDashboard() {
     if (!dashboardViews.has(view)) return;
     setActiveView(view);
     setLogoutConfirm(false);
-    window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${view}`;
+    setProfileMenuOpen(false);
+    const segment = dashboardRouteSegments[view] || view;
+    window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
+  };
+
+  const signOut = () => {
+    try {
+      window.localStorage.removeItem("vidora-viewer");
+      window.localStorage.removeItem("vidoraViewerState");
+    } catch (e) {/* ignore */}
+    setLogoutConfirm(false);
+    setProfileMenuOpen(false);
+    window.location.hash = "#/";
   };
 
   const showToast = (message) => {
@@ -8604,7 +8654,7 @@ function VidoraDashboard() {
     <section className="vd-card vd-profile">
       <div className="vd-form-grid"><label>{t.settings.defaultOutput}<select className="vd-input" defaultValue="Persian"><option value="Persian">{t.upload.persian}</option><option value="English">{t.upload.english}</option></select></label></div>
       <div className="vd-toggle-grid">{[t.settings.autoSubtitles, t.settings.autoSummaries, t.settings.saveNotes].map((label) => <label className="vd-toggle is-on" key={label}><span />{label}</label>)}</div>
-      <div className="vd-danger-zone"><button className="vd-secondary" onClick={() => setLogoutConfirm(true)}><LogOut size={16} /> {t.actions.logout}</button><button className="vd-secondary danger" onClick={() => showToast(t.toast.deleteRequested)}><Trash2 size={16} /> {t.actions.deleteAccount}</button></div>
+      <div className="vd-danger-zone"><button className="vd-secondary danger" onClick={() => showToast(t.toast.deleteRequested)}><Trash2 size={16} /> {t.actions.deleteAccount}</button></div>
     </section>
   );
 
@@ -8623,7 +8673,13 @@ function VidoraDashboard() {
   const renderSidebarItem = (item) => {
     const ItemIcon = item.icon;
     const isActive = item.view === activeView;
-    const onClick = () => item.action === "logout" ? setLogoutConfirm(true) : selectView(item.view);
+    const onClick = () => {
+      if (item.externalHash) {
+        window.location.hash = item.externalHash;
+        return;
+      }
+      selectView(item.view);
+    };
     return (
       <button className={`vd-nav-item ${isActive ? "is-active" : ""}`} key={item.labelKey} onClick={onClick}>
         <ItemIcon size={18} strokeWidth={1.8} />
@@ -8638,11 +8694,21 @@ function VidoraDashboard() {
       <div>
         {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
       </div>
-      <button className="vd-user vd-sidebar-profile" onClick={() => selectView("profile")}>
-        <div className="vd-avatar">S</div>
-        <div><h2>Sepehr</h2><p className="vd-technical-text">sepehrrahimpour8@gmail.com</p></div>
-        <MoreHorizontal size={17} />
-      </button>
+      <div className="vd-profile-menu-wrap">
+        {profileMenuOpen ? (
+          <div className="vd-profile-menu" role="menu">
+            <button role="menuitem" onClick={() => selectView("profile")}>{t.profileMenu.account}</button>
+            <button role="menuitem" onClick={() => selectView("settings")}>{t.profileMenu.settings}</button>
+            <button role="menuitem" onClick={() => { setProfileMenuOpen(false); window.location.hash = "#/"; }}>{t.profileMenu.backToWebsite}</button>
+            <button role="menuitem" className="is-danger" onClick={() => setLogoutConfirm(true)}>{t.profileMenu.logout}</button>
+          </div>
+        ) : null}
+        <button className="vd-user vd-sidebar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-expanded={profileMenuOpen}>
+          <div className="vd-avatar">S</div>
+          <div><h2>Sepehr</h2><p className="vd-technical-text">sepehrrahimpour8@gmail.com</p></div>
+          <MoreHorizontal size={17} />
+        </button>
+      </div>
     </aside>
   );
 
@@ -8658,7 +8724,7 @@ function VidoraDashboard() {
       <style dangerouslySetInnerHTML={{ __html: `
         .vd-page{min-height:100vh;background:radial-gradient(circle at 14% 8%,rgba(255,255,255,.7),transparent 32%),linear-gradient(135deg,#d8d8d5 0%,#c4c5c1 48%,#dededb 100%);display:flex;align-items:center;justify-content:center;padding:32px;font-family:var(--font-sans);color:#111;overflow:hidden}
         .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden;direction:ltr}.is-fa .vd-shell{grid-template-columns:minmax(0,1fr) 310px}
-        .vd-sidebar{grid-column:1;border-radius:28px;background:rgba(243,244,241,.55);border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:24px 20px;overflow:auto;display:flex;flex-direction:column}.is-fa .vd-sidebar{grid-column:2}.vd-user{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:14px;margin-bottom:24px;text-align:left;cursor:pointer;color:#111}.vd-sidebar-profile{margin-top:auto;margin-bottom:0;border-top:1px solid rgba(30,30,28,.1);padding:18px 13px 0}.vd-sidebar-profile>div:nth-child(2){min-width:0;flex:1}.vd-sidebar-profile svg{color:#696b67;flex:0 0 auto}.is-fa .vd-user{text-align:right}.vd-avatar{width:54px;height:54px;border-radius:999px;background:linear-gradient(145deg,#fafafa,#d9dad6);border:1px solid rgba(255,255,255,.7);box-shadow:0 10px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#202020;flex:0 0 auto}.vd-avatar.large{width:82px;height:82px;font-size:30px}.vd-user h2{margin:0;font-size:19px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6d6f6b;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vd-technical-text{direction:ltr;text-align:left;unicode-bidi:plaintext}.vd-section{padding:14px 0}.vd-section+.vd-section{border-top:1px solid rgba(30,30,28,.1)}.vd-label{font-size:12px;color:#858782;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+        .vd-sidebar{grid-column:1;border-radius:28px;background:rgba(243,244,241,.55);border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);padding:24px 20px;overflow:auto;display:flex;flex-direction:column}.is-fa .vd-sidebar{grid-column:2}.vd-user{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:14px;margin-bottom:24px;text-align:left;cursor:pointer;color:#111}.vd-profile-menu-wrap{position:relative;margin-top:auto}.vd-sidebar-profile{margin-top:0;margin-bottom:0;border-top:1px solid rgba(30,30,28,.1);padding:18px 13px 0}.vd-sidebar-profile>div:nth-child(2){min-width:0;flex:1}.vd-sidebar-profile svg{color:#696b67;flex:0 0 auto}.vd-profile-menu{position:absolute;left:0;right:0;bottom:82px;border-radius:18px;border:1px solid rgba(255,255,255,.58);background:rgba(245,246,243,.9);box-shadow:0 22px 52px rgba(42,43,40,.18),inset 0 1px 0 rgba(255,255,255,.64);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);padding:8px;display:grid;gap:3px;z-index:5}.vd-profile-menu button{height:38px;border:0;border-radius:12px;background:transparent;color:#191a18;text-align:left;padding:0 11px;font:inherit;font-size:13px;font-weight:720;cursor:pointer}.vd-profile-menu button:hover{background:rgba(255,255,255,.48)}.vd-profile-menu button.is-danger{color:#3a1717}.is-fa .vd-profile-menu button{text-align:right}.is-fa .vd-user{text-align:right}.vd-avatar{width:54px;height:54px;border-radius:999px;background:linear-gradient(145deg,#fafafa,#d9dad6);border:1px solid rgba(255,255,255,.7);box-shadow:0 10px 18px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#202020;flex:0 0 auto}.vd-avatar.large{width:82px;height:82px;font-size:30px}.vd-user h2{margin:0;font-size:19px;line-height:1.1;font-weight:700;letter-spacing:0}.vd-user p{margin:5px 0 0;color:#6d6f6b;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vd-technical-text{direction:ltr;text-align:left;unicode-bidi:plaintext}.vd-section{padding:14px 0}.vd-section+.vd-section{border-top:1px solid rgba(30,30,28,.1)}.vd-label{font-size:12px;color:#858782;margin:0 0 10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
         .vd-nav-list{display:grid;gap:5px}.vd-nav-item{height:44px;width:100%;border:0;border-radius:14px;background:transparent;color:#191a18;display:grid;grid-template-columns:24px 1fr auto;grid-template-areas:"icon label count";align-items:center;gap:12px;padding:0 13px;text-align:left;font-size:14px;font-weight:650;cursor:pointer;letter-spacing:0;transition:background .18s ease,box-shadow .18s ease}.vd-nav-item svg{grid-area:icon;color:#2d2e2c}.vd-nav-item>span:not(.vd-count){grid-area:label}.is-fa .vd-nav-item{grid-template-columns:auto 1fr 24px;grid-template-areas:"count label icon";text-align:right}.vd-nav-item:hover{background:rgba(255,255,255,.32)}.vd-nav-item.is-active{height:50px;border:1px solid rgba(255,255,255,.62);background:rgba(255,255,255,.42);box-shadow:0 14px 28px rgba(110,114,109,.18),inset 0 1px 0 rgba(255,255,255,.66)}.vd-count{grid-area:count;min-width:26px;height:24px;border-radius:999px;background:rgba(255,255,255,.45);display:inline-flex;align-items:center;justify-content:center;color:#777976;font-size:12px;font-weight:750}
         .vd-main{grid-column:2;border-radius:30px;background:rgba(241,242,239,.52);border:1px solid rgba(255,255,255,.52);box-shadow:inset 0 1px 0 rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:38px;overflow:auto}.is-fa .vd-main{grid-column:1}.vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:24px}.vd-head h1{margin:0;font-size:42px;line-height:1.05;font-weight:720;letter-spacing:0;color:#101010}.vd-head p{margin:10px 0 0;color:#727570;font-size:17px;line-height:1.45;max-width:720px}.is-fa .vd-head,.is-fa .vd-head p,.is-fa .vd-head h1{text-align:right}
         .vd-card{border-radius:22px;border:1px solid rgba(255,255,255,.56);background:rgba(255,255,255,.34);box-shadow:0 16px 42px rgba(65,66,62,.1),inset 0 1px 0 rgba(255,255,255,.48);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.vd-top-grid{display:grid;grid-template-columns:minmax(220px,.34fr) minmax(320px,1fr);gap:18px;margin-bottom:20px}.vd-stats{display:grid;gap:16px}.vd-stats.single{grid-template-columns:1fr}.vd-stats.three{grid-template-columns:repeat(3,1fr)}.vd-stats.two{grid-template-columns:repeat(2,1fr)}.vd-stat{min-height:132px;padding:22px}.vd-stat span{display:block;color:#555854;font-size:13px;font-weight:750;letter-spacing:.01em}.vd-stat strong{display:block;font-size:50px;line-height:.95;font-weight:560;letter-spacing:-.03em;margin-top:22px;color:#222321}
@@ -8674,7 +8740,7 @@ function VidoraDashboard() {
         {isFa ? <>{mainPanel}{sidebarPanel}</> : <>{sidebarPanel}{mainPanel}</>}
       </section>
       <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name || "")} hidden />
-      {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={() => { setLogoutConfirm(false); window.location.hash = "#/login"; }}>{t.actions.logout}</button></div></div></div> : null}
+      {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={signOut}>{t.actions.logout}</button></div></div></div> : null}
       {toast ? <div className="vd-toast">{toast}</div> : null}
     </main>
   );
@@ -8781,6 +8847,14 @@ function useAuthLang() {
 // Auth backdrop — the user's own photo, committed to the repo.
 const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/IMG_0766.JPG`;
 
+function finishMockAuth(defaultHash = "#/dashboard") {
+  try {
+    window.localStorage.setItem("vidora-viewer", "subscriber");
+  } catch (e) {/* ignore */}
+  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
+  window.location.hash = redirect ? `#${redirect}` : defaultHash;
+}
+
 function LoginPage() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
@@ -8791,14 +8865,10 @@ function LoginPage() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     console.log("Sign In submitted:", data);
-    // Mock session: signing in grants full library access, and honors a
-    // ?redirect=/watch/[slug] param so gated videos resume where the user was.
-    try {
-      window.localStorage.setItem("vidora-viewer", "subscriber");
-    } catch (e) {/* ignore */}
-    const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
-    window.location.hash = redirect ? `#${redirect}` : "#/dashboard";
+    // Mock session: signing in grants full library access and honors redirect.
+    finishMockAuth();
   };
+  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
 
   return (
     <div className="vd-signin dark bg-background text-foreground">
@@ -8810,9 +8880,9 @@ function LoginPage() {
         heroImageSrc={AUTH_HERO_IMAGE()}
         testimonials={t.testimonials}
         onSignIn={handleSignIn}
-        onGoogleSignIn={() => { window.location.hash = "#/dashboard"; }}
+        onGoogleSignIn={() => finishMockAuth()}
         onResetPassword={() => console.log("Reset password clicked")}
-        onCreateAccount={() => { window.location.hash = "#/signup"; }}
+        onCreateAccount={() => { window.location.hash = redirect ? `#/signup?redirect=${encodeURIComponent(redirect)}` : "#/signup"; }}
       />
     </div>
   );
@@ -8828,7 +8898,9 @@ function SignupPage() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     console.log("Sign Up submitted:", data);
+    finishMockAuth();
   };
+  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
 
   return (
     <div className="vd-signin dark bg-background text-foreground">
@@ -8840,8 +8912,8 @@ function SignupPage() {
         heroImageSrc={AUTH_HERO_IMAGE()}
         testimonials={t.testimonials}
         onSignUp={handleSignUp}
-        onGoogleSignUp={() => console.log("Continue with Google clicked")}
-        onSignIn={() => { window.location.hash = "#/login"; }}
+        onGoogleSignUp={() => finishMockAuth()}
+        onSignIn={() => { window.location.hash = redirect ? `#/login?redirect=${encodeURIComponent(redirect)}` : "#/login"; }}
       />
     </div>
   );
