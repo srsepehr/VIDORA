@@ -1,11 +1,10 @@
 {
   "nav": {
     "home": "Home",
-    "library": "Library",
-    "categories": "Categories",
     "new": "New",
     "myList": "My List",
     "login": "Log in",
+    "profile": "My account",
     "search": "Search",
     "menu": "Menu",
     "close": "Close"
@@ -18,6 +17,11 @@
     "preview": "Preview",
     "slide": "Slide {n}"
   },
+  "continueWatching": {
+    "title": "Continue Watching",
+    "remaining": "{minutes} min left",
+    "resume": "Resume"
+  },
   "trending": {
     "title": "Trending Now",
     "filters": { "popular": "Popular", "new": "New", "featured": "Featured" },
@@ -25,19 +29,28 @@
     "prev": "Previous",
     "next": "Next"
   },
+  "browse": {
+    "title": "Browse by Category",
+    "count": "{count} videos"
+  },
+  "newOn": {
+    "title": "New on Vidora",
+    "badge": "New"
+  },
+  "editorsPick": {
+    "label": "Editor's Pick"
+  },
   "categories": {
     "all": "All",
+    "allTopics": "All topics",
     "ai": "Artificial Intelligence",
-    "aiShort": "AI",
-    "startup": "Startups",
-    "business": "Business",
+    "startups": "Startups & Business",
     "tech": "Technology",
-    "biography": "Biography",
-    "companies": "Company Stories",
     "product": "Product Design",
-    "language": "Language Learning",
-    "worldnews": "World News",
-    "science": "Science"
+    "companies": "Company Stories",
+    "founders": "Founders",
+    "science": "Science & Future",
+    "language": "Language Learning"
   },
   "types": {
     "all": "All",
@@ -47,20 +60,28 @@
     "news": "News",
     "biography": "Biographies"
   },
-  "library": {
-    "title": "Library",
-    "searchPlaceholder": "Search videos",
+  "allVideos": {
+    "title": "All Videos",
     "loadMore": "Load More",
     "emptyCategory": "No videos in this category yet.",
-    "emptySearch": "No videos match your search.",
     "error": "We couldn't load the videos.",
     "retry": "Try again"
+  },
+  "search": {
+    "placeholder": "Search videos",
+    "recent": "Recent searches",
+    "suggestions": "Suggestions",
+    "clear": "Clear",
+    "resultsFor": "Results for \"{q}\"",
+    "resultsCount": "{count} videos",
+    "empty": "No videos match your search.",
+    "close": "Close"
   },
   "sort": {
     "newest": "Newest",
     "popular": "Most popular",
     "views": "Most viewed",
-    "alpha": "A–Z",
+    "shortest": "Shortest",
     "allDurations": "All durations",
     "under15": "Under 15 min",
     "d15to30": "15–30 min",
@@ -76,10 +97,11 @@
     "unsave": "Remove from saved",
     "play": "Play"
   },
-  "banner": {
-    "tabs": { "overview": "Overview", "chapters": "Chapters", "similar": "Similar" }
+  "footer": {
+    "tagline": "The world's best educational videos, in your language.",
+    "rights": "© 2026 Vidora. All rights reserved.",
+    "support": "Support"
   },
-  "similar": { "title": "Similar Videos" },
   "watch": {
     "back": "Library",
     "about": "About this video",
@@ -97,6 +119,7 @@
     "previewNote": "You're watching a preview. The full video requires an account.",
     "loginToSave": "Sign in to save videos.",
     "savedToast": "Added to your list",
-    "unsavedToast": "Removed from your list"
+    "unsavedToast": "Removed from your list",
+    "similar": "Similar Videos"
   }
 }

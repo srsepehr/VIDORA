@@ -1,7 +1,8 @@
-// Vidora Library — public monochrome content-discovery page (#/library) and
-// the dedicated watch route (#/watch/:slug). Structure mirrors the provided
-// streaming-reference: cinematic hero, trending carousel, main grid with
-// search/filters/sort, secondary featured banner, similar-videos carousel.
+// Vidora Library — public monochrome content-discovery page (#/library), the
+// dedicated watch route (#/watch/:slug), and the search route (#/search?q=).
+// Page flow: Hero → Continue Watching (logged-in only) → Trending → Browse by
+// Category → New on Vidora → Editor's Pick → All Videos → Footer.
+// Search lives only in the header (expanding input + live results overlay).
 // Strictly black / white / neutral gray. All copy lives in
 // src/locales/{en,fa}/library.json; language follows the site-wide selector.
 import React from "react";
@@ -10,15 +11,15 @@ import {
   ArrowRight,
   Bookmark,
   BrainCircuit,
-  Briefcase,
   Building2,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   Cpu,
   FileText,
   FlaskConical,
-  Globe,
   Languages,
+  LayoutGrid,
   ListVideo,
   Lock,
   Menu as MenuIcon,
@@ -56,7 +57,7 @@ function makeT(lang) {
 const fmtNum = (lang, n) => Number(n).toLocaleString(lang === "fa" ? "fa-IR" : "en-US", { useGrouping: false });
 
 // ---------------------------------------------------------------------------
-// Mock viewer/auth state (guest | member | subscriber) + saved list
+// Mock viewer/auth state (guest | member | subscriber), saved list, recents
 // ---------------------------------------------------------------------------
 
 function readViewer() {
@@ -76,24 +77,41 @@ function readSaved() {
   }
 }
 
+function readRecentSearches() {
+  try {
+    return JSON.parse(window.localStorage.getItem("vidora-recent-searches") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function pushRecentSearch(q) {
+  const trimmed = q.trim();
+  if (!trimmed) return readRecentSearches();
+  const next = [trimmed, ...readRecentSearches().filter((item) => item !== trimmed)].slice(0, 5);
+  try {
+    window.localStorage.setItem("vidora-recent-searches", JSON.stringify(next));
+  } catch (e) {/* ignore */}
+  return next;
+}
+
 // ---------------------------------------------------------------------------
 // Content (mocked; bilingual titles/descriptions)
+// Topics: ai, startups, tech, product, companies, founders, science, language
 // ---------------------------------------------------------------------------
 
 const CAT_ICONS = {
   ai: BrainCircuit,
-  startup: Rocket,
-  business: Briefcase,
+  startups: Rocket,
   tech: Cpu,
-  biography: User,
-  companies: Building2,
   product: Package,
-  language: Languages,
-  worldnews: Globe,
+  companies: Building2,
+  founders: User,
   science: FlaskConical,
+  language: Languages,
 };
 
-// tone: rotating monochrome thumbnail gradients (kept dark & calm)
+// rotating monochrome thumbnail gradients (kept dark & calm)
 const TONES = [
   "linear-gradient(160deg,#26262c 0%,#101014 62%,#0a0a0d 100%)",
   "linear-gradient(200deg,#1c1c22 0%,#0e0e12 55%,#131318 100%)",
@@ -144,25 +162,30 @@ const VIDEOS = [
     },
   }),
   V("how-ai-agents-work", "AI Agentها چگونه کار می‌کنند", "How AI Agents Work", "ai", "course", 24, 64, "free", "2026-07-06", { progress: 45 }),
-  V("startup-pricing", "استراتژی قیمت‌گذاری برای استارتاپ‌ها", "Pricing Strategy for Startups", "startup", "course", 42, 71, "subscription", "2026-07-05"),
-  V("founder-paths", "مسیر رشد بنیان‌گذاران", "The Founder's Growth Path", "biography", "biography", 47, 38, "preview", "2026-06-30"),
+  V("startup-pricing", "استراتژی قیمت‌گذاری برای استارتاپ‌ها", "Pricing Strategy for Startups", "startups", "course", 42, 71, "subscription", "2026-07-05", { progress: 62 }),
+  V("founder-paths", "مسیر رشد بنیان‌گذاران", "The Founder's Growth Path", "founders", "biography", 47, 38, "preview", "2026-06-30"),
   V("product-builders", "درس‌هایی از سازندگان محصول", "Lessons from Product Builders", "product", "interview", 33, 27, "free", "2026-06-26"),
   V("ai-economics", "اقتصاد هوش مصنوعی", "The Economics of AI", "ai", "documentary", 29, 44, "subscription", "2026-06-24"),
   V("successful-products", "چگونه محصولات موفق ساخته می‌شوند", "How Successful Products Are Made", "product", "course", 36, 52, "free", "2026-06-22"),
-  V("future-of-work", "آینده بازار کار", "The Future of Work", "business", "documentary", 31, 76, "preview", "2026-06-18"),
-  V("entrepreneur-decisions", "زندگی و تصمیم‌های کارآفرینان بزرگ", "Decisions of Great Entrepreneurs", "biography", "biography", 58, 41, "subscription", "2026-06-15"),
+  V("future-of-work", "آینده بازار کار", "The Future of Work", "startups", "documentary", 31, 76, "preview", "2026-06-18"),
+  V("entrepreneur-decisions", "زندگی و تصمیم‌های کارآفرینان بزرگ", "Decisions of Great Entrepreneurs", "founders", "biography", 58, 41, "subscription", "2026-06-15"),
   V("english-with-video", "یادگیری زبان با ویدیوهای واقعی", "Learning Languages with Real Videos", "language", "course", 22, 33, "free", "2026-06-12"),
   V("tech-trends", "روندهای فناوری ۲۰۲۶", "Tech Trends 2026", "tech", "news", 27, 58, "preview", "2026-06-10"),
-  V("world-economy", "مرور اقتصاد جهان", "World Economy Brief", "worldnews", "news", 18, 21, "free", "2026-06-08"),
+  V("world-economy", "مرور اقتصاد جهان", "World Economy Brief", "startups", "news", 18, 21, "free", "2026-06-08"),
   V("design-thinking", "تفکر طراحی در عمل", "Design Thinking in Practice", "product", "course", 40, 30, "subscription", "2026-06-05"),
-  V("space-science", "علم فضا برای همه", "Space Science for Everyone", "science", "documentary", 44, 66, "preview", "2026-06-02"),
-  V("bootstrapping", "رشد بدون سرمایه‌گذار", "Growing Without Investors", "startup", "interview", 35, 25, "free", "2026-05-28"),
-  V("brand-story", "چگونه برند ساخته می‌شود", "How Brands Are Built", "business", "course", 30, 19, "subscription", "2026-05-24"),
+  V("space-science", "علم فضا برای همه", "Space Science for Everyone", "science", "documentary", 44, 66, "preview", "2026-06-02", { progress: 15 }),
+  V("bootstrapping", "رشد بدون سرمایه‌گذار", "Growing Without Investors", "startups", "interview", 35, 25, "free", "2026-05-28"),
+  V("brand-story", "چگونه برند ساخته می‌شود", "How Brands Are Built", "startups", "course", 30, 19, "subscription", "2026-05-24"),
   V("ai-in-schools", "هوش مصنوعی در آموزش", "AI in Education", "ai", "news", 26, 35, "free", "2026-05-20"),
 ];
 
 const HERO_SLUGS = ["future-of-ai", "sam-altman-talk", "building-giants"];
-const BANNER_SLUG = "openai-history";
+const EDITORS_PICK_SLUG = "openai-history";
+const TOPICS = ["ai", "startups", "tech", "product", "companies", "founders", "science", "language"];
+const BROWSE_TOPICS = ["ai", "startups", "companies", "founders", "science", "product"];
+const TYPES = ["course", "interview", "documentary", "news", "biography"];
+const NEWEST = [...VIDEOS].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 5);
+
 const bySlug = (slug) => VIDEOS.find((v) => v.slug === slug);
 const toneOf = (video) => TONES[VIDEOS.indexOf(video) % TONES.length];
 
@@ -181,6 +204,12 @@ const CHAPTERS = [
   { frac: 0.74, fa: "جمع‌بندی و قدم بعدی", en: "Wrap-up & next steps" },
 ];
 
+function searchVideos(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return VIDEOS.filter((v) => v.title.fa.toLowerCase().includes(q) || v.title.en.toLowerCase().includes(q));
+}
+
 // ---------------------------------------------------------------------------
 // Styles — strict monochrome, logical properties for RTL
 // ---------------------------------------------------------------------------
@@ -196,25 +225,48 @@ const CSS = `
 .lib-wrap{max-width:1440px;margin:0 auto;padding-inline:40px}
 
 /* header */
-.lib-head{position:sticky;top:0;z-index:60;background:rgba(8,8,10,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.lib-head-in{height:64px;display:flex;align-items:center;gap:22px}
+.lib-head{position:sticky;top:0;z-index:60;background:rgba(8,8,10,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.lib-head-in{height:64px;display:flex;align-items:center;gap:22px;position:relative}
 .lib-logo{display:flex;align-items:center;flex:none}
 .lib-logo img{height:20px;width:auto;display:block}
 .lib-logo span{font-weight:800;letter-spacing:.16em;font-size:16px;color:#fff}
 .lib-nav{display:flex;gap:4px;margin-inline:auto}
 .lib-nav button{height:34px;padding-inline:14px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--mut)}
 .lib-nav button:hover{color:#fff}
-.lib-nav button.is-active{background:#fff;color:#000}
-.lib-head-actions{display:flex;align-items:center;gap:10px;flex:none}
+.lib-head-actions{display:flex;align-items:center;gap:10px;flex:none;margin-inline-start:auto}
 .lib-iconbtn{width:36px;height:36px;border-radius:999px;display:grid;place-items:center;color:#d6d6dd}
 .lib-iconbtn:hover{background:var(--s2)}
 .lib-login{height:36px;padding-inline:16px;border-radius:999px;background:#fff;color:#000;font-weight:700;font-size:13px;display:inline-flex;align-items:center}
+.lib-avatarbtn{width:34px;height:34px;border-radius:999px;background:var(--s3);border:1px solid var(--line2);display:grid;place-items:center;color:#fff}
 .lib-burger{display:none}
+
+/* header search */
+.lib-hsearch{flex:1;display:flex;align-items:center;gap:11px;height:42px;border:1px solid var(--line2);border-radius:999px;background:var(--s1);padding-inline:16px;min-width:0}
+.lib-hsearch:focus-within{border-color:rgba(255,255,255,.45)}
+.lib-hsearch input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:14px;color:#fff}
+.lib-hsearch input::placeholder{color:var(--mut2)}
+.lib-hsearch svg{color:var(--mut);flex:none}
+.lib-search-close{height:34px;padding-inline:14px;border-radius:999px;font-size:13px;font-weight:650;color:var(--mut);flex:none}
+.lib-search-close:hover{color:#fff}
+.lib-search-panel{position:absolute;top:calc(100% + 8px);inset-inline-start:0;inset-inline-end:0;margin-inline:auto;width:min(720px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.55);padding:10px;z-index:65;max-height:70vh;overflow-y:auto}
+.lib-sp-label{font-size:11px;font-weight:750;letter-spacing:.06em;color:var(--mut2);text-transform:uppercase;padding:8px 10px 4px;display:flex;justify-content:space-between;align-items:center}
+.lib-sp-label button{font-size:11px;color:var(--mut);text-transform:none;letter-spacing:0}
+.lib-sp-label button:hover{color:#fff}
+.lib-sr{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:11px;width:100%}
+.lib-sr:hover,.lib-sr.is-active{background:var(--s2)}
+.lib-sr-thumb{width:58px;height:38px;border-radius:8px;flex:none;display:grid;place-items:center;overflow:hidden}
+.lib-sr-thumb svg{opacity:.3;color:#fff}
+.lib-sr-title{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-sr-meta{font-size:11.5px;color:var(--mut);margin-top:2px;display:flex;gap:6px;align-items:center}
+.lib-sr-badge{margin-inline-start:auto;flex:none;height:22px;padding-inline:8px;border-radius:999px;border:1px solid rgba(255,255,255,.28);font-size:10px;font-weight:700;display:inline-flex;align-items:center;color:var(--mut)}
+.lib-sp-empty{padding:22px 10px;text-align:center;color:var(--mut);font-size:13px}
+
+/* drawer */
 .lib-drawer-veil{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:70}
 .lib-drawer{position:fixed;top:0;bottom:0;inset-inline-start:0;width:270px;background:var(--s1);border-inline-end:1px solid var(--line);z-index:75;padding:20px;display:none;flex-direction:column;gap:4px}
 .lib-drawer.is-open{display:flex}
 .lib-drawer button{height:44px;border-radius:11px;padding-inline:13px;text-align:start;font-weight:650;font-size:14.5px;color:var(--mut);display:flex;align-items:center;gap:10px}
-.lib-drawer button.is-active{background:#fff;color:#000}
+.lib-drawer button:hover{background:var(--s2);color:#fff}
 
 /* buttons */
 .lib-btn{height:44px;border-radius:10px;padding-inline:22px;font-size:14px;font-weight:750;display:inline-flex;align-items:center;justify-content:center;gap:9px;white-space:nowrap}
@@ -222,7 +274,7 @@ const CSS = `
 .lib-btn.is-primary:hover{background:#e4e4e8}
 .lib-btn.is-ghost{background:rgba(255,255,255,.08);border:1px solid var(--line2);color:#fff}
 .lib-btn.is-ghost:hover{background:rgba(255,255,255,.14)}
-.lib-btn.is-sm{height:36px;padding-inline:14px;font-size:12.5px;border-radius:9px}
+.lib-btn.is-sm{height:34px;padding-inline:13px;font-size:12.5px;border-radius:9px}
 
 /* hero */
 .lib-hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
@@ -230,7 +282,7 @@ const CSS = `
 .lib-hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.94) 0%,rgba(8,8,10,.72) 34%,rgba(8,8,10,.28) 62%,rgba(8,8,10,.55) 100%)}
 [dir="rtl"] .lib-hero-shade{background:linear-gradient(270deg,rgba(8,8,10,.94) 0%,rgba(8,8,10,.72) 34%,rgba(8,8,10,.28) 62%,rgba(8,8,10,.55) 100%)}
 .lib-hero-shade::after{content:"";position:absolute;inset-inline:0;bottom:0;height:34%;background:linear-gradient(180deg,transparent,rgba(8,8,10,.9))}
-.lib-hero-in{position:relative;min-height:clamp(430px,58vh,620px);display:flex;align-items:center;padding-block:64px}
+.lib-hero-in{position:relative;min-height:clamp(420px,56vh,600px);display:flex;align-items:center;padding-block:64px}
 .lib-hero-box{max-width:41%;display:grid;gap:16px}
 .lib-hero-label{font-size:12px;font-weight:750;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
 .lib-hero-title{font-size:clamp(30px,3.4vw,50px);font-weight:800;line-height:1.16;letter-spacing:-.01em}
@@ -242,8 +294,8 @@ const CSS = `
 .lib-hero-dots button.is-active{background:#fff}
 
 /* sections */
-.lib-section{margin-top:88px}
-.lib-section.is-tight{margin-top:64px}
+.lib-section{margin-top:96px}
+.lib-section.is-first{margin-top:72px}
 .lib-sec-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .lib-sec-title{display:flex;align-items:center;gap:11px;font-size:21px;font-weight:800;letter-spacing:-.01em}
 .lib-sec-title svg{color:var(--mut)}
@@ -253,7 +305,7 @@ const CSS = `
 .lib-toplinks button:hover{color:#fff}
 .lib-toplinks button.is-active{background:#fff;color:#000}
 
-/* chips + pills */
+/* chips */
 .lib-chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:22px;padding-block:2px}
 .lib-chips::-webkit-scrollbar{display:none}
 .lib-chip{height:34px;flex:none;padding-inline:15px;border-radius:999px;border:1px solid var(--line2);background:transparent;font-size:12.5px;font-weight:650;color:#d6d6dd;display:inline-flex;align-items:center;gap:7px}
@@ -269,9 +321,8 @@ const CSS = `
 .lib-arrow:hover{background:var(--s3)}
 .lib-arrow.is-prev{inset-inline-start:-19px}
 .lib-arrow.is-next{inset-inline-end:-19px}
-.lib-arrow:disabled{opacity:.3;cursor:default}
 
-/* card */
+/* standard card */
 .lib-card{display:grid;gap:10px;min-width:0;text-align:start}
 .lib-thumb{position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--s2)}
 .lib-thumb-art{position:absolute;inset:0;display:grid;place-items:center;transition:transform .35s ease}
@@ -291,38 +342,46 @@ const CSS = `
 .lib-card-meta{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:18px}
 .lib-card-extra{font-size:11.5px;color:var(--mut2)}
 
-/* library controls */
-.lib-search{display:flex;align-items:center;gap:11px;height:48px;border-radius:12px;border:1px solid var(--line2);background:var(--s1);padding-inline:16px;margin-top:26px}
-.lib-search:focus-within{border-color:rgba(255,255,255,.45)}
-.lib-search input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:14px;color:#fff}
-.lib-search input::placeholder{color:var(--mut2)}
-.lib-search svg{color:var(--mut);flex:none}
-.lib-sorts{display:flex;gap:10px;margin-inline-start:auto}
+/* continue watching */
+.lib-cw-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:24px}
+.lib-cw-card{display:flex;gap:13px;align-items:center;border:1px solid var(--line);border-radius:13px;background:var(--s1);padding:13px;min-width:0}
+.lib-cw-card:hover{border-color:rgba(255,255,255,.28);background:var(--s2)}
+.lib-cw-thumb{width:84px;height:56px;border-radius:9px;flex:none;display:grid;place-items:center;position:relative;overflow:hidden}
+.lib-cw-thumb svg{opacity:.28;color:#fff}
+.lib-cw-body{flex:1;min-width:0;display:grid;gap:7px}
+.lib-cw-title{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-cw-meter{height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}
+.lib-cw-meter>span{display:block;height:100%;background:#fff;border-radius:inherit}
+.lib-cw-sub{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--mut)}
+.lib-cw-resume{font-weight:750;color:#fff;display:inline-flex;align-items:center;gap:5px}
+
+/* browse by category */
+.lib-cats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-top:26px}
+.lib-cat-card{border:1px solid var(--line);border-radius:14px;background:var(--s1);padding:20px 16px;display:grid;gap:12px;justify-items:center;text-align:center;min-width:0}
+.lib-cat-card:hover{border-color:rgba(255,255,255,.32);background:var(--s2)}
+.lib-cat-icon{width:46px;height:46px;border-radius:999px;background:var(--s3);border:1px solid var(--line2);display:grid;place-items:center;color:#e6e6ec}
+.lib-cat-name{font-size:13px;font-weight:750;line-height:1.5}
+.lib-cat-count{font-size:11.5px;color:var(--mut2)}
+
+/* editor's pick (compact banner) */
+.lib-banner{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+.lib-banner-media{position:absolute;inset:0;background-size:cover;background-position:center 30%;filter:grayscale(1)}
+.lib-banner-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.95) 0%,rgba(8,8,10,.7) 42%,rgba(8,8,10,.3) 100%)}
+[dir="rtl"] .lib-banner-shade{background:linear-gradient(270deg,rgba(8,8,10,.95) 0%,rgba(8,8,10,.7) 42%,rgba(8,8,10,.3) 100%)}
+.lib-banner-in{position:relative;padding:38px clamp(24px,4vw,52px);min-height:264px;display:flex;flex-direction:column;justify-content:center}
+.lib-banner-box{max-width:48%;display:grid;gap:12px}
+.lib-banner-title{font-size:clamp(22px,2.4vw,32px);font-weight:800;letter-spacing:-.01em;line-height:1.25}
+.lib-banner-desc{color:#cfcfd6;font-size:13.5px;line-height:1.8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* controls + grid */
 .lib-select{height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--s1);color:#d6d6dd;padding-inline:10px;font-size:12.5px;font-weight:600;outline:none}
 .lib-select:focus{border-color:rgba(255,255,255,.4)}
-.lib-controls-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
-
-/* grid */
+.lib-controls-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}
 .lib-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:26px 16px;margin-top:30px}
 .lib-loadmore{display:grid;place-items:center;margin-top:36px}
 .lib-empty{display:grid;place-items:center;text-align:center;gap:6px;padding:70px 20px;border:1px dashed var(--line);border-radius:14px;margin-top:30px}
 .lib-empty svg{color:var(--mut2);margin-bottom:6px}
 .lib-empty p{color:var(--mut);font-size:14px}
-
-/* secondary banner */
-.lib-banner{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-top:100px}
-.lib-banner-media{position:absolute;inset:0;background-size:cover;background-position:center 30%;filter:grayscale(1)}
-.lib-banner-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.95) 0%,rgba(8,8,10,.7) 42%,rgba(8,8,10,.3) 100%)}
-[dir="rtl"] .lib-banner-shade{background:linear-gradient(270deg,rgba(8,8,10,.95) 0%,rgba(8,8,10,.7) 42%,rgba(8,8,10,.3) 100%)}
-.lib-banner-in{position:relative;padding:46px clamp(24px,4vw,56px);min-height:340px;display:flex;flex-direction:column;justify-content:center;gap:14px}
-.lib-banner-box{max-width:46%;display:grid;gap:13px}
-.lib-banner-title{font-size:clamp(24px,2.6vw,36px);font-weight:800;letter-spacing:-.01em;line-height:1.2}
-.lib-banner-tabs{display:flex;gap:3px;margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
-.lib-banner-tabs button{height:32px;padding-inline:13px;border-radius:999px;font-size:12.5px;font-weight:650;color:var(--mut)}
-.lib-banner-tabs button.is-active{background:#fff;color:#000}
-.lib-banner-panel{color:#cfcfd6;font-size:13.5px;line-height:1.85;min-height:64px}
-.lib-banner-panel .lib-chaprow{display:flex;gap:10px;align-items:center;padding-block:4px}
-.lib-ts{color:#fff;font-weight:750;font-size:11.5px;font-variant-numeric:tabular-nums}
 
 /* skeletons */
 .lib-skel{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%);background-size:200% 100%;animation:libshimmer 1.4s infinite linear;border-radius:12px}
@@ -332,6 +391,14 @@ const CSS = `
 /* toast */
 .lib-toasts{position:fixed;bottom:22px;inset-inline-end:22px;display:grid;gap:8px;z-index:90}
 .lib-toast{background:#fff;color:#000;border-radius:11px;padding:11px 15px;font-size:13px;font-weight:700;box-shadow:0 16px 40px rgba(0,0,0,.45);max-width:320px}
+
+/* footer */
+.lib-footer{margin-top:104px;border-top:1px solid var(--line);padding-block:34px 44px}
+.lib-footer-in{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.lib-footer-links{display:flex;gap:18px;margin-inline:auto}
+.lib-footer-links button{font-size:13px;color:var(--mut);font-weight:600}
+.lib-footer-links button:hover{color:#fff}
+.lib-footer-rights{font-size:12px;color:var(--mut2)}
 
 /* watch page */
 .lib-watch{padding-block:34px 90px}
@@ -355,6 +422,7 @@ const CSS = `
 .lib-inc svg{color:#d6d6dd}
 .lib-note{border:1px solid var(--line2);border-radius:11px;background:var(--s1);color:var(--mut);font-size:13px;padding:11px 14px;margin-top:12px;line-height:1.7}
 .lib-pillbadge{height:24px;padding-inline:10px;border-radius:999px;border:1px solid rgba(255,255,255,.3);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;color:#fff}
+.lib-ts{color:#fff;font-weight:750;font-size:11.5px;font-variant-numeric:tabular-nums}
 
 @media(prefers-reduced-motion:reduce){.lib-root *{transition:none!important;animation:none!important}}
 
@@ -365,23 +433,29 @@ const CSS = `
   .lib-hero-box{max-width:60%}
   .lib-banner-box{max-width:70%}
   .lib-watch-cols{grid-template-columns:1fr}
+  .lib-cw-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lib-cats{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:760px){
   .lib-wrap{padding-inline:18px}
   .lib-nav,.lib-login{display:none}
   .lib-burger{display:grid}
   .lib-head-in{height:56px;gap:12px}
+  .lib-search-panel{width:100%}
   .lib-row{grid-auto-columns:calc((100% - 12px)/1.9);gap:12px}
   .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}
-  .lib-hero-in{min-height:430px;align-items:flex-end;padding-block:40px 56px}
+  .lib-hero-in{min-height:420px;align-items:flex-end;padding-block:40px 56px}
   .lib-hero-box{max-width:100%}
-  .lib-section{margin-top:56px}
+  .lib-section{margin-top:60px}
   .lib-banner-box{max-width:100%}
   .lib-banner-in{min-height:0;padding:26px 18px}
   .lib-arrow{display:none}
-  .lib-sorts{margin-inline-start:0;width:100%}
-  .lib-sorts .lib-select{flex:1}
+  .lib-cw-grid{grid-template-columns:1fr}
+  .lib-cats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lib-controls-row .lib-select{flex:1}
   .lib-toasts{inset-inline:14px;bottom:14px}
+  .lib-footer-in{flex-direction:column;align-items:flex-start;gap:14px}
+  .lib-footer-links{margin-inline:0}
 }
 `;
 
@@ -393,7 +467,7 @@ const Ctx = React.createContext(null);
 const useLib = () => React.useContext(Ctx);
 
 function LibraryProvider({ children }) {
-  const { lang, setLang } = window.useLang();
+  const { lang } = window.useLang();
   const rtl = lang === "fa";
   const t = React.useMemo(() => makeT(lang), [lang]);
   const [viewer] = React.useState(readViewer);
@@ -428,7 +502,7 @@ function LibraryProvider({ children }) {
   const title = (video) => video.title[lang] || video.title.en;
   const desc = (video) => (video.desc ? video.desc[lang] || video.desc.en : GENERIC_DESC[lang] || GENERIC_DESC.en);
 
-  const ctx = { t, lang, rtl, setLang, viewer, saved, toggleSave, showToast, catName, title, desc };
+  const ctx = { t, lang, rtl, viewer, saved, toggleSave, showToast, catName, title, desc };
   return (
     <Ctx.Provider value={ctx}>
       <div className="lib-root" dir={rtl ? "rtl" : "ltr"} lang={lang}>
@@ -447,24 +521,161 @@ function LibraryProvider({ children }) {
 }
 
 // ---------------------------------------------------------------------------
-// Header (logo stays physically left in both languages)
+// Header — logo stays physically left; search expands in place with a live
+// results overlay (no page scrolling), recent searches, keyboard navigation.
 // ---------------------------------------------------------------------------
 
+function HeaderSearch({ onClose }) {
+  const { t, lang, catName, title } = useLib();
+  const [q, setQ] = React.useState("");
+  const [active, setActive] = React.useState(-1);
+  const [recent, setRecent] = React.useState(readRecentSearches);
+  const inputRef = React.useRef(null);
+  const wrapRef = React.useRef(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  React.useEffect(() => {
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [onClose]);
+
+  const results = React.useMemo(() => searchVideos(q).slice(0, 6), [q]);
+  const suggestions = React.useMemo(() => [...VIDEOS].sort((a, b) => b.viewsK - a.viewsK).slice(0, 4), []);
+
+  const openVideo = (video) => {
+    pushRecentSearch(q || title(video));
+    onClose();
+    window.location.hash = `#/watch/${video.slug}`;
+  };
+  const submit = () => {
+    if (active >= 0 && results[active]) return openVideo(results[active]);
+    if (!q.trim()) return;
+    setRecent(pushRecentSearch(q));
+    onClose();
+    window.location.hash = `#/search?q=${encodeURIComponent(q.trim())}`;
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") onClose();
+    else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((i) => Math.min(results.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => Math.max(-1, i - 1));
+    } else if (e.key === "Enter") submit();
+  };
+
+  const resultRow = (video, i) => {
+    const Icon = CAT_ICONS[video.category] || Sparkles;
+    return (
+      <button key={video.slug} className={`lib-sr${i === active ? " is-active" : ""}`} onClick={() => openVideo(video)}>
+        <span className="lib-sr-thumb" style={{ background: toneOf(video) }}>
+          <Icon size={22} strokeWidth={1.4} />
+        </span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span className="lib-sr-title" style={{ display: "block" }}>
+            {title(video)}
+          </span>
+          <span className="lib-sr-meta">
+            <span>{catName(video.category)}</span>
+            <span>·</span>
+            <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
+          </span>
+        </span>
+        <span className="lib-sr-badge">{t(`access.${video.access}`)}</span>
+      </button>
+    );
+  };
+
+  return (
+    <div ref={wrapRef} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+      <div className="lib-hsearch" role="search">
+        <Search size={16} />
+        <input
+          id="lib-header-search"
+          ref={inputRef}
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setActive(-1);
+          }}
+          onKeyDown={onKey}
+          placeholder={t("search.placeholder")}
+          aria-label={t("search.placeholder")}
+          dir={/[؀-ۿ]/.test(q) || (!q && useLib) ? undefined : undefined}
+        />
+        {q ? (
+          <button onClick={() => setQ("")} aria-label={t("search.clear")} style={{ display: "grid", color: "var(--mut)" }}>
+            <X size={15} />
+          </button>
+        ) : null}
+      </div>
+      <button className="lib-search-close" onClick={onClose}>
+        {t("search.close")}
+      </button>
+      <div className="lib-search-panel" role="listbox" aria-label={t("search.placeholder")}>
+        {q.trim() ? (
+          results.length ? (
+            results.map(resultRow)
+          ) : (
+            <p className="lib-sp-empty">{t("search.empty")}</p>
+          )
+        ) : (
+          <>
+            {recent.length ? (
+              <>
+                <p className="lib-sp-label">
+                  {t("search.recent")}
+                  <button
+                    onClick={() => {
+                      try {
+                        window.localStorage.removeItem("vidora-recent-searches");
+                      } catch (e) {/* ignore */}
+                      setRecent([]);
+                    }}
+                  >
+                    {t("search.clear")}
+                  </button>
+                </p>
+                {recent.map((term) => (
+                  <button key={term} className="lib-sr" onClick={() => setQ(term)}>
+                    <span className="lib-sr-thumb" style={{ background: "var(--s2)" }}>
+                      <Clock3 size={16} strokeWidth={1.6} style={{ opacity: 0.5 }} />
+                    </span>
+                    <span className="lib-sr-title">{term}</span>
+                  </button>
+                ))}
+              </>
+            ) : null}
+            <p className="lib-sp-label">{t("search.suggestions")}</p>
+            {suggestions.map(resultRow)}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LibraryHeader() {
-  const { t } = useLib();
+  const { t, viewer } = useLib();
   const [drawer, setDrawer] = React.useState(false);
+  const [searchOpen, setSearchOpen] = React.useState(false);
   const [logoBroken, setLogoBroken] = React.useState(false);
+  const goMyList = () => {
+    window.location.hash = viewer === "guest" ? "#/login?redirect=/library" : "#/dashboard/saved";
+  };
   const items = [
     { key: "home", label: t("nav.home"), go: () => (window.location.hash = "#/") },
-    { key: "library", label: t("nav.library"), go: () => (window.location.hash = "#/library"), active: true },
-    { key: "categories", label: t("nav.categories"), go: () => document.getElementById("lib-main")?.scrollIntoView({ behavior: "smooth" }) },
-    { key: "new", label: t("nav.new"), go: () => document.getElementById("lib-trending")?.scrollIntoView({ behavior: "smooth" }) },
-    { key: "mylist", label: t("nav.myList"), go: () => document.getElementById("lib-main")?.scrollIntoView({ behavior: "smooth" }) },
+    { key: "new", label: t("nav.new"), go: () => document.getElementById("lib-new")?.scrollIntoView({ behavior: "smooth" }) },
+    { key: "mylist", label: t("nav.myList"), go: goMyList },
   ];
-  const focusSearch = () => {
-    document.getElementById("lib-search-input")?.focus();
-    document.getElementById("lib-main")?.scrollIntoView({ behavior: "smooth" });
-  };
+  const closeSearch = React.useCallback(() => setSearchOpen(false), []);
   return (
     <header className="lib-head">
       <div className="lib-wrap lib-head-in" dir="ltr">
@@ -472,24 +683,36 @@ function LibraryHeader() {
           {logoBroken ? null : <img src={`${BASE()}assets/logos/vidora-mark-white.png`} alt="" onError={() => setLogoBroken(true)} />}
           <span>VIDORA</span>
         </a>
-        <nav className="lib-nav" aria-label={t("nav.menu")}>
-          {items.map((item) => (
-            <button key={item.key} className={item.active ? "is-active" : ""} onClick={item.go}>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="lib-head-actions">
-          <button className="lib-iconbtn" aria-label={t("nav.search")} onClick={focusSearch}>
-            <Search size={17} />
-          </button>
-          <a className="lib-login" href="#/login">
-            {t("nav.login")}
-          </a>
-          <button className="lib-iconbtn lib-burger" aria-label={t("nav.menu")} onClick={() => setDrawer(true)}>
-            <MenuIcon size={19} />
-          </button>
-        </div>
+        {searchOpen ? (
+          <HeaderSearch onClose={closeSearch} />
+        ) : (
+          <>
+            <nav className="lib-nav" aria-label={t("nav.menu")}>
+              {items.map((item) => (
+                <button key={item.key} onClick={item.go}>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="lib-head-actions">
+              <button className="lib-iconbtn" aria-label={t("nav.search")} aria-expanded={searchOpen} onClick={() => setSearchOpen(true)}>
+                <Search size={17} />
+              </button>
+              {viewer === "guest" ? (
+                <a className="lib-login" href="#/login">
+                  {t("nav.login")}
+                </a>
+              ) : (
+                <a className="lib-avatarbtn" href="#/dashboard" aria-label={t("nav.profile")} title={t("nav.profile")}>
+                  <User size={16} />
+                </a>
+              )}
+              <button className="lib-iconbtn lib-burger" aria-label={t("nav.menu")} onClick={() => setDrawer(true)}>
+                <MenuIcon size={19} />
+              </button>
+            </div>
+          </>
+        )}
       </div>
       {drawer ? <div className="lib-drawer-veil" onClick={() => setDrawer(false)} /> : null}
       <div className={`lib-drawer${drawer ? " is-open" : ""}`}>
@@ -497,18 +720,18 @@ function LibraryHeader() {
           <X size={18} />
         </button>
         {items.map((item) => (
-          <button key={item.key} className={item.active ? "is-active" : ""} onClick={() => { setDrawer(false); item.go(); }}>
+          <button key={item.key} onClick={() => { setDrawer(false); item.go(); }}>
             {item.label}
           </button>
         ))}
-        <button onClick={() => (window.location.hash = "#/login")}>{t("nav.login")}</button>
+        {viewer === "guest" ? <button onClick={() => (window.location.hash = "#/login")}>{t("nav.login")}</button> : <button onClick={() => (window.location.hash = "#/dashboard")}>{t("nav.profile")}</button>}
       </div>
     </header>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Primitives
+// Primitives — one standard media card + one compact progress card
 // ---------------------------------------------------------------------------
 
 function AccessBadge({ video }) {
@@ -542,14 +765,10 @@ function SaveButton({ video }) {
   );
 }
 
-function VideoCard({ video }) {
+function VideoCard({ video, flag }) {
   const { t, lang, catName, title } = useLib();
   const Icon = CAT_ICONS[video.category] || Sparkles;
-  const extra = video.progress
-    ? t("card.watching")
-    : video.viewsK >= 40
-      ? t("card.views", { count: fmtNum(lang, video.viewsK) })
-      : null;
+  const extra = flag || (video.progress ? t("card.watching") : video.viewsK >= 40 ? t("card.views", { count: fmtNum(lang, video.viewsK) }) : null);
   return (
     <a className="lib-card" href={`#/watch/${video.slug}`} aria-label={title(video)}>
       <span className="lib-thumb">
@@ -576,7 +795,32 @@ function VideoCard({ video }) {
         <span>·</span>
         <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
       </span>
-      <span className="lib-card-extra">{extra || " "}</span>
+      <span className="lib-card-extra">{extra || " "}</span>
+    </a>
+  );
+}
+
+function ContinueCard({ video }) {
+  const { t, lang, title } = useLib();
+  const Icon = CAT_ICONS[video.category] || Sparkles;
+  const remaining = Math.max(1, Math.round((video.durationMin * (100 - video.progress)) / 100));
+  return (
+    <a className="lib-cw-card" href={`#/watch/${video.slug}`} aria-label={title(video)}>
+      <span className="lib-cw-thumb" style={{ background: toneOf(video) }}>
+        <Icon size={24} strokeWidth={1.3} />
+      </span>
+      <span className="lib-cw-body">
+        <span className="lib-cw-title">{title(video)}</span>
+        <span className="lib-cw-meter" dir="ltr">
+          <span style={{ width: `${video.progress}%` }} />
+        </span>
+        <span className="lib-cw-sub">
+          <span>{t("continueWatching.remaining", { minutes: fmtNum(lang, remaining) })}</span>
+          <span className="lib-cw-resume">
+            <Play size={11} /> {t("continueWatching.resume")}
+          </span>
+        </span>
+      </span>
     </a>
   );
 }
@@ -591,7 +835,7 @@ function SkeletonCard() {
   );
 }
 
-function VideoCarousel({ videos, loading, ariaLabel }) {
+function VideoCarousel({ videos, loading, ariaLabel, flagFor }) {
   const { t, rtl } = useLib();
   const rowRef = React.useRef(null);
   const scroll = (fwd) => {
@@ -608,7 +852,7 @@ function VideoCarousel({ videos, loading, ariaLabel }) {
       <div className="lib-row" ref={rowRef} tabIndex={0} role="list" aria-label={ariaLabel}>
         {loading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
-          : videos.map((video) => <VideoCard key={video.slug} video={video} />)}
+          : videos.map((video) => <VideoCard key={video.slug} video={video} flag={flagFor ? flagFor(video) : undefined} />)}
       </div>
       <button className="lib-arrow is-next" aria-label={t("trending.next")} onClick={() => scroll(true)}>
         {rtl ? <ChevronLeft size={19} /> : <ChevronRight size={19} />}
@@ -617,10 +861,10 @@ function VideoCarousel({ videos, loading, ariaLabel }) {
   );
 }
 
-function CategoryChips({ active, onChange, keys }) {
+function CategoryChips({ active, onChange, keys, max = 6 }) {
   const { t, catName } = useLib();
   const [expanded, setExpanded] = React.useState(false);
-  const visible = expanded ? keys : keys.slice(0, 6);
+  const visible = expanded ? keys : keys.slice(0, max);
   return (
     <div className="lib-chips" role="tablist">
       <button className={`lib-chip${active === "all" ? " is-active" : ""}`} role="tab" aria-selected={active === "all"} onClick={() => onChange("all")}>
@@ -631,7 +875,7 @@ function CategoryChips({ active, onChange, keys }) {
           {catName(key)}
         </button>
       ))}
-      {!expanded && keys.length > 6 ? (
+      {!expanded && keys.length > max ? (
         <button className="lib-chip" onClick={() => setExpanded(true)}>
           {t("trending.more")} +
         </button>
@@ -641,7 +885,7 @@ function CategoryChips({ active, onChange, keys }) {
 }
 
 // ---------------------------------------------------------------------------
-// Hero
+// Sections
 // ---------------------------------------------------------------------------
 
 function FeaturedHero({ loading }) {
@@ -699,39 +943,149 @@ function FeaturedHero({ loading }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Library page
-// ---------------------------------------------------------------------------
+function ContinueWatching() {
+  const { t, viewer } = useLib();
+  if (viewer === "guest") return null;
+  const inProgress = VIDEOS.filter((v) => v.progress).slice(0, 4);
+  if (inProgress.length === 0) return null;
+  return (
+    <section className="lib-section is-first lib-wrap" aria-label={t("continueWatching.title")}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <Clock3 size={19} /> {t("continueWatching.title")}
+        </h2>
+      </div>
+      <div className="lib-cw-grid">
+        {inProgress.map((video) => (
+          <ContinueCard key={video.slug} video={video} />
+        ))}
+      </div>
+    </section>
+  );
+}
 
-const TREND_CATS = ["ai", "startup", "business", "tech", "biography", "companies"];
-const ALL_CATS = ["ai", "startup", "business", "tech", "biography", "companies", "product", "language", "worldnews", "science"];
-const TYPES = ["course", "interview", "documentary", "news", "biography"];
-const GRID_STEP = 10;
-
-function LibraryPageInner() {
-  const { t, lang } = useLib();
-  const [loading, setLoading] = React.useState(true);
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 650);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  // trending state
-  const [trendFilter, setTrendFilter] = React.useState("popular");
-  const [trendCat, setTrendCat] = React.useState("all");
+function TrendingSection({ loading }) {
+  const { t } = useLib();
+  const [filter, setFilter] = React.useState("popular");
+  const [topic, setTopic] = React.useState("all");
   const trending = React.useMemo(() => {
     let list = [...VIDEOS];
-    if (trendCat !== "all") list = list.filter((v) => v.category === trendCat);
-    if (trendFilter === "new") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    else if (trendFilter === "featured") list = [...list.filter((v) => v.featured || v.banner), ...list.filter((v) => !v.featured && !v.banner)];
+    if (topic !== "all") list = list.filter((v) => v.category === topic);
+    if (filter === "new") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+    else if (filter === "featured") list = [...list.filter((v) => v.featured || v.banner), ...list.filter((v) => !v.featured && !v.banner)];
     else list.sort((a, b) => b.viewsK - a.viewsK);
     return list.slice(0, 10);
-  }, [trendFilter, trendCat]);
+  }, [filter, topic]);
+  return (
+    <section className="lib-section lib-wrap" aria-label={t("trending.title")}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <TrendingUp size={20} /> {t("trending.title")}
+        </h2>
+        <span className="lib-sec-spacer" />
+        <div className="lib-toplinks" role="tablist">
+          {["popular", "new", "featured"].map((key) => (
+            <button key={key} role="tab" aria-selected={filter === key} className={filter === key ? "is-active" : ""} onClick={() => setFilter(key)}>
+              {t(`trending.filters.${key}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <CategoryChips active={topic} onChange={setTopic} keys={TOPICS} />
+      {trending.length === 0 && !loading ? (
+        <div className="lib-empty">
+          <ListVideo size={30} />
+          <p>{t("allVideos.emptyCategory")}</p>
+        </div>
+      ) : (
+        <VideoCarousel videos={trending} loading={loading} ariaLabel={t("trending.title")} />
+      )}
+    </section>
+  );
+}
 
-  // library state
-  const [query, setQuery] = React.useState("");
+function BrowseByCategory({ onPick }) {
+  const { t, catName } = useLib();
+  return (
+    <section className="lib-section lib-wrap" aria-label={t("browse.title")}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <LayoutGrid size={19} /> {t("browse.title")}
+        </h2>
+      </div>
+      <div className="lib-cats">
+        {BROWSE_TOPICS.map((key) => {
+          const Icon = CAT_ICONS[key];
+          const count = VIDEOS.filter((v) => v.category === key).length;
+          return (
+            <button key={key} className="lib-cat-card" onClick={() => onPick(key)}>
+              <span className="lib-cat-icon">
+                <Icon size={21} strokeWidth={1.7} />
+              </span>
+              <span className="lib-cat-name">{catName(key)}</span>
+              <span className="lib-cat-count">{t("browse.count", { count: fmtNum(useLib().lang, count) })}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function NewOnVidora({ loading }) {
+  const { t } = useLib();
+  const newSlugs = new Set(NEWEST.map((v) => v.slug));
+  return (
+    <section className="lib-section lib-wrap" id="lib-new" aria-label={t("newOn.title")}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <Sparkles size={19} /> {t("newOn.title")}
+        </h2>
+      </div>
+      <VideoCarousel videos={NEWEST} loading={loading} ariaLabel={t("newOn.title")} flagFor={(v) => (newSlugs.has(v.slug) ? t("newOn.badge") : undefined)} />
+    </section>
+  );
+}
+
+function EditorsPick() {
+  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
+  const video = bySlug(EDITORS_PICK_SLUG);
+  const isSaved = saved.includes(video.slug);
+  return (
+    <section className="lib-section lib-wrap" aria-label={t("editorsPick.label")}>
+      <div className="lib-banner">
+        <div className="lib-banner-media" style={{ backgroundImage: `url(${BASE()}${BANNER_IMAGE})` }} />
+        <div className="lib-banner-shade" />
+        <div className="lib-banner-in">
+          <div className="lib-banner-box">
+            <p className="lib-hero-label">{t("editorsPick.label")}</p>
+            <h2 className="lib-banner-title">{title(video)}</h2>
+            <p className="lib-banner-desc">{desc(video)}</p>
+            <div className="lib-hero-meta">
+              <span>{catName(video.category)}</span>
+              <span>·</span>
+              <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
+            </div>
+            <div className="lib-hero-cta">
+              <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
+                <Play size={16} /> {t("hero.watch")}
+              </a>
+              <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
+                <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const GRID_STEP = 10;
+
+function AllVideos({ loading, topic, setTopic }) {
+  const { t, lang } = useLib();
   const [type, setType] = React.useState("all");
-  const [cat, setCat] = React.useState("all");
   const [sort, setSort] = React.useState("newest");
   const [duration, setDuration] = React.useState("all");
   const [limit, setLimit] = React.useState(GRID_STEP);
@@ -739,209 +1093,188 @@ function LibraryPageInner() {
   const filtered = React.useMemo(() => {
     let list = VIDEOS.filter((v) => {
       if (type !== "all" && v.type !== type) return false;
-      if (cat !== "all" && v.category !== cat) return false;
+      if (topic !== "all" && v.category !== topic) return false;
       if (duration === "under15" && v.durationMin >= 15) return false;
       if (duration === "d15to30" && (v.durationMin < 15 || v.durationMin > 30)) return false;
       if (duration === "d30to60" && (v.durationMin < 30 || v.durationMin > 60)) return false;
       if (duration === "over60" && v.durationMin <= 60) return false;
-      if (query) {
-        const q = query.trim().toLowerCase();
-        return v.title.fa.toLowerCase().includes(q) || v.title.en.toLowerCase().includes(q);
-      }
       return true;
     });
     if (sort === "newest") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     if (sort === "popular" || sort === "views") list.sort((a, b) => b.viewsK - a.viewsK);
-    if (sort === "alpha") list.sort((a, b) => (a.title[lang] || a.title.en).localeCompare(b.title[lang] || b.title.en, lang === "fa" ? "fa" : "en"));
     return list;
-  }, [query, type, cat, sort, duration, lang]);
+  }, [type, topic, sort, duration]);
 
-  React.useEffect(() => setLimit(GRID_STEP), [query, type, cat, sort, duration]);
+  React.useEffect(() => setLimit(GRID_STEP), [type, topic, sort, duration]);
 
-  const banner = bySlug(BANNER_SLUG);
-  const similar = VIDEOS.filter((v) => v.slug !== BANNER_SLUG && (v.category === banner.category || v.category === "ai")).slice(0, 8);
+  return (
+    <section className="lib-section lib-wrap" id="lib-all" aria-label={t("allVideos.title")}>
+      <div className="lib-sec-head">
+        <h2 className="lib-sec-title">
+          <ListVideo size={20} /> {t("allVideos.title")}
+        </h2>
+      </div>
+      <div className="lib-chips" role="tablist" style={{ marginTop: 20 }}>
+        {["all", ...TYPES].map((key) => (
+          <button key={key} className={`lib-chip${type === key ? " is-active" : ""}`} role="tab" aria-selected={type === key} onClick={() => setType(key)}>
+            {t(`types.${key}`)}
+          </button>
+        ))}
+      </div>
+      <div className="lib-controls-row">
+        <select className="lib-select" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label={t("categories.allTopics")}>
+          <option value="all">{t("categories.allTopics")}</option>
+          {TOPICS.map((key) => (
+            <option key={key} value={key}>
+              {t(`categories.${key}`)}
+            </option>
+          ))}
+        </select>
+        <select className="lib-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label={t("sort.newest")}>
+          {["newest", "popular", "views"].map((key) => (
+            <option key={key} value={key}>
+              {t(`sort.${key}`)}
+            </option>
+          ))}
+        </select>
+        <select className="lib-select" value={duration} onChange={(e) => setDuration(e.target.value)} aria-label={t("sort.allDurations")}>
+          <option value="all">{t("sort.allDurations")}</option>
+          {["under15", "d15to30", "d30to60", "over60"].map((key) => (
+            <option key={key} value={key}>
+              {t(`sort.${key}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+      {loading ? (
+        <div className="lib-grid">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="lib-empty">
+          <ListVideo size={30} />
+          <p>{t("allVideos.emptyCategory")}</p>
+        </div>
+      ) : (
+        <>
+          <div className="lib-grid">
+            {filtered.slice(0, limit).map((video) => (
+              <VideoCard key={video.slug} video={video} />
+            ))}
+          </div>
+          {filtered.length > limit ? (
+            <div className="lib-loadmore">
+              <button className="lib-btn is-ghost" onClick={() => setLimit((n) => n + GRID_STEP)}>
+                {t("allVideos.loadMore")}
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+function LibraryFooter() {
+  const { t, viewer } = useLib();
+  const [logoBroken, setLogoBroken] = React.useState(false);
+  return (
+    <footer className="lib-footer">
+      <div className="lib-wrap lib-footer-in">
+        <a className="lib-logo" href="#/" aria-label="Vidora" style={{ gap: 9 }}>
+          {logoBroken ? null : <img src={`${BASE()}assets/logos/vidora-mark-white.png`} alt="" onError={() => setLogoBroken(true)} />}
+          <span>VIDORA</span>
+        </a>
+        <div className="lib-footer-links">
+          <button onClick={() => (window.location.hash = "#/")}>{t("nav.home")}</button>
+          <button onClick={() => document.getElementById("lib-new")?.scrollIntoView({ behavior: "smooth" })}>{t("nav.new")}</button>
+          <button onClick={() => (window.location.hash = viewer === "guest" ? "#/login" : "#/dashboard/saved")}>{t("nav.myList")}</button>
+          <button onClick={() => (window.location.hash = "#/dashboard/support")}>{t("footer.support")}</button>
+        </div>
+        <p className="lib-footer-rights">{t("footer.rights")}</p>
+      </div>
+    </footer>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Library page
+// ---------------------------------------------------------------------------
+
+function readTopicFromHash() {
+  const query = window.location.hash.split("?")[1] || "";
+  const topic = new URLSearchParams(query).get("topic");
+  return topic && TOPICS.includes(topic) ? topic : "all";
+}
+
+function LibraryPageInner() {
+  const [loading, setLoading] = React.useState(true);
+  const [topic, setTopic] = React.useState(readTopicFromHash);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setLoading(false), 650);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const pickTopic = (key) => {
+    setTopic(key);
+    try {
+      window.history.replaceState(null, "", `#/library?topic=${key}`);
+    } catch (e) {/* ignore */}
+    document.getElementById("lib-all")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <>
       <LibraryHeader />
       <FeaturedHero loading={loading} />
-
-      {/* Trending */}
-      <section className="lib-section lib-wrap" id="lib-trending" aria-label={t("trending.title")}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <TrendingUp size={20} /> {t("trending.title")}
-          </h2>
-          <span className="lib-sec-spacer" />
-          <div className="lib-toplinks" role="tablist">
-            {["popular", "new", "featured"].map((key) => (
-              <button key={key} role="tab" aria-selected={trendFilter === key} className={trendFilter === key ? "is-active" : ""} onClick={() => setTrendFilter(key)}>
-                {t(`trending.filters.${key}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <CategoryChips active={trendCat} onChange={setTrendCat} keys={TREND_CATS} />
-        {trending.length === 0 && !loading ? (
-          <div className="lib-empty">
-            <ListVideo size={30} />
-            <p>{t("library.emptyCategory")}</p>
-          </div>
-        ) : (
-          <VideoCarousel videos={trending} loading={loading} ariaLabel={t("trending.title")} />
-        )}
-      </section>
-
-      {/* Main library */}
-      <section className="lib-section lib-wrap" id="lib-main" aria-label={t("library.title")} style={{ marginTop: 104 }}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <ListVideo size={20} /> {t("library.title")}
-          </h2>
-        </div>
-        <div className="lib-search">
-          <Search size={17} />
-          <input id="lib-search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("library.searchPlaceholder")} aria-label={t("library.searchPlaceholder")} />
-        </div>
-        <div className="lib-chips" role="tablist" style={{ marginTop: 18 }}>
-          {["all", ...TYPES].map((key) => (
-            <button key={key} className={`lib-chip${type === key ? " is-active" : ""}`} role="tab" aria-selected={type === key} onClick={() => setType(key)}>
-              {t(`types.${key}`)}
-            </button>
-          ))}
-        </div>
-        <div className="lib-controls-row">
-          <CategoryChips active={cat} onChange={setCat} keys={ALL_CATS} />
-        </div>
-        <div className="lib-controls-row">
-          <span className="lib-sorts">
-            <select className="lib-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label={t("sort.newest")}>
-              {["newest", "popular", "views", "alpha"].map((key) => (
-                <option key={key} value={key}>
-                  {t(`sort.${key}`)}
-                </option>
-              ))}
-            </select>
-            <select className="lib-select" value={duration} onChange={(e) => setDuration(e.target.value)} aria-label={t("sort.allDurations")}>
-              <option value="all">{t("sort.allDurations")}</option>
-              {["under15", "d15to30", "d30to60", "over60"].map((key) => (
-                <option key={key} value={key}>
-                  {t(`sort.${key}`)}
-                </option>
-              ))}
-            </select>
-          </span>
-        </div>
-        {loading ? (
-          <div className="lib-grid">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="lib-empty">
-            <Search size={30} />
-            <p>{query ? t("library.emptySearch") : t("library.emptyCategory")}</p>
-          </div>
-        ) : (
-          <>
-            <div className="lib-grid">
-              {filtered.slice(0, limit).map((video) => (
-                <VideoCard key={video.slug} video={video} />
-              ))}
-            </div>
-            {filtered.length > limit ? (
-              <div className="lib-loadmore">
-                <button className="lib-btn is-ghost" onClick={() => setLimit((n) => n + GRID_STEP)}>
-                  {t("library.loadMore")}
-                </button>
-              </div>
-            ) : null}
-          </>
-        )}
-      </section>
-
-      {/* Secondary banner */}
-      <div className="lib-wrap">
-        <FeaturedBanner video={banner} />
-      </div>
-
-      {/* Similar */}
-      <section className="lib-section is-tight lib-wrap" aria-label={t("similar.title")} style={{ paddingBottom: 90 }}>
-        <div className="lib-sec-head">
-          <h2 className="lib-sec-title">
-            <Sparkles size={19} /> {t("similar.title")}
-          </h2>
-        </div>
-        <VideoCarousel videos={similar} loading={loading} ariaLabel={t("similar.title")} />
-      </section>
+      <ContinueWatching />
+      <TrendingSection loading={loading} />
+      <BrowseByCategory onPick={pickTopic} />
+      <NewOnVidora loading={loading} />
+      <EditorsPick />
+      <AllVideos loading={loading} topic={topic} setTopic={setTopic} />
+      <LibraryFooter />
     </>
   );
 }
 
-function FeaturedBanner({ video }) {
-  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
-  const [tab, setTab] = React.useState("overview");
-  const isSaved = saved.includes(video.slug);
-  const durationSec = video.durationMin * 60;
-  const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  const similarTitles = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category).slice(0, 3);
+// ---------------------------------------------------------------------------
+// Search results page (#/search?q=…)
+// ---------------------------------------------------------------------------
+
+function SearchPageInner() {
+  const { t, lang } = useLib();
+  const q = React.useMemo(() => {
+    const query = window.location.hash.split("?")[1] || "";
+    return new URLSearchParams(query).get("q") || "";
+  }, [window.location.hash]); // eslint-disable-line react-hooks/exhaustive-deps
+  const results = searchVideos(q);
   return (
-    <section className="lib-banner" aria-label={title(video)}>
-      <div className="lib-banner-media" style={{ backgroundImage: `url(${BASE()}${BANNER_IMAGE})` }} />
-      <div className="lib-banner-shade" />
-      <div className="lib-banner-in">
-        <div className="lib-banner-box">
-          <p className="lib-hero-label">{t("hero.label")}</p>
-          <h2 className="lib-banner-title">{title(video)}</h2>
-          <div className="lib-hero-meta">
-            <span>{catName(video.category)}</span>
-            <span>·</span>
-            <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            <span>·</span>
-            <span>{t(`access.${video.access}`)}</span>
+    <>
+      <LibraryHeader />
+      <div className="lib-wrap" style={{ paddingBlock: "38px 90px" }}>
+        <a className="lib-back" href="#/library">
+          <Search size={13} /> {t("watch.back")}
+        </a>
+        <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{t("search.resultsFor", { q })}</h1>
+        <p style={{ color: "var(--mut)", fontSize: 13.5, marginTop: 8 }}>{t("search.resultsCount", { count: fmtNum(lang, results.length) })}</p>
+        {results.length === 0 ? (
+          <div className="lib-empty">
+            <Search size={30} />
+            <p>{t("search.empty")}</p>
           </div>
-          <div className="lib-hero-cta">
-            <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
-              <Play size={16} /> {t("hero.watch")}
-            </a>
-            <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-              <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-            </button>
-          </div>
-          <div className="lib-banner-tabs" role="tablist">
-            {["overview", "chapters", "similar"].map((key) => (
-              <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "is-active" : ""} onClick={() => setTab(key)}>
-                {t(`banner.tabs.${key}`)}
-              </button>
+        ) : (
+          <div className="lib-grid">
+            {results.map((video) => (
+              <VideoCard key={video.slug} video={video} />
             ))}
           </div>
-          <div className="lib-banner-panel">
-            {tab === "overview" ? <p>{desc(video)}</p> : null}
-            {tab === "chapters"
-              ? CHAPTERS.map((ch) => (
-                  <div className="lib-chaprow" key={ch.en}>
-                    <span className="lib-ts" dir="ltr">
-                      {clock(Math.round(durationSec * ch.frac))}
-                    </span>
-                    <span>{lang === "fa" ? ch.fa : ch.en}</span>
-                  </div>
-                ))
-              : null}
-            {tab === "similar"
-              ? similarTitles.map((v) => (
-                  <div className="lib-chaprow" key={v.slug}>
-                    <Play size={12} />
-                    <a href={`#/watch/${v.slug}`} style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>
-                      {title(v)}
-                    </a>
-                  </div>
-                ))
-              : null}
-          </div>
-        </div>
+        )}
       </div>
-    </section>
+      <LibraryFooter />
+    </>
   );
 }
 
@@ -988,7 +1321,6 @@ function WatchPageInner() {
           <div className="lib-player-center" style={{ opacity: 0.14 }}>
             <Icon size={140} strokeWidth={0.9} color="#fff" />
           </div>
-          {!canPreview && !playing ? null : null}
           {playing ? (
             <div className="lib-player-center">
               <span className="lib-pillbadge">{t("watch.playing")}</span>
@@ -1067,13 +1399,13 @@ function WatchPageInner() {
           </div>
         </div>
 
-        <section className="lib-section is-tight" aria-label={t("similar.title")}>
+        <section className="lib-section" style={{ marginTop: 72 }} aria-label={t("watch.similar")}>
           <div className="lib-sec-head">
             <h2 className="lib-sec-title">
-              <Sparkles size={19} /> {t("similar.title")}
+              <Sparkles size={19} /> {t("watch.similar")}
             </h2>
           </div>
-          <VideoCarousel videos={similar} loading={false} ariaLabel={t("similar.title")} />
+          <VideoCarousel videos={similar} loading={false} ariaLabel={t("watch.similar")} />
         </section>
       </div>
     </>
@@ -1096,6 +1428,14 @@ export function WatchPage() {
   return (
     <LibraryProvider>
       <WatchPageInner />
+    </LibraryProvider>
+  );
+}
+
+export function SearchPage() {
+  return (
+    <LibraryProvider>
+      <SearchPageInner />
     </LibraryProvider>
   );
 }

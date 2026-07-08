@@ -23,7 +23,7 @@ import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } fro
 import { Card } from "@/components/ui/heroui-card";
 import { SignInPage } from "@/components/ui/sign-in";
 import { SignUpPage } from "@/components/ui/sign-up";
-import { LibraryPage, WatchPage } from "./library.jsx";
+import { LibraryPage, WatchPage, SearchPage } from "./library.jsx";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -8862,6 +8862,7 @@ function Page() {
   const path = window.location.pathname;
   if (hash.startsWith("#/library")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
+  if (hash.startsWith("#/search")) return <SearchPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;
