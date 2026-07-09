@@ -3,3 +3,7 @@ dist
 .DS_Store
 .env
 .env.local
+__pycache__/
+*.pyc
+worker/.env
+/models/

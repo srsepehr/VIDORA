@@ -1,0 +1,30 @@
+# Worker CI: byte-compile + import + Python unit/integration tests + real
+# Postgres queue-RPC tests. Runs on changes to the worker or its migrations.
+name: Worker CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/worker-ci.yml"
+  pull_request:
+    paths:
+      - "worker/**"
+      - "supabase/migrations/**"
+
+jobs:
+  worker-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure PostgreSQL 16 client+server on PATH
+        run: |
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+          ls /usr/lib/postgresql/16/bin/initdb
+      - name: Run full worker test suite
+        run: bash worker/tests/run_all.sh

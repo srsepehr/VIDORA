@@ -56,7 +56,13 @@ const ACTIVE_STATUSES = new Set([
   "uploading_result",
 ]);
 
-const CANCELLABLE_STATUSES = new Set(["created", "uploading", "uploaded", "validating", "queued"]);
+// Cancellation is allowed while pending or actively processing — the worker
+// observes the cancelled video via its heartbeat and stops. Terminal states
+// (completed/failed/cancelled) are excluded.
+const CANCELLABLE_STATUSES = new Set([
+  "created", "uploading", "uploaded", "validating", "queued",
+  "acquiring_source", "downloading_source", "extracting_audio", "transcribing", "translating",
+]);
 
 export function statusLabel(status, isFa) {
   const entry = VIDEO_STATUS_LABELS[status] || VIDEO_STATUS_LABELS.created;

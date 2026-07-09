@@ -1,0 +1,4 @@
+# The worker deliberately uses the Python standard library for all HTTP
+# (queue RPCs, translation calls, storage download) so the only heavy runtime
+# dependency is the self-hosted speech-to-text engine.
+faster-whisper==1.0.3
