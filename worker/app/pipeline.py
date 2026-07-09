@@ -140,7 +140,7 @@ class Pipeline:
         # Persian value — retries resume instead of re-translating.
         all_rows = self.client.select_many(
             "transcript_segments",
-            f"video_id=eq.{job.video_id}&select=segment_index,source_text,translated_text_fa&order=segment_index.asc",
+            f"video_id=eq.{job.video_id}&select=segment_index,source_text,translated_text_fa,source_language&order=segment_index.asc",
         )
         pending = [TSegment(r["segment_index"], r["source_text"]) for r in all_rows if not (r.get("translated_text_fa") or "").strip()]
         total = len(pending)
@@ -148,7 +148,10 @@ class Pipeline:
             self._beat(job.id, current=0, total=0, percent=100)
             return
 
+        source_language = next((r.get("source_language") for r in all_rows if r.get("source_language")), "")
         batches = build_batches(pending, self.config.translation_batch_chars)
+        for batch in batches:
+            batch.source_language = source_language or ""
         done = 0
         for batch in batches:
             self._beat(job.id)  # cancellation check between batches

@@ -2,6 +2,30 @@
 
 Internal record of the choices made for the asynchronous processing worker.
 
+> **Current mode: private, zero-cost development.** Not public, low volume, short
+> test videos only. Runs on **Modal** as an event-triggered, scale-to-zero worker
+> (no always-on polling), with **self-hosted** speech-to-text (faster-whisper
+> `base`) and **self-hosted** translation (NLLB-200 on CPU) — so there is **no
+> paid API anywhere in the pipeline**. Hard caps: 2-minute / 100 MB videos, one
+> concurrent job, one worker, per-invocation timeout. Everything is behind
+> swappable adapters (runtime / STT / translation / storage / queue) so the
+> public phase can replace Modal + NLLB with a persistent host + a hosted LLM by
+> configuration, without touching domain logic. See §8 for the zero-cost model.
+
+## 0. Runtime & translation adapters (why two of each)
+
+| Concern | Private zero-cost adapter (now) | Public upgrade adapter (later) |
+|---|---|---|
+| Runtime | Modal on-demand `drain()` (scale-to-zero) | persistent container poll loop (`Worker.run`) on Fly/Railway/VPS |
+| STT | faster-whisper `base` / int8 / CPU (self-hosted) | `small`/`medium` on a larger host |
+| Translation | NLLB-200 distilled (self-hosted, no key) | Qwen via OpenAI-compatible endpoint (paid) |
+| Storage | Supabase Storage (service role) | same |
+| Queue | Supabase Postgres RPCs | same |
+
+The runtime seam is `Worker.drain()` (process available jobs then exit) vs
+`Worker.run()` (poll forever). `worker/modal_app.py` is the only Modal-specific
+file and contains no domain logic.
+
 ## 1. What the worker does
 
 Claims queued `video_jobs`, then per job: acquires the source → validates with
@@ -159,7 +183,38 @@ text is not logged by default (`LOG_TRANSCRIPTS=false`).
 
 ## 7. Remaining human steps before a real end-to-end run
 
-See the phase report / `worker/.env.example`. The worker code, migration, and
-tests are complete; a real run needs (a) the migration applied to the live DB,
-(b) a deploy target with billing, (c) the Supabase service-role key, and (d) a
-chosen Qwen provider + API key.
+The worker code, migration, and tests are complete. A real run needs only:
+(a) the new migration applied to the live DB, (b) a **free** Modal account +
+token, and (c) a Modal Secret `vidora-worker` holding `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`. No translation key or paid provider is needed in
+this phase.
+
+## 8. Private zero-cost model (Modal) — pre-deploy facts
+
+- **Free resources used:** Modal serverless compute (CPU only), scale-to-zero;
+  self-hosted faster-whisper `base` and NLLB-200 (no inference API). Supabase
+  free tier for DB + storage. No paid API in the pipeline.
+- **Payment method required?** Modal signup does not require a card to start and
+  provides monthly free compute credits; **confirm at signup**. Supabase is
+  already on the free tier. NLLB + Whisper are self-hosted → no billing.
+- **Can overage occur?** Only if a card is attached to Modal and free credits are
+  exceeded. With **no card attached, Modal cannot auto-charge** — invocations
+  simply stop when credits are exhausted. That is the overage prevention.
+- **How overage is prevented:** no card on the Modal account; `max_containers=1`;
+  `retries=0` at the platform (DB queue owns retries); hard per-invocation
+  `timeout=1500s`; 2-min / 100 MB media caps enforced in-worker; event-triggered
+  (no always-on polling burning credits).
+- **Estimated use for one 2-minute video (CPU):** whisper `base` ≈ roughly
+  real-time-ish on 2 CPUs (order of 1–3 min), NLLB translation of a few dozen
+  short segments (order of tens of seconds); plus ffprobe/ffmpeg (seconds). Rough
+  order: a few CPU-minutes per test video. **Confirm empirically on the first
+  run** (numbers vary with CPU allocation).
+- **How many tests fit in the free allowance:** with typical free monthly credits
+  and a few CPU-minutes per 2-minute video, **dozens to low-hundreds** of test
+  runs/month. Exact count depends on Modal's current free credit amount — verify
+  in the Modal dashboard.
+- **What must change before public launch:** attach billing + raise limits;
+  switch the runtime adapter to a persistent host (Fly/Railway) or Modal with
+  billing; switch translation to a hosted LLM (`openai_compatible` + Qwen) for
+  fluent Persian; raise whisper to `small`/`medium`; add SRT/VTT + rendering
+  phases; reliability/monitoring for real traffic.

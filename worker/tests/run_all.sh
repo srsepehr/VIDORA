@@ -10,9 +10,10 @@ cd "$REPO"
 
 echo "== byte-compile worker package =="
 python3 -m compileall -q worker/app
+python3 -c "import py_compile; py_compile.compile('worker/modal_app.py', doraise=True); print('modal_app syntax ok')"
 
 echo "== import entrypoint without heavy deps =="
-python3 -c "import worker.app.main; import worker.app.health; import worker.app.pipeline; print('imports ok')"
+python3 -c "import worker.app.main; import worker.app.health; import worker.app.pipeline; import worker.app.translation_local; print('imports ok')"
 
 echo "== python unit + integration tests =="
 python3 -m unittest worker.tests.test_worker

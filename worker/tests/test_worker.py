@@ -272,6 +272,83 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.stt_model, "small")
 
 
+class TestLocalTranslation(unittest.TestCase):
+    def test_flores_mapping(self):
+        from worker.app.translation_local import flores_code
+        self.assertEqual(flores_code("en"), "eng_Latn")
+        self.assertEqual(flores_code("fa"), "pes_Arab")
+        self.assertEqual(flores_code("EN"), "eng_Latn")
+        self.assertEqual(flores_code("xx"), "eng_Latn")  # unknown -> english
+
+    def test_nllb_translate_batch_with_mocked_model(self):
+        from worker.app.translation_local import LocalNLLBTranslationProvider
+
+        class FakeTok:
+            src_lang = "eng_Latn"
+            def convert_tokens_to_ids(self, t): return 250042
+            def __call__(self, text, **kw): return {"input_ids": [[1, 2, 3]]}
+            def batch_decode(self, tokens, skip_special_tokens=True): return ["سلام دنیا"]
+
+        class FakeModel:
+            def generate(self, **kw): return [[9, 9, 9]]
+
+        p = LocalNLLBTranslationProvider()
+        p._tokenizer = FakeTok()
+        p._model = FakeModel()
+        with mock.patch.object(p, "_ensure_model", return_value=None):
+            out = p.translate_batch(translation.Batch(
+                segments=[translation.Segment(0, "hi"), translation.Segment(1, "world")],
+                source_language="en",
+            ))
+        self.assertEqual(out, {0: "سلام دنیا", 1: "سلام دنیا"})
+
+    def test_nllb_rejects_empty_source(self):
+        from worker.app.translation_local import LocalNLLBTranslationProvider
+
+        class FakeTok:
+            src_lang = "eng_Latn"
+            def convert_tokens_to_ids(self, t): return 1
+            def __call__(self, text, **kw): return {"input_ids": [[1]]}
+            def batch_decode(self, tokens, skip_special_tokens=True): return [""]
+
+        p = LocalNLLBTranslationProvider()
+        p._tokenizer = FakeTok()
+        p._model = type("M", (), {"generate": lambda self, **kw: [[1]]})()
+        with mock.patch.object(p, "_ensure_model", return_value=None):
+            with self.assertRaises(WorkerError) as ctx:
+                p.translate_batch(translation.Batch(segments=[translation.Segment(0, "   ")], source_language="en"))
+        self.assertEqual(ctx.exception.code, "TRANSLATION_INCOMPLETE")
+
+
+class TestProviderSelection(unittest.TestCase):
+    def _cfg(self, extra):
+        env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "svc", **extra}
+        with mock.patch.dict(os.environ, env, clear=True):
+            return configmod.load_config()
+
+    def test_defaults_to_local_nllb_without_key(self):
+        from worker.app.main import build_translation_provider
+        from worker.app.translation_local import LocalNLLBTranslationProvider
+        cfg = self._cfg({})
+        self.assertEqual(cfg.translation_provider, "local_nllb")
+        self.assertTrue(cfg.has_translation)  # no external key required
+        self.assertIsInstance(build_translation_provider(cfg), LocalNLLBTranslationProvider)
+
+    def test_openai_compatible_when_selected(self):
+        from worker.app.main import build_translation_provider
+        cfg = self._cfg({
+            "TRANSLATION_PROVIDER": "openai_compatible",
+            "TRANSLATION_BASE_URL": "https://api.example.com/v1",
+            "TRANSLATION_API_KEY": "k", "TRANSLATION_MODEL": "qwen-x",
+        })
+        self.assertEqual(cfg.translation_provider, "openai_compatible")
+        self.assertEqual(type(build_translation_provider(cfg)).__name__, "OpenAICompatibleProvider")
+
+    def test_openai_compatible_missing_key_raises(self):
+        with self.assertRaises(WorkerError):
+            self._cfg({"TRANSLATION_PROVIDER": "openai_compatible"})
+
+
 class FakeQueue:
     def __init__(self, heartbeat_returns=None):
         self.calls = []
@@ -456,6 +533,50 @@ class TestPipeline(unittest.TestCase):
         # Only segment 1 was sent for translation.
         self.assertEqual(tr.batches, [[1]])
         self.assertEqual(q.completed, "translating")
+
+
+class TestDrain(unittest.TestCase):
+    def _worker(self):
+        from worker.app.main import Worker
+        env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "svc"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = configmod.load_config()
+        return Worker(cfg)
+
+    def test_drain_processes_available_then_exits(self):
+        from worker.app.queue import ClaimedJob
+        worker = self._worker()
+
+        class DrainQueue:
+            def __init__(self):
+                self.jobs = [ClaimedJob("j1", "v1", "u", "acquiring_source", 1, 3),
+                             ClaimedJob("j2", "v2", "u", "acquiring_source", 1, 3)]
+                self.reaped = 0
+            def reap_expired(self):
+                self.reaped += 1
+                return 0
+            def claim_next(self):
+                return self.jobs.pop(0) if self.jobs else None
+
+        processed = []
+        worker.queue = DrainQueue()
+        worker.pipeline = type("P", (), {"process": lambda self, job: processed.append(job.id)})()
+        summary = worker.drain(max_jobs=5, max_seconds=30)
+        self.assertEqual(processed, ["j1", "j2"])
+        self.assertEqual(summary["processed"], 2)
+
+    def test_drain_respects_max_jobs(self):
+        from worker.app.queue import ClaimedJob
+        worker = self._worker()
+
+        class InfiniteQueue:
+            def reap_expired(self): return 0
+            def claim_next(self): return ClaimedJob("j", "v", "u", "acquiring_source", 1, 3)
+
+        worker.queue = InfiniteQueue()
+        worker.pipeline = type("P", (), {"process": lambda self, job: None})()
+        summary = worker.drain(max_jobs=2, max_seconds=30)
+        self.assertEqual(summary["processed"], 2)
 
 
 if __name__ == "__main__":

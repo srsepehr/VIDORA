@@ -59,13 +59,18 @@ class Config:
     stt_beam_size: int
     stt_download_root: str
 
-    # Translation (OpenAI-compatible endpoint; provider-agnostic)
+    # Translation. Two swappable adapters:
+    #  - "local_nllb": self-hosted Meta NLLB on CPU. Zero external API, no key,
+    #    no charge — the default for the private zero-cost phase.
+    #  - "openai_compatible": a hosted LLM endpoint (paid) for the public phase.
     translation_provider: str
     translation_base_url: str
     translation_model: str
     translation_api_key: str
     translation_batch_chars: int
     translation_max_retries: int
+    nllb_model: str
+    nllb_target_lang: str
 
     # Health server
     health_host: str
@@ -77,6 +82,8 @@ class Config:
 
     @property
     def has_translation(self) -> bool:
+        if self.translation_provider == "local_nllb":
+            return bool(self.nllb_model)
         return bool(self.translation_base_url and self.translation_api_key and self.translation_model)
 
 
@@ -86,13 +93,18 @@ def load_config(*, require_translation: bool = True) -> Config:
 
     worker_id = _opt("WORKER_ID") or f"{socket.gethostname()}-{os.getpid()}"
 
+    translation_provider = _opt("TRANSLATION_PROVIDER", "local_nllb")
     translation_base_url = _opt("TRANSLATION_BASE_URL").rstrip("/")
     translation_api_key = _opt("TRANSLATION_API_KEY")
     translation_model = _opt("TRANSLATION_MODEL")
-    if require_translation and not (translation_base_url and translation_api_key and translation_model):
+    # Only the hosted (paid) adapter needs an endpoint + key. The self-hosted
+    # NLLB adapter needs nothing external, keeping the private phase zero-cost.
+    if require_translation and translation_provider == "openai_compatible" and not (
+        translation_base_url and translation_api_key and translation_model
+    ):
         raise WorkerError(
             WORKER_CONFIGURATION_MISSING,
-            dev_detail="translation endpoint not fully configured (TRANSLATION_BASE_URL/API_KEY/MODEL)",
+            dev_detail="openai_compatible translation needs TRANSLATION_BASE_URL/API_KEY/MODEL",
         )
 
     return Config(
@@ -104,20 +116,24 @@ def load_config(*, require_translation: bool = True) -> Config:
         heartbeat_seconds=_int("HEARTBEAT_SECONDS", 20),
         poll_interval_seconds=_int("POLL_INTERVAL_SECONDS", 5),
         reap_interval_seconds=_int("REAP_INTERVAL_SECONDS", 30),
-        max_source_bytes=_int("MAX_SOURCE_BYTES", 500 * 1024 * 1024),
-        max_duration_seconds=_int("MAX_DURATION_SECONDS", 900),
+        # Private zero-cost phase caps: 100 MB / 2 minutes. Raise via env later.
+        max_source_bytes=_int("MAX_SOURCE_BYTES", 100 * 1024 * 1024),
+        max_duration_seconds=_int("MAX_DURATION_SECONDS", 120),
         stt_provider=_opt("STT_PROVIDER", "faster_whisper"),
-        stt_model=_opt("STT_MODEL", "small"),
+        # Smallest practical multilingual model for the private phase.
+        stt_model=_opt("STT_MODEL", "base"),
         stt_device=_opt("STT_DEVICE", "cpu"),
         stt_compute_type=_opt("STT_COMPUTE_TYPE", "int8"),
         stt_beam_size=_int("STT_BEAM_SIZE", 5),
         stt_download_root=_opt("STT_DOWNLOAD_ROOT", "/models"),
-        translation_provider=_opt("TRANSLATION_PROVIDER", "openai_compatible"),
+        translation_provider=translation_provider,
         translation_base_url=translation_base_url,
         translation_model=translation_model,
         translation_api_key=translation_api_key,
         translation_batch_chars=_int("TRANSLATION_BATCH_CHARS", 4000),
         translation_max_retries=_int("TRANSLATION_MAX_RETRIES", 3),
+        nllb_model=_opt("NLLB_MODEL", "facebook/nllb-200-distilled-600M"),
+        nllb_target_lang=_opt("NLLB_TARGET_LANG", "pes_Arab"),
         health_host=_opt("HEALTH_HOST", "0.0.0.0"),
         health_port=_int("HEALTH_PORT", 8080),
         work_dir=_opt("WORK_DIR", "/tmp/vidora-worker"),

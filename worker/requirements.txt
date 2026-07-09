@@ -1,4 +1,10 @@
-# The worker deliberately uses the Python standard library for all HTTP
-# (queue RPCs, translation calls, storage download) so the only heavy runtime
-# dependency is the self-hosted speech-to-text engine.
+# The worker uses the Python standard library for all HTTP (queue RPCs,
+# storage download, hosted-translation calls), so the only heavy dependencies
+# are the self-hosted inference engines used in the zero-cost private phase:
+#   - faster-whisper: speech-to-text (CPU)
+#   - transformers + torch + sentencepiece: NLLB-200 translation (CPU)
+# The hosted OpenAI-compatible translation adapter needs no extra dependency.
 faster-whisper==1.0.3
+transformers==4.44.2
+torch==2.2.2
+sentencepiece==0.2.0

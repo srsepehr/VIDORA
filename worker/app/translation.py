@@ -44,6 +44,7 @@ class ProviderHealth:
 class Batch:
     segments: list[Segment]
     context: list[Segment] = field(default_factory=list)
+    source_language: str = ""  # ISO-639-1 from STT; used by MT adapters
 
 
 def build_batches(segments: list[Segment], max_chars: int, context_window: int = 3) -> list[Batch]:

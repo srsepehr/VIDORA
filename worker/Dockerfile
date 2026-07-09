@@ -20,12 +20,17 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the STT model into the image. STT_MODEL is a build arg so the
-# baked model matches the runtime model (default: small / int8 on CPU).
-ARG STT_MODEL=small
+# Pre-download the STT + translation models into the image so no job ever
+# re-downloads. Defaults match the private zero-cost phase (base whisper +
+# self-hosted NLLB-200); override the build args for the public phase.
+ARG STT_MODEL=base
 ARG STT_COMPUTE_TYPE=int8
-ENV STT_MODEL=${STT_MODEL} STT_COMPUTE_TYPE=${STT_COMPUTE_TYPE}
+ARG NLLB_MODEL=facebook/nllb-200-distilled-600M
+ENV STT_MODEL=${STT_MODEL} STT_COMPUTE_TYPE=${STT_COMPUTE_TYPE} \
+    NLLB_MODEL=${NLLB_MODEL} TRANSLATION_PROVIDER=local_nllb \
+    MAX_DURATION_SECONDS=120 MAX_SOURCE_BYTES=104857600
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('${STT_MODEL}', device='cpu', compute_type='${STT_COMPUTE_TYPE}', download_root='/models')"
+RUN python -c "from transformers import AutoTokenizer, AutoModelForSeq2SeqLM; AutoTokenizer.from_pretrained('${NLLB_MODEL}', cache_dir='/models'); AutoModelForSeq2SeqLM.from_pretrained('${NLLB_MODEL}', cache_dir='/models')"
 
 COPY app ./app
 
