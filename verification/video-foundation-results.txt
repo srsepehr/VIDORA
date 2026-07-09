@@ -1,0 +1,39 @@
+PASS: signup user A returns session
+PASS: signup user B returns session
+PASS: login user A returns session for same uid
+== insert video row as A (videos row creation)
+PASS: video insert returns id
+== storage: A uploads a real private object into its own folder
+PASS: A uploads private source object
+== promote video to 'uploaded' with storage_key (owner safe-update policy)
+PASS: owner can promote its video to uploaded
+== enqueue RPC as A (video_jobs row creation + idempotency)
+PASS: enqueue creates a job row
+PASS: second enqueue returns same job (idempotent)
+PASS: job status is queued
+PASS: exactly one active job exists (no duplicates)
+PASS: video status is queued after enqueue
+== processing-page persistence: a fresh session reads the same state
+PASS: video state persists across a new session (refresh)
+PASS: job state persists across a new session (refresh)
+== cross-user database isolation (B must not see or touch A's data)
+PASS: B cannot read A's video row
+PASS: B cannot enqueue A's video
+PASS: B cannot read A's job rows
+== cross-user private storage isolation
+PASS: B denied writing into A's storage folder
+PASS: A can read its own object metadata
+PASS: B cannot read A's object metadata
+== cancel + retry
+PASS: cancel succeeds from queued
+PASS: video is cancelled
+PASS: queued job is cancelled
+PASS: retry creates a new job
+PASS: retry increments attempt to 2
+== delete + cleanup (owner deletes object then row)
+PASS: A deletes its own source object
+PASS: object is gone after delete
+PASS: A deletes its own video row
+PASS: video row is gone after delete
+== SUMMARY
+ALL_CHECKS_PASSED
