@@ -87,3 +87,13 @@ test("hash login returnTo rejects external destinations", () => {
   global.window = { location: { hash: "#/login?returnTo=%2Fdashboard%2Fvideos" } };
   assert.equal(returnTo.getReturnToFromHash(), "/dashboard/videos");
 });
+
+test("signup route owns the notice state it renders", () => {
+  const source = fs.readFileSync(path.join(root, "src/main.jsx"), "utf8");
+  const signupStart = source.indexOf("function SignupPage()");
+  const signupEnd = source.indexOf("function AuthLoadingScreen", signupStart);
+  const signupSource = source.slice(signupStart, signupEnd);
+
+  assert.match(signupSource, /const \[formNotice, setFormNotice\] = React\.useState\(""\);/);
+  assert.match(signupSource, /formNotice=\{formNotice\}/);
+});

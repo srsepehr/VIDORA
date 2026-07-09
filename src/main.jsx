@@ -8993,6 +8993,7 @@ function SignupPage() {
   const { t, rtl } = useAuthLang();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState("");
+  const [formNotice, setFormNotice] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState({});
   const returnTo = getReturnToFromHash();
 
@@ -9001,6 +9002,7 @@ function SignupPage() {
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     setIsSubmitting(true);
     setFormError("");
+    setFormNotice("");
     setFieldErrors({});
     try {
       const password = String(data.password || "");
