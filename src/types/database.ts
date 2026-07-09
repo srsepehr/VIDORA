@@ -2,7 +2,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type SubscriptionStatus = "pending" | "active" | "expired" | "cancelled" | "payment_failed";
 
-export type VideoSourceType = "upload" | "youtube" | "supported_url";
+export type VideoSourceType = "upload" | "youtube" | "supported_url" | "direct_media_url" | "supported_external_url";
 
 export type VideoStatus =
   | "created"
@@ -10,6 +10,7 @@ export type VideoStatus =
   | "uploaded"
   | "validating"
   | "queued"
+  | "acquiring_source"
   | "downloading_source"
   | "extracting_audio"
   | "transcribing"
@@ -71,15 +72,43 @@ export interface UserVideo {
   source_url: string | null;
   storage_key: string | null;
   output_storage_key: string | null;
+  subtitle_vtt_storage_key: string | null;
+  subtitle_srt_storage_key: string | null;
   thumbnail_storage_key: string | null;
   title: string | null;
   duration_seconds: number | null;
   file_size_bytes: number | null;
   mime_type: string | null;
+  detected_language: string | null;
   status: VideoStatus;
   failure_code: string | null;
   failure_message_fa: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+export interface VideoJob {
+  id: string;
+  video_id: string;
+  user_id: string;
+  stage: VideoStatus;
+  status: JobStatus;
+  progress_percent: number;
+  progress_current: number | null;
+  progress_total: number | null;
+  attempt: number;
+  max_attempts: number;
+  provider: string | null;
+  provider_job_id: string | null;
+  worker_id: string | null;
+  lease_expires_at: string | null;
+  heartbeat_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  retryable: boolean;
+  created_at: string;
+  updated_at: string;
 }

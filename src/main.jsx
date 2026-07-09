@@ -38,6 +38,8 @@ import {
 import { AppError, logAppError, toAppError } from "./lib/app-error";
 import { getCurrentInternalPath, getReturnToFromHash, loginHashFor, sanitizeReturnTo, toHash } from "./lib/return-to";
 import { fetchActiveSubscription, fetchUserVideos, normalizeVideoStatus } from "./lib/user-data";
+import { deleteVideo, retryVideoProcessing } from "./lib/video-service";
+import { TranslationIntakePanel, VideoProcessingDetail, isActiveVideoStatus, statusLabel } from "./video-workflow.jsx";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -8371,7 +8373,7 @@ function EditorialFooter() {
 window.EditorialFooter = EditorialFooter;
 
 const dashboardCopy = { en: dashboardEn, fa: dashboardFa };
-const dashboardViews = new Set(["dashboard", "new-video", "library", "saved", "profile", "subscription", "support", "settings"]);
+const dashboardViews = new Set(["dashboard", "new-video", "library", "saved", "profile", "subscription", "support", "settings", "video-detail"]);
 const dashboardViewAliases = {
   completed: "library",
   videos: "library",
@@ -8423,19 +8425,22 @@ function VidoraDashboard({ session }) {
   const profileName = getDisplayName(session);
   const profileEmail = getUserEmail(session);
   const profileInitial = (profileName || profileEmail || "V").trim().charAt(0).toUpperCase();
-  const fileInputRef = React.useRef(null);
   const avatarInputRef = React.useRef(null);
+  const getVideoDetailId = () => {
+    const match = /^#\/(?:dashboard|panel)\/videos\/([0-9a-fA-F-]{8,})/.exec(window.location.hash);
+    return match ? match[1] : "";
+  };
   const getInitialView = () => {
+    if (getVideoDetailId()) return "video-detail";
     const segment = window.location.hash.replace(/^#\/(?:dashboard|panel)\/?/, "") || "dashboard";
     const view = dashboardViewAliases[segment] || segment;
     return dashboardViews.has(view) ? view : "dashboard";
   };
   const [activeView, setActiveView] = React.useState(getInitialView);
-  const [selectedFileName, setSelectedFileName] = React.useState("");
-  const [youtubeUrl, setYoutubeUrl] = React.useState("");
+  const [videoDetailId, setVideoDetailId] = React.useState(getVideoDetailId);
+  const [deleteTarget, setDeleteTarget] = React.useState(null);
   const [videoFilter, setVideoFilter] = React.useState("All");
   const [noteQuery, setNoteQuery] = React.useState("");
-  const [translationStarted, setTranslationStarted] = React.useState(false);
   const [profileSaved, setProfileSaved] = React.useState(false);
   const [supportSent, setSupportSent] = React.useState(false);
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
@@ -8466,7 +8471,10 @@ function VidoraDashboard({ session }) {
   }, [session]);
 
   React.useEffect(() => {
-    const onHashChange = () => setActiveView(getInitialView());
+    const onHashChange = () => {
+      setActiveView(getInitialView());
+      setVideoDetailId(getVideoDetailId());
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -8492,19 +8500,24 @@ function VidoraDashboard({ session }) {
     window.setTimeout(() => setToast(""), 2200);
   };
 
-  const openFilePicker = () => fileInputRef.current?.click();
-  const canStartTranslation = Boolean(selectedFileName || youtubeUrl.trim());
+  const openVideoDetail = (videoId) => {
+    window.location.hash = `#/dashboard/videos/${videoId}`;
+  };
   const userVideoRows = React.useMemo(() => (
     dashboardData.videos.map((video) => {
       const status = normalizeVideoStatus(video.status);
-      const minutes = video.duration_seconds ? `${Math.max(1, Math.round(video.duration_seconds / 60))} min` : "—";
+      const minutes = video.duration_seconds ? `${Math.max(1, Math.round(video.duration_seconds / 60))} ${isFa ? "دقیقه" : "min"}` : "";
+      const sourceType = video.source_type === "upload" ? (isFa ? "آپلود" : "Upload") : video.source_type === "youtube" ? (isFa ? "یوتیوب" : "YouTube") : (isFa ? "لینک ویدیو" : "Video link");
       return {
         id: video.id,
+        raw: video,
         title: video.title || video.original_filename || video.source_url || (isFa ? "ویدیوی بدون عنوان" : "Untitled video"),
         status,
-        actionKey: status === "Failed" ? "retry" : status === "Ready" ? "open" : "viewProgress",
+        stage: statusLabel(video.status, isFa),
+        failure: video.failure_message_fa || "",
+        created: new Date(video.created_at).toLocaleDateString(isFa ? "fa-IR" : "en-US"),
         minutes,
-        metaType: status === "Failed" ? "failed" : status === "Ready" ? "uploaded" : "processing",
+        sourceType,
       };
     })
   ), [dashboardData.videos, isFa]);
@@ -8516,14 +8529,11 @@ function VidoraDashboard({ session }) {
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
   const renewalLabel = activeSubscription?.ends_at ? new Date(activeSubscription.ends_at).toLocaleDateString(isFa ? "fa-IR" : "en-US") : "—";
 
-  const startTranslation = () => {
-    if (!canStartTranslation) return;
-    setTranslationStarted(false);
-    showToast(isFa ? "زیرساخت آپلود و پردازش ویدیو در فاز بعد به Storage و Worker متصل می‌شود." : "Video upload and processing will be connected to Storage and workers in the next phase.");
-  };
-
   const renderHeader = () => {
-    const [title, subtitle] = t.titles[activeView] || t.titles.dashboard;
+    const detailTitles = isFa
+      ? ["وضعیت پردازش ویدیو", "وضعیت هر مرحله از پردازش در همین صفحه به‌روزرسانی می‌شود."]
+      : ["Video processing status", "Every stage updates on this page as processing advances."];
+    const [title, subtitle] = activeView === "video-detail" ? detailTitles : (t.titles[activeView] || t.titles.dashboard);
     return (
       <header className="vd-head">
         <div>
@@ -8534,73 +8544,81 @@ function VidoraDashboard({ session }) {
     );
   };
 
-  const renderDropzone = (large = false) => (
-    <div className={`vd-drop ${large ? "is-large" : ""}`}>
-      <div>
-        <span className="vd-drop-icon"><Upload size={26} strokeWidth={1.7} /></span>
-        <h3>{t.upload.fileTitle}</h3>
-        <p>{t.upload.fileText}</p>
-        <p>{t.upload.formats}</p>
-        <div className="vd-actions">
-          <button className="vd-primary" onClick={openFilePicker}><Upload size={17} /> {t.actions.uploadVideo}</button>
-        </div>
-        {selectedFileName ? <p className="vd-selected-file">{selectedFileName}</p> : null}
-      </div>
-    </div>
-  );
-
-  const renderYoutubeSection = () => (
-    <section className="vd-youtube-section">
-      <div className="vd-youtube-copy">
-        <span className="vd-inline-icon"><Link2 size={18} /></span>
-        <div>
-          <h3>{t.upload.youtubeTitle}</h3>
-          <p>{t.upload.youtubeText}</p>
-        </div>
-      </div>
-      <input className="vd-input vd-url-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} type="url" placeholder={t.upload.youtubePlaceholder} />
-    </section>
-  );
-
-  const renderTranslationPanel = (large = false) => (
-    <article className="vd-card vd-upload">
-      <div className="vd-upload-head"><div><h2>{t.dashboard.startTitle}</h2><p>{t.dashboard.startText}</p></div></div>
-      <p className="vd-helper">{t.upload.autoHelper}</p>
-      {renderDropzone(large)}
-      {renderYoutubeSection()}
-      <button className="vd-primary vd-start vd-start-full" disabled={!canStartTranslation} onClick={startTranslation}>{translationStarted ? t.actions.startingTranslation : t.actions.startTranslation}</button>
-      {translationStarted ? <p className="vd-success"><CheckCircle2 size={16} /> {t.upload.started}</p> : null}
-    </article>
-  );
-
-  const videoMeta = (video) => {
-    if (video.metaType === "processing") return `${t.library.processingMeta} · ${t.library.remaining}`;
-    if (video.metaType === "failed") return t.library.failedReason;
-    return t.library.uploaded;
+  const retryVideoRow = (video) => {
+    retryVideoProcessing(session, video.id)
+      .then(() => {
+        showToast(t.toast.retryQueued);
+        openVideoDetail(video.id);
+      })
+      .catch((error) => {
+        const appError = toAppError(error);
+        logAppError(appError, "VidoraDashboard.retryVideoRow");
+        showToast(appError.messageFa);
+      });
   };
 
   const renderVideoRow = (video) => (
-    <article className="vd-video" key={video.id || video.title}>
+    <article className="vd-video" key={video.id}>
       <div className="vd-thumb" />
       <div>
-        <h3>{video.title}</h3>
-        <p>{t.library.direction} - {video.minutes}</p>
-        <p className="vd-video-meta">{videoMeta(video)}</p>
+        <h3 dir="auto">{video.title}</h3>
+        <p>{[video.sourceType, video.minutes, video.created].filter(Boolean).join(" · ")}</p>
+        <p className="vd-video-meta">{video.status === "Failed" && video.failure ? video.failure : video.stage}</p>
       </div>
       <span className={`vd-status is-${video.status.toLowerCase()}`}>{t.status[video.status]}</span>
-      <button className="vd-open" onClick={() => video.status === "Failed" ? showToast(t.toast.retryQueued) : selectView("library")}>{t.actions[video.actionKey]}</button>
-      <button className="vd-icon-action" aria-label={`More actions for ${video.title}`} onClick={() => showToast(t.toast.moreActions)}><MoreHorizontal size={17} /></button>
+      {video.status === "Failed" ? (
+        <button className="vd-open" onClick={() => retryVideoRow(video)}>{t.actions.retry}</button>
+      ) : (
+        <button className="vd-open" onClick={() => openVideoDetail(video.id)}>{video.status === "Ready" ? t.actions.open : t.actions.viewProgress}</button>
+      )}
+      <button className="vd-icon-action" aria-label={isFa ? "حذف ویدیو" : "Delete video"} onClick={() => setDeleteTarget(video.raw)}><Trash2 size={16} /></button>
     </article>
   );
 
-  const reloadDashboardData = () => {
-    setDashboardData((state) => ({ ...state, loading: true, error: "" }));
+  const reloadDashboardData = (silent = false) => {
+    if (!silent) setDashboardData((state) => ({ ...state, loading: true, error: "" }));
     Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
       .then(([videos, subscription]) => setDashboardData({ loading: false, error: "", videos, subscription }))
       .catch((error) => {
         const appError = toAppError(error);
         logAppError(appError, "VidoraDashboard.reloadUserData");
         setDashboardData({ loading: false, error: appError.messageFa, videos: [], subscription: null });
+      });
+  };
+
+  React.useEffect(() => {
+    const hasActive = dashboardData.videos.some((video) => isActiveVideoStatus(video.status));
+    if (!hasActive) return undefined;
+    const timer = window.setInterval(() => reloadDashboardData(true), 15000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardData.videos]);
+
+  const renderIntakePanel = () => (
+    <TranslationIntakePanel
+      session={session}
+      isFa={isFa}
+      copy={{ startTitle: t.dashboard.startTitle, startText: t.dashboard.startText }}
+      onCreated={(videoId) => {
+        reloadDashboardData(true);
+        openVideoDetail(videoId);
+      }}
+    />
+  );
+
+  const confirmDeleteVideo = () => {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    deleteVideo(session, target)
+      .then(() => {
+        showToast(isFa ? "ویدیو حذف شد." : "Video deleted.");
+        reloadDashboardData(true);
+      })
+      .catch((error) => {
+        const appError = toAppError(error);
+        logAppError(appError, "VidoraDashboard.deleteVideo");
+        showToast(appError.messageFa);
       });
   };
 
@@ -8646,14 +8664,14 @@ function VidoraDashboard({ session }) {
           <button className="vd-secondary" onClick={() => selectView("subscription")}>{t.actions.manageSubscription}</button>
         </aside>
       </div>
-      {renderTranslationPanel()}
+      {renderIntakePanel()}
       <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2>{renderVideoList(userVideoRows.slice(0, 5))}</section>
     </>
   );
 
   const renderNewTranslation = () => (
     <section className="vd-wide">
-      {renderTranslationPanel(true)}
+      {renderIntakePanel()}
     </section>
   );
 
@@ -8726,6 +8744,21 @@ function VidoraDashboard({ session }) {
   );
 
   const renderActiveView = () => {
+    if (activeView === "video-detail") {
+      return (
+        <VideoProcessingDetail
+          session={session}
+          videoId={videoDetailId}
+          isFa={isFa}
+          onBack={() => selectView("library")}
+          onDeleted={() => {
+            showToast(isFa ? "ویدیو حذف شد." : "Video deleted.");
+            reloadDashboardData(true);
+            selectView("library");
+          }}
+        />
+      );
+    }
     if (activeView === "dashboard") return renderDashboard();
     if (activeView === "new-video") return renderNewTranslation();
     if (activeView === "library") return renderLibrary();
@@ -8801,14 +8834,36 @@ function VidoraDashboard({ session }) {
         .vd-video-list{display:grid;gap:10px;margin-top:16px}.vd-video{min-height:74px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.28);display:grid;grid-template-columns:62px minmax(0,1fr) auto auto auto;align-items:center;gap:12px;padding:12px}.vd-thumb{width:62px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2c2d2d,#777872);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}.vd-thumb.wide{width:100%;height:120px}.vd-video h3,.vd-mini-card h3{margin:0;font-size:16px;line-height:1.2}.vd-video p,.vd-mini-card p{margin:5px 0 0;color:#747672;font-size:13px}.vd-video-meta{font-size:12px!important;color:#8a8c88!important}.vd-status{height:28px;border-radius:999px;padding:0 10px;background:rgba(255,255,255,.42);display:flex;align-items:center;font-size:12px;font-weight:750;color:#555754}.vd-status.is-ready{color:#263529}.vd-status.is-processing{color:#4d4c43}.vd-status.is-failed{color:#553333}.vd-icon-action{width:34px;height:34px;border-radius:10px;border:1px solid rgba(30,30,28,.14);background:rgba(255,255,255,.28);display:grid;place-items:center;cursor:pointer;color:#191919}
         .vd-controls{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.vd-controls label{height:42px;min-width:250px;display:flex;align-items:center;gap:9px;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.34);padding:0 12px}.vd-controls input{border:0;background:transparent;padding:0}.vd-controls div{display:flex;gap:8px}.vd-controls button{height:36px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.28);padding:0 13px;font-weight:700;cursor:pointer}.vd-controls button.is-active{background:#202020;color:#fff}.vd-form-grid,.vd-toggle-grid,.vd-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.vd-form-grid label{display:grid;gap:8px;color:#555854;font-weight:700;font-size:13px}.vd-toggle{height:44px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.32);display:flex;align-items:center;gap:10px;padding:0 14px;font-weight:720;color:#202020}.vd-toggle span{width:24px;height:24px;border-radius:999px;background:#202020;box-shadow:inset 0 0 0 7px #fff}.vd-mini-card,.vd-plan-option{padding:18px;border-radius:18px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}.vd-tags{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}.vd-tags span{height:26px;border-radius:999px;background:rgba(255,255,255,.45);padding:0 9px;display:inline-flex;align-items:center;font-size:12px;font-weight:700;color:#555854}.vd-empty{min-height:360px;display:grid;place-items:center;text-align:center;padding:44px}.vd-empty h2{margin:12px 0 0}.vd-empty p{margin:6px 0 0;color:#70736f}.vd-note-date{font-size:12px;color:#777a76}.vd-mini-card blockquote{margin:14px 0;color:#31322f;line-height:1.6}.vd-profile{display:grid;gap:18px}.vd-profile-head{display:flex;align-items:center;gap:18px}.vd-plan-option{display:grid;gap:12px}.vd-plan-option strong{font-size:38px;font-weight:560}.vd-plan-option.is-current{box-shadow:0 18px 38px rgba(65,66,62,.12),inset 0 0 0 1px rgba(0,0,0,.08)}.vd-view-stack{display:grid;gap:18px}.vd-table{display:grid;gap:8px;margin-top:16px}.vd-table>div{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:center;border-radius:14px;background:rgba(255,255,255,.28);padding:10px 12px;color:#555854;font-size:14px}.vd-support-card{width:100%;min-height:90px;border:1px solid rgba(255,255,255,.55);cursor:pointer;display:flex;align-items:center;gap:12px;color:#171817;font-weight:750}.vd-danger-zone{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(35,35,35,.1);padding-top:18px}
         .vd-modal{position:fixed;inset:0;background:rgba(30,31,29,.28);display:grid;place-items:center;z-index:50}.vd-modal-card{width:min(420px,calc(100% - 32px));border-radius:24px;border:1px solid rgba(255,255,255,.58);background:rgba(242,243,240,.9);box-shadow:0 28px 80px rgba(0,0,0,.2);padding:24px;backdrop-filter:blur(18px)}.vd-modal-card h2{margin:0;font-size:24px}.vd-modal-card p{color:#666965;line-height:1.6}.vd-modal-actions{display:flex;justify-content:flex-end;gap:10px}.vd-toast{position:fixed;right:34px;bottom:34px;border-radius:15px;background:#202020;color:#fff;padding:12px 16px;font-weight:720;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:60}
+        .vd-drop.is-over{border-color:rgba(31,31,31,.55);background:rgba(255,255,255,.4)}
+        .vd-upload-file{margin-top:14px;display:flex;align-items:center;gap:12px;border:1px solid rgba(35,35,35,.12);border-radius:15px;background:rgba(255,255,255,.36);padding:12px 14px;color:#1f1f1f}.vd-upload-file-info{flex:1;min-width:0;display:grid;gap:2px}.vd-upload-file-info strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;unicode-bidi:plaintext}.vd-upload-file-info span{font-size:12.5px;color:#777a76}
+        .vd-upload-progress{margin-top:14px;display:grid;gap:10px;border:1px solid rgba(255,255,255,.5);border-radius:15px;background:rgba(255,255,255,.28);padding:14px}.vd-upload-progress .vd-secondary{justify-self:start}
+        .vd-error{margin:12px 0 0;color:#5a2b24;font-weight:640;font-size:13.5px;line-height:1.7}
+        .vd-linklike{border:0;background:none;padding:0;font:inherit;font-weight:740;color:#1f1f1f;text-decoration:underline;cursor:pointer}
+        .vd-spin{animation:vdspin .9s linear infinite}@keyframes vdspin{to{transform:rotate(360deg)}}
+        .vd-confirm-line{margin-top:12px;display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#4c4f4b;line-height:1.7;cursor:pointer}.vd-confirm-line input{width:16px;height:16px;margin-top:3px;accent-color:#1f1f1f;flex:0 0 auto}
+        .vd-queued-note{margin:16px 0 0;border:1px solid rgba(255,255,255,.55);border-radius:16px;background:rgba(255,255,255,.3);padding:14px 16px}.vd-queued-note p{margin:0;color:#4c4f4b;font-size:14px;line-height:1.9}.vd-queued-note p+p{margin-top:4px}
+        .vd-stagelist{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:4px}.vd-stagelist li{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;color:#83867f;font-size:14.5px}.vd-stagelist li svg{flex:0 0 auto}.vd-stagelist li.is-done{color:#2f4035}.vd-stagelist li.is-current{color:#151515;font-weight:720;background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.6)}.vd-stagelist li em{font-style:normal;font-size:12.5px;font-weight:640;color:#5f625e;background:rgba(255,255,255,.55);border-radius:999px;padding:3px 10px}
+        .vd-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}.vd-detail-head h2{margin:0;font-size:22px;line-height:1.45;overflow-wrap:anywhere}.vd-detail-actions{display:flex;gap:10px;flex-wrap:wrap;flex:0 0 auto}
+        .vd-detail-meta{margin-top:18px;padding-top:14px;border-top:1px solid rgba(35,35,35,.1);display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:#777a76;font-size:12.5px}.vd-detail-meta span{display:inline-flex;align-items:center;gap:6px;min-width:0}.vd-detail-url{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         @media(max-width:1180px){.vd-page{padding:18px;overflow:auto}.vd-shell{height:auto;min-height:0;grid-template-columns:minmax(250px,300px) minmax(0,1fr);overflow:visible}.is-fa .vd-shell{grid-template-columns:minmax(0,1fr) minmax(250px,300px)}.vd-top-grid{grid-template-columns:1fr}.vd-stats.three{grid-template-columns:repeat(3,1fr)}}
         @media(max-width:760px){.vd-page{align-items:flex-start;padding:10px}.vd-shell,.is-fa .vd-shell{grid-template-columns:1fr;padding:10px;border-radius:26px}.vd-sidebar,.is-fa .vd-sidebar,.vd-main,.is-fa .vd-main{grid-column:1}.vd-sidebar{border-radius:22px;padding:18px;min-height:440px}.vd-main{border-radius:22px;padding:22px}.vd-head{display:block}.vd-head h1{font-size:34px}.vd-head p{font-size:16px}.vd-stats,.vd-stats.three,.vd-stats.two,.vd-form-grid,.vd-toggle-grid,.vd-card-grid,.vd-youtube-section{grid-template-columns:1fr}.vd-upload-head{display:block}.vd-video{grid-template-columns:54px minmax(0,1fr);align-items:start}.vd-status,.vd-open,.vd-icon-action{justify-self:start}.vd-link-input,.vd-controls{display:grid}.vd-table>div{grid-template-columns:1fr}.vd-profile-head{align-items:flex-start}.vd-controls label{min-width:0}}
       ` }} />
       <section className="vd-shell" dir={isFa ? "rtl" : "ltr"} aria-label="Vidora dashboard">
         {isFa ? <>{mainPanel}{sidebarPanel}</> : <>{sidebarPanel}{mainPanel}</>}
       </section>
-      <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name || "")} hidden />
       {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={signOut}>{t.actions.logout}</button></div></div></div> : null}
+      {deleteTarget ? (
+        <div className="vd-modal" role="dialog" aria-modal="true">
+          <div className="vd-modal-card">
+            <h2>{isFa ? "ویدیو حذف شود؟" : "Delete this video?"}</h2>
+            <p>{isFa ? "فایل و همه اطلاعات پردازش این ویدیو برای همیشه حذف می‌شود." : "The file and all processing data will be permanently removed."}</p>
+            <div className="vd-modal-actions">
+              <button className="vd-secondary" onClick={() => setDeleteTarget(null)}>{t.actions.cancel}</button>
+              <button className="vd-primary" onClick={confirmDeleteVideo}>{isFa ? "حذف قطعی" : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {toast ? <div className="vd-toast">{toast}</div> : null}
     </main>
   );
