@@ -62,6 +62,7 @@ image = (
         "transformers==4.44.2",
         "torch==2.2.2",
         "sentencepiece==0.2.0",
+        "fastapi[standard]",
     )
     .env(PHASE_ENV)
     .run_function(_bake_models)
@@ -97,10 +98,56 @@ def trigger():
     work starts without any always-on poller. Still scale-to-zero."""
     from worker.app.main import run_drain
 
-    return run_drain(max_jobs=3, max_seconds=1400.0)
+    return run_drain(max_jobs=1, max_seconds=1400.0)
+
+
+@app.function(image=image, secrets=[secret], timeout=600, max_containers=1)
+def health():
+    """Readiness probe: verifies tools, DB connectivity, and that both
+    self-hosted models load — without claiming or processing any job."""
+    import shutil
+
+    from worker.app import __version__
+    from worker.app.config import load_config
+    from worker.app.supabase import SupabaseClient
+    from worker.app.transcription import FasterWhisperProvider
+    from worker.app.translation_local import LocalNLLBTranslationProvider
+
+    cfg = load_config(require_translation=True)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    stt = FasterWhisperProvider(
+        model_size=cfg.stt_model, device=cfg.stt_device,
+        compute_type=cfg.stt_compute_type, download_root=cfg.stt_download_root,
+    )
+    tr = LocalNLLBTranslationProvider(
+        model_name=cfg.nllb_model, target_lang=cfg.nllb_target_lang,
+        download_root=cfg.stt_download_root,
+    )
+    sh, th = stt.health_check(), tr.health_check()
+    out = {
+        "worker_version": __version__,
+        "translation_provider": cfg.translation_provider,
+        "stt_model": cfg.stt_model,
+        "max_duration_seconds": cfg.max_duration_seconds,
+        "max_source_bytes": cfg.max_source_bytes,
+        "ffmpeg": shutil.which("ffmpeg") is not None,
+        "ffprobe": shutil.which("ffprobe") is not None,
+        "supabase": client.ping(),
+        "stt_ok": sh.ok, "stt_detail": sh.detail,
+        "translation_ok": th.ok, "translation_detail": th.detail,
+    }
+    out["ready"] = all([out["ffmpeg"], out["ffprobe"], out["supabase"], sh.ok, th.ok])
+    return out
 
 
 @app.local_entrypoint()
-def main():
-    result = drain.remote()
+def main(max_jobs: int = 1):
+    # Default to a single job so a dev trigger never processes more than the one
+    # test video without an explicit override.
+    result = drain.remote(max_jobs=max_jobs)
     print("drain result:", result)
+
+
+@app.local_entrypoint()
+def check():
+    print("health:", health.remote())

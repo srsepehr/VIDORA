@@ -1,0 +1,44 @@
+# Drives Modal deploy / health / one-job drain from a runner with Modal
+# reachability (the dev sandbox cannot reach Modal). Zero-cost: Modal builds and
+# runs on the owner's free workspace; this runner only holds the Modal token.
+name: Worker deploy (Modal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "deploy | health | drain (drain processes exactly one job)"
+        type: choice
+        default: health
+        options: [deploy, health, drain]
+
+jobs:
+  modal:
+    runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check Modal credentials present
+        run: |
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+            echo "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET secrets are not set."
+            echo "Add them in repo Settings → Secrets → Actions (from 'modal token new')."
+            exit 1
+          fi
+          echo "modal credentials present"
+      - name: Install Modal CLI
+        run: pip install "modal>=0.64"
+      - name: Deploy
+        if: ${{ inputs.step == 'deploy' }}
+        run: modal deploy worker/modal_app.py
+      - name: Health / readiness
+        if: ${{ inputs.step == 'health' }}
+        run: modal run worker/modal_app.py::check
+      - name: Drain one job
+        if: ${{ inputs.step == 'drain' }}
+        run: modal run worker/modal_app.py::main --max-jobs 1
