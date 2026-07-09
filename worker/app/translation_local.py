@@ -33,9 +33,19 @@ def flores_code(iso639_1: str) -> str:
 
 
 class LocalNLLBTranslationProvider:
+    # TEMPORARY development provider. NLLB-200 is a sentence-level MT model used
+    # ONLY to prove the pipeline at zero API cost — its fluency is NOT production
+    # quality. The public phase swaps in a hosted LLM via the openai_compatible
+    # adapter (config change only). Translation is strictly per-segment so the
+    # transcript segment ids map 1:1 to translated ids (NLLB cannot reliably
+    # split a grouped translation back to segment boundaries, so no grouping is
+    # applied here — correctness of the 1:1 mapping is preferred over context).
+    IS_DEVELOPMENT_PROVIDER = True
+
     def __init__(self, model_name: str = "facebook/nllb-200-distilled-600M",
                  target_lang: str = "pes_Arab", download_root: str | None = None,
-                 max_new_tokens: int = 512):
+                 max_new_tokens: int = 512, max_input_tokens: int = 1024):
+        self.max_input_tokens = max_input_tokens
         self.model_name = model_name
         self.target_lang = target_lang
         self.download_root = download_root
@@ -68,7 +78,7 @@ class LocalNLLBTranslationProvider:
                 text = (seg.source_text or "").strip()
                 if not text:
                     raise WorkerError(TRANSLATION_INCOMPLETE, dev_detail=f"empty source seg {seg.segment_index}")
-                inputs = self._tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
+                inputs = self._tokenizer(text, return_tensors="pt", truncation=True, max_length=self.max_input_tokens)
                 tokens = self._model.generate(
                     **inputs, forced_bos_token_id=bos, max_new_tokens=self.max_new_tokens,
                 )

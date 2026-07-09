@@ -128,6 +128,20 @@ class Pipeline:
         self._advance(job.id, STAGE_TRANSLATING, percent=0)
         self._translate_all(job)
 
+        # Completeness guard: never finish the phase while any segment is still
+        # untranslated. A miss fails retryably instead of marking a partial job
+        # done.
+        remaining = [
+            r for r in self.client.select_many(
+                "transcript_segments", f"video_id=eq.{job.video_id}&select=segment_index,translated_text_fa")
+            if not (r.get("translated_text_fa") or "").strip()
+        ]
+        if remaining:
+            raise WorkerError(
+                "TRANSLATION_INCOMPLETE",
+                dev_detail=f"{len(remaining)} segment(s) untranslated at completion",
+            )
+
         # 6) phase complete: video ends at 'translating' with full transcript.
         ok, cancelled = self.queue.complete(job.id, video_status=STAGE_TRANSLATING)
         if cancelled:

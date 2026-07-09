@@ -54,6 +54,11 @@ class Worker:
             download_root=config.stt_download_root,
         )
         self.translation = build_translation_provider(config)
+        if getattr(self.translation, "IS_DEVELOPMENT_PROVIDER", False):
+            log.warning(
+                "TEMPORARY development translation provider active (%s); fluency is NOT production quality",
+                config.translation_provider,
+            )
         self.providers = Providers(
             stt=self.stt, translation=self.translation,
             translation_provider_name=config.translation_provider,

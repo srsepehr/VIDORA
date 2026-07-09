@@ -380,6 +380,14 @@ class FakeQueue:
 
     def update_translations(self, video_id, items, provider, model):
         self.translations.append((items, provider, model))
+        # Reflect the write back into the linked client's rows so subsequent
+        # reads (incl. the completeness guard) see the translations.
+        client = getattr(self, "client", None)
+        if client is not None:
+            by_index = {i["segment_index"]: i["translated_text_fa"] for i in items}
+            for row in client._rows:
+                if row["segment_index"] in by_index:
+                    row["translated_text_fa"] = by_index[row["segment_index"]]
         return len(items)
 
     def set_media_metadata(self, video_id, duration, lang):
@@ -435,6 +443,7 @@ class FakeTranslation:
 
 def _pipeline(fake_queue, fake_client, stt, tr, tmp):
     from worker.app.pipeline import Pipeline, Providers
+    fake_queue.client = fake_client  # let translation writes reflect in reads
     env = {
         "SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "svc",
         "TRANSLATION_BASE_URL": "https://api.example.com/v1", "TRANSLATION_API_KEY": "k",
@@ -506,6 +515,37 @@ class TestPipeline(unittest.TestCase):
                     stack.enter_context(patch)
                 with self.assertRaises(Cancelled):
                     p.process(ClaimedJob("j1", "v1", "u1", "acquiring_source", 1, 3))
+        self.assertIsNone(q.completed)
+
+    def test_incomplete_translation_blocks_completion(self):
+        import tempfile, contextlib
+        from worker.app.queue import ClaimedJob
+        from worker.app.errors import WorkerError as WE
+        video = {"id": "v1", "source_type": "upload", "storage_key": "k"}
+        rows = [
+            {"segment_index": 0, "source_text": "hello", "translated_text_fa": None},
+            {"segment_index": 1, "source_text": "world", "translated_text_fa": None},
+        ]
+        q = FakeQueue()
+        client = FakeClient(video, rows)
+        stt = FakeSTT(transcription.TranscriptionResult("en", [
+            transcription.TranscriptSegment(0, 1000, "hello"),
+            transcription.TranscriptSegment(1000, 2000, "world"),
+        ]))
+
+        # A broken translation provider that returns nothing -> rows stay
+        # untranslated -> completeness guard must fire and block completion.
+        class NoopTranslation:
+            def translate_batch(self, batch):
+                return {}
+        with tempfile.TemporaryDirectory() as tmp:
+            p = _pipeline(q, client, stt, NoopTranslation(), tmp)
+            with contextlib.ExitStack() as stack:
+                for patch in self._patches():
+                    stack.enter_context(patch)
+                with self.assertRaises(WE) as ctx:
+                    p.process(ClaimedJob("j1", "v1", "u1", "acquiring_source", 1, 3))
+        self.assertEqual(ctx.exception.code, "TRANSLATION_INCOMPLETE")
         self.assertIsNone(q.completed)
 
     def test_translation_resumes_and_skips_already_translated(self):
