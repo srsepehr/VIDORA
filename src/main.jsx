@@ -4,6 +4,7 @@ import {
   BadgeDollarSign,
   CheckCircle2,
   Download,
+  FileText,
   Gauge,
   Heart,
   Library,
@@ -24,6 +25,19 @@ import { Card } from "@/components/ui/heroui-card";
 import { SignInPage } from "@/components/ui/sign-in";
 import { SignUpPage } from "@/components/ui/sign-up";
 import { LibraryPage, WatchPage, SearchPage } from "./library.jsx";
+import { AuthDiagnostics } from "./components/dev/AuthDiagnostics";
+import {
+  getDisplayName,
+  getUserEmail,
+  restoreAuthSession,
+  signInWithPassword,
+  signOut as signOutUser,
+  signUpWithPassword,
+  subscribeAuthState,
+} from "./lib/auth";
+import { AppError, logAppError, toAppError } from "./lib/app-error";
+import { getCurrentInternalPath, getReturnToFromHash, loginHashFor, sanitizeReturnTo, toHash } from "./lib/return-to";
+import { fetchActiveSubscription, fetchUserVideos, normalizeVideoStatus } from "./lib/user-data";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -8378,14 +8392,14 @@ const sidebarGroups = [
     items: [
       { icon: Gauge, labelKey: "dashboard", view: "dashboard" },
       { icon: Upload, labelKey: "newTranslation", view: "new-video" },
-      { icon: Library, labelKey: "myVideos", view: "library", count: "24" },
+      { icon: Library, labelKey: "myVideos", view: "library" },
       { icon: Library, labelKey: "publicLibrary", externalHash: "#/library" },
     ],
   },
   {
     labelKey: "saved",
     items: [
-      { icon: Heart, labelKey: "saved", view: "saved", count: "12" },
+      { icon: Heart, labelKey: "saved", view: "saved" },
     ],
   },
   {
@@ -8402,44 +8416,13 @@ const sidebarGroups = [
   },
 ];
 
-const recentVideos = [
-  { title: "How AI agents work", status: "Ready", actionKey: "open", minutes: "18 min", metaType: "uploaded" },
-  { title: "Startup pricing strategy", status: "Processing", actionKey: "viewProgress", minutes: "42 min", metaType: "processing" },
-  { title: "Sam Altman interview", status: "Ready", actionKey: "open", minutes: "55 min", metaType: "uploaded" },
-];
-
-const allVideos = [
-  { title: "How AI agents work", status: "Ready", actionKey: "open", minutes: "18 min", metaType: "uploaded" },
-  { title: "Startup pricing strategy", status: "Processing", actionKey: "viewProgress", minutes: "42 min", metaType: "processing" },
-  { title: "Sam Altman interview", status: "Ready", actionKey: "open", minutes: "55 min", metaType: "uploaded" },
-  { title: "Building AI products", status: "Failed", actionKey: "retry", minutes: "31 min", metaType: "failed" },
-];
-const watchlistVideos = [
-  { title: "Design systems for SaaS", progress: "42%" },
-  { title: "AI tools for product teams", progress: "18%" },
-  { title: "English listening practice", progress: "67%" },
-];
-const savedNotes = [
-  { title: "Agent workflows", source: "How AI agents work", excerpt: "Agents need a clear goal, tools, memory, and a way to check progress.", date: "Jul 6" },
-  { title: "Pricing lesson", source: "Startup pricing strategy", excerpt: "Price around value and urgency, not only feature volume.", date: "Jul 5" },
-  { title: "Interview phrases", source: "Sam Altman interview", excerpt: "Useful spoken English phrases from a long-form conversation.", date: "Jul 3" },
-];
-const usageStats = [
-  ["minutesUsed", "1,280"],
-  ["videosProcessed", "24"],
-  ["summariesGenerated", "18"],
-  ["notesSaved", "86"],
-];
-const invoices = [
-  ["Jul 12, 2026", "Pro", "$19"],
-  ["Jun 12, 2026", "Pro", "$19"],
-  ["May 12, 2026", "Pro", "$19"],
-];
-
-function VidoraDashboard() {
+function VidoraDashboard({ session }) {
   const { lang } = window.useLang();
   const t = dashboardCopy[lang] || dashboardCopy.fa;
   const isFa = lang === "fa";
+  const profileName = getDisplayName(session);
+  const profileEmail = getUserEmail(session);
+  const profileInitial = (profileName || profileEmail || "V").trim().charAt(0).toUpperCase();
   const fileInputRef = React.useRef(null);
   const avatarInputRef = React.useRef(null);
   const getInitialView = () => {
@@ -8458,6 +8441,29 @@ function VidoraDashboard() {
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
   const [toast, setToast] = React.useState("");
+  const [dashboardData, setDashboardData] = React.useState({
+    loading: true,
+    error: "",
+    videos: [],
+    subscription: null,
+  });
+
+  React.useEffect(() => {
+    let alive = true;
+    setDashboardData((state) => ({ ...state, loading: true, error: "" }));
+    Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
+      .then(([videos, subscription]) => {
+        if (alive) setDashboardData({ loading: false, error: "", videos, subscription });
+      })
+      .catch((error) => {
+        const appError = toAppError(error);
+        logAppError(appError, "VidoraDashboard.loadUserData");
+        if (alive) setDashboardData({ loading: false, error: appError.messageFa, videos: [], subscription: null });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [session]);
 
   React.useEffect(() => {
     const onHashChange = () => setActiveView(getInitialView());
@@ -8474,11 +8480,8 @@ function VidoraDashboard() {
     window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
   };
 
-  const signOut = () => {
-    try {
-      window.localStorage.removeItem("vidora-viewer");
-      window.localStorage.removeItem("vidoraViewerState");
-    } catch (e) {/* ignore */}
+  const signOut = async () => {
+    await signOutUser();
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
     window.location.hash = "#/";
@@ -8491,11 +8494,32 @@ function VidoraDashboard() {
 
   const openFilePicker = () => fileInputRef.current?.click();
   const canStartTranslation = Boolean(selectedFileName || youtubeUrl.trim());
+  const userVideoRows = React.useMemo(() => (
+    dashboardData.videos.map((video) => {
+      const status = normalizeVideoStatus(video.status);
+      const minutes = video.duration_seconds ? `${Math.max(1, Math.round(video.duration_seconds / 60))} min` : "—";
+      return {
+        id: video.id,
+        title: video.title || video.original_filename || video.source_url || (isFa ? "ویدیوی بدون عنوان" : "Untitled video"),
+        status,
+        actionKey: status === "Failed" ? "retry" : status === "Ready" ? "open" : "viewProgress",
+        minutes,
+        metaType: status === "Failed" ? "failed" : status === "Ready" ? "uploaded" : "processing",
+      };
+    })
+  ), [dashboardData.videos, isFa]);
+  const activeSubscription = dashboardData.subscription;
+  const includedMinutes = Number(activeSubscription?.included_minutes || 0);
+  const usedMinutes = Number(activeSubscription?.used_minutes || 0);
+  const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
+  const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
+  const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
+  const renewalLabel = activeSubscription?.ends_at ? new Date(activeSubscription.ends_at).toLocaleDateString(isFa ? "fa-IR" : "en-US") : "—";
 
   const startTranslation = () => {
     if (!canStartTranslation) return;
-    setTranslationStarted(true);
-    showToast(t.toast.translationStarted);
+    setTranslationStarted(false);
+    showToast(isFa ? "زیرساخت آپلود و پردازش ویدیو در فاز بعد به Storage و Worker متصل می‌شود." : "Video upload and processing will be connected to Storage and workers in the next phase.");
   };
 
   const renderHeader = () => {
@@ -8556,7 +8580,7 @@ function VidoraDashboard() {
   };
 
   const renderVideoRow = (video) => (
-    <article className="vd-video" key={video.title}>
+    <article className="vd-video" key={video.id || video.title}>
       <div className="vd-thumb" />
       <div>
         <h3>{video.title}</h3>
@@ -8569,23 +8593,61 @@ function VidoraDashboard() {
     </article>
   );
 
+  const reloadDashboardData = () => {
+    setDashboardData((state) => ({ ...state, loading: true, error: "" }));
+    Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
+      .then(([videos, subscription]) => setDashboardData({ loading: false, error: "", videos, subscription }))
+      .catch((error) => {
+        const appError = toAppError(error);
+        logAppError(appError, "VidoraDashboard.reloadUserData");
+        setDashboardData({ loading: false, error: appError.messageFa, videos: [], subscription: null });
+      });
+  };
+
+  const renderVideoList = (rows) => {
+    if (dashboardData.loading) {
+      return <div className="vd-empty compact"><Search size={24} /><h2>{isFa ? "در حال دریافت داده‌ها..." : "Loading data..."}</h2></div>;
+    }
+    if (dashboardData.error) {
+      return (
+        <div className="vd-empty compact">
+          <MessageCircle size={26} />
+          <h2>{isFa ? "دریافت اطلاعات ممکن نشد" : "Could not load data"}</h2>
+          <p>{dashboardData.error}</p>
+          <button className="vd-secondary" onClick={reloadDashboardData}>{isFa ? "تلاش دوباره" : "Retry"}</button>
+        </div>
+      );
+    }
+    if (!rows.length) {
+      return (
+        <div className="vd-empty compact">
+          <Upload size={28} />
+          <h2>{isFa ? "هنوز ویدیویی ندارید" : "No videos yet"}</h2>
+          <p>{isFa ? "اولین ویدیوی خود را آپلود کنید یا لینک یک ویدیوی پشتیبانی‌شده را وارد کنید." : "Upload your first video or submit a supported video URL."}</p>
+          <button className="vd-primary" onClick={() => selectView("new-video")}>{t.actions.startTranslation}</button>
+        </div>
+      );
+    }
+    return <div className="vd-video-list">{rows.map(renderVideoRow)}</div>;
+  };
+
   const renderDashboard = () => (
     <>
       <div className="vd-top-grid">
         <div className="vd-stats single">
-          <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>720</strong></article>
+          <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>{remainingMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
         </div>
         <aside className="vd-card vd-plan-card">
           <h2>{t.dashboard.currentPlan}</h2>
-          <div className="vd-plan-line"><span>{t.dashboard.plan}</span><strong>Pro</strong></div>
-          <div className="vd-plan-line"><span>{t.dashboard.monthlyMinutes}</span><strong>1,280 / 2,000</strong></div>
-          <div className="vd-meter"><span /></div>
-          <div className="vd-plan-line"><span>{t.dashboard.renewal}</span><strong>Aug 12</strong></div>
+          <div className="vd-plan-line"><span>{t.dashboard.plan}</span><strong>{planName}</strong></div>
+          <div className="vd-plan-line"><span>{t.dashboard.monthlyMinutes}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")} / {includedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></div>
+          <div className="vd-meter"><span style={{ width: `${usagePercent}%` }} /></div>
+          <div className="vd-plan-line"><span>{t.dashboard.renewal}</span><strong>{renewalLabel}</strong></div>
           <button className="vd-secondary" onClick={() => selectView("subscription")}>{t.actions.manageSubscription}</button>
         </aside>
       </div>
       {renderTranslationPanel()}
-      <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2><div className="vd-video-list">{recentVideos.map(renderVideoRow)}</div></section>
+      <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2>{renderVideoList(userVideoRows.slice(0, 5))}</section>
     </>
   );
 
@@ -8596,31 +8658,30 @@ function VidoraDashboard() {
   );
 
   const renderLibrary = () => {
-    const rows = videoFilter === "All" ? allVideos : allVideos.filter((video) => video.status === videoFilter);
+    const rows = videoFilter === "All" ? userVideoRows : userVideoRows.filter((video) => video.status === videoFilter);
     return (
       <section className="vd-card vd-recent">
         <div className="vd-controls"><label><Search size={17} /><input placeholder={t.library.search} /></label><div>{["All", "Processing", "Ready", "Failed"].map((filter) => <button className={videoFilter === filter ? "is-active" : ""} key={filter} onClick={() => setVideoFilter(filter)}>{t.filters[filter]}</button>)}</div></div>
-        <div className="vd-video-list">{rows.map(renderVideoRow)}</div>
+        {renderVideoList(rows)}
       </section>
     );
   };
 
   const renderSaved = () => {
-    const notes = savedNotes.filter((note) => `${note.title} ${note.source} ${note.excerpt}`.toLowerCase().includes(noteQuery.toLowerCase()));
     return (
       <section className="vd-view-stack">
         <article className="vd-card vd-recent"><h2>{t.savedPage.liked}</h2><div className="vd-empty compact"><Heart size={28} /><h2>{t.savedPage.emptyTitle}</h2><p>{t.savedPage.emptyText}</p></div></article>
-        <article className="vd-card vd-recent"><h2>{t.savedPage.watchlist}</h2><div className="vd-video-list">{watchlistVideos.map((video) => <article className="vd-video" key={video.title}><div className="vd-thumb" /><div><h3>{video.title}</h3><p>{video.progress}</p></div><span className="vd-status">{t.status.Saved}</span><button className="vd-open" onClick={() => showToast(t.actions.continueWatching)}>{t.actions.continueWatching}</button><button className="vd-icon-action" aria-label={video.title}><MoreHorizontal size={17} /></button></article>)}</div></article>
-        <article className="vd-card vd-recent"><h2>{t.savedPage.notes}</h2><div className="vd-controls single"><label><Search size={17} /><input value={noteQuery} onChange={(event) => setNoteQuery(event.target.value)} placeholder={t.savedPage.searchNotes} /></label></div><div className="vd-card-grid">{notes.map((note) => <article className="vd-mini-card" key={note.title}><span className="vd-note-date">{note.date}</span><h3>{note.title}</h3><p>{note.source}</p><blockquote>{note.excerpt}</blockquote><button className="vd-open" onClick={() => showToast(t.toast.noteOpened)}>{t.actions.open}</button></article>)}</div></article>
+        <article className="vd-card vd-recent"><h2>{t.savedPage.watchlist}</h2><div className="vd-empty compact"><Library size={28} /><h2>{t.savedPage.emptyTitle}</h2><p>{isFa ? "پس از آماده شدن قابلیت ذخیره، ویدیوهای نشان‌شده اینجا نمایش داده می‌شوند." : "Saved videos will appear here after the save feature is connected."}</p></div></article>
+        <article className="vd-card vd-recent"><h2>{t.savedPage.notes}</h2><div className="vd-controls single"><label><Search size={17} /><input value={noteQuery} onChange={(event) => setNoteQuery(event.target.value)} placeholder={t.savedPage.searchNotes} /></label></div><div className="vd-empty compact"><FileText size={28} /><h2>{t.savedPage.emptyTitle}</h2><p>{isFa ? "یادداشت‌های واقعی پس از تکمیل صفحه پخش و ابزار یادگیری اضافه می‌شوند." : "Real notes will appear after the watch workspace and learning tools are connected."}</p></div></article>
       </section>
     );
   };
 
   const renderProfile = () => (
     <section className="vd-card vd-profile">
-      <div className="vd-profile-head"><div className="vd-avatar large">S</div><div><h2>Sepehr Rahimpour</h2><p>sepehrrahimpour8@gmail.com</p><button className="vd-secondary" onClick={() => avatarInputRef.current?.click()}>{t.actions.uploadPhoto}</button></div></div>
+      <div className="vd-profile-head"><div className="vd-avatar large">{profileInitial}</div><div><h2>{profileName}</h2><p className="vd-technical-text">{profileEmail}</p><button className="vd-secondary" onClick={() => avatarInputRef.current?.click()}>{t.actions.uploadPhoto}</button></div></div>
       <input ref={avatarInputRef} type="file" accept="image/*" hidden />
-      <div className="vd-form-grid"><label>{t.profile.name}<input className="vd-input" defaultValue="Sepehr Rahimpour" /></label><label>{t.profile.email}<input className="vd-input" defaultValue="sepehrrahimpour8@gmail.com" /></label></div>
+      <div className="vd-form-grid"><label>{t.profile.name}<input className="vd-input" defaultValue={profileName} /></label><label>{t.profile.email}<input className="vd-input vd-technical-text" defaultValue={profileEmail} readOnly /></label></div>
       <button className="vd-primary" onClick={() => { setProfileSaved(true); showToast(t.toast.profileSaved); }}>{t.actions.saveChanges}</button>
       {profileSaved ? <p className="vd-success"><CheckCircle2 size={16} /> {t.profile.saved}</p> : null}
     </section>
@@ -8630,16 +8691,22 @@ function VidoraDashboard() {
     <section className="vd-view-stack">
       <div className="vd-card-grid">
         {[
-          [t.subscription.free, "$0", t.subscription.minutes120, t.subscription.freeFeature, t.subscription.upgradePro, false],
-          [t.subscription.pro, "$19", t.subscription.minutes2000, t.subscription.proFeature, t.actions.manageSubscription, true],
-          [t.subscription.team, "$49", t.subscription.minutes8000, t.subscription.teamFeature, t.subscription.buyPlan, false],
-        ].map(([plan, price, minutes, feature, action, current]) => <article className={`vd-card vd-plan-option ${current ? "is-current" : ""}`} key={plan}><h2>{plan}</h2><strong>{price}</strong><p>{minutes}</p><p>{feature}</p><button className={current ? "vd-secondary" : "vd-primary"} onClick={() => showToast(action)}>{action}</button></article>)}
+          ["free", t.subscription.free, "$0", t.subscription.minutes120, t.subscription.freeFeature, t.subscription.upgradePro],
+          ["pro", t.subscription.pro, "$19", t.subscription.minutes2000, t.subscription.proFeature, t.subscription.buyPlan],
+          ["team", t.subscription.team, "$49", t.subscription.minutes8000, t.subscription.teamFeature, t.subscription.buyPlan],
+        ].map(([slug, plan, price, minutes, feature, action]) => {
+          const current = activeSubscription?.plans?.slug === slug;
+          return <article className={`vd-card vd-plan-option ${current ? "is-current" : ""}`} key={slug}><h2>{plan}</h2><strong>{price}</strong><p>{minutes}</p><p>{feature}</p><button className={current ? "vd-secondary" : "vd-primary"} onClick={() => showToast(current ? t.actions.manageSubscription : (isFa ? "اتصال پرداخت در مرحله بعد انجام می‌شود." : "Payment connection is planned for the next phase."))}>{current ? t.actions.manageSubscription : action}</button></article>;
+        })}
       </div>
       <article className="vd-card vd-recent"><h2>{t.subscription.usage}</h2>
-      <div className="vd-stats two">{usageStats.map(([label, value]) => <article className="vd-card vd-stat" key={label}><span>{t.subscription[label]}</span><strong>{value}</strong></article>)}</div>
-      <div className="vd-plan-line"><span>{t.subscription.used}</span><strong>1,280 / 2,000 minutes</strong></div><div className="vd-meter"><span /></div></article>
-      <article className="vd-card vd-plan-card"><h2>{t.subscription.paymentMethod}</h2><div className="vd-plan-line"><span>{t.subscription.cardLabel}</span><strong>{t.subscription.card}</strong></div><button className="vd-secondary" onClick={() => showToast(t.toast.paymentOpened)}>{t.actions.updatePayment}</button></article>
-      <article className="vd-card vd-recent"><h2>{t.subscription.invoices}</h2><div className="vd-table">{invoices.map((row) => <div key={row[0]}>{row.map((cell) => <span key={cell}>{cell}</span>)}<span>{t.subscription.paid}</span><button className="vd-open" onClick={() => showToast(t.toast.invoiceDownloaded)}><Download size={15} /> {t.actions.download}</button></div>)}</div></article>
+      <div className="vd-stats two">
+        <article className="vd-card vd-stat"><span>{t.subscription.minutesUsed}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
+        <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>{remainingMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
+      </div>
+      <div className="vd-plan-line"><span>{t.subscription.used}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")} / {includedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")} minutes</strong></div><div className="vd-meter"><span style={{ width: `${usagePercent}%` }} /></div></article>
+      <article className="vd-card vd-plan-card"><h2>{t.subscription.paymentMethod}</h2><div className="vd-empty compact"><BadgeDollarSign size={28} /><h2>{isFa ? "پرداخت هنوز متصل نشده است" : "Payment is not connected yet"}</h2><p>{isFa ? "ساختار اشتراک آماده است؛ اتصال درگاه پرداخت در فاز بعد انجام می‌شود." : "The subscription foundation is ready; payment provider integration is planned for the next phase."}</p></div></article>
+      <article className="vd-card vd-recent"><h2>{t.subscription.invoices}</h2><div className="vd-empty compact"><Download size={28} /><h2>{isFa ? "فاکتوری ثبت نشده است" : "No invoices yet"}</h2><p>{isFa ? "پس از اتصال پرداخت، فاکتورهای واقعی اینجا نمایش داده می‌شوند." : "Real invoices will appear here after payment is connected."}</p></div></article>
     </section>
   );
 
@@ -8680,11 +8747,12 @@ function VidoraDashboard() {
       }
       selectView(item.view);
     };
+    const count = item.labelKey === "myVideos" && !dashboardData.loading && !dashboardData.error ? String(userVideoRows.length) : item.count;
     return (
       <button className={`vd-nav-item ${isActive ? "is-active" : ""}`} key={item.labelKey} onClick={onClick}>
         <ItemIcon size={18} strokeWidth={1.8} />
         <span>{t.nav[item.labelKey]}</span>
-        {item.count ? <span className="vd-count">{item.count}</span> : null}
+        {count ? <span className="vd-count">{count}</span> : null}
       </button>
     );
   };
@@ -8704,8 +8772,8 @@ function VidoraDashboard() {
           </div>
         ) : null}
         <button className="vd-user vd-sidebar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-expanded={profileMenuOpen}>
-          <div className="vd-avatar">S</div>
-          <div><h2>Sepehr</h2><p className="vd-technical-text">sepehrrahimpour8@gmail.com</p></div>
+          <div className="vd-avatar">{profileInitial}</div>
+          <div><h2>{profileName}</h2><p className="vd-technical-text">{profileEmail}</p></div>
           <MoreHorizontal size={17} />
         </button>
       </div>
@@ -8847,12 +8915,23 @@ function useAuthLang() {
 // Auth backdrop — the user's own photo, committed to the repo.
 const AUTH_HERO_IMAGE = () => `${import.meta.env.BASE_URL}uploads/IMG_0766.JPG`;
 
-function finishMockAuth(defaultHash = "#/dashboard") {
-  try {
-    window.localStorage.setItem("vidora-viewer", "subscriber");
-  } catch (e) {/* ignore */}
-  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
-  window.location.hash = redirect ? `#${redirect}` : defaultHash;
+const OAUTH_DISABLED_FA = "ورود با گوگل پس از تنظیم Provider در Supabase فعال می‌شود. فعلاً با ایمیل و رمز عبور وارد شوید.";
+const OAUTH_DISABLED_EN = "Google sign-in will be available after the Supabase provider is configured. Use email and password for now.";
+
+function signInFieldErrors(error) {
+  if (!(error instanceof AppError)) return {};
+  if (error.code === "INVALID_EMAIL") return { email: error.messageFa };
+  if (error.code === "INVALID_PASSWORD") return { password: error.messageFa };
+  return {};
+}
+
+function signUpFieldErrors(error) {
+  if (!(error instanceof AppError)) return {};
+  if (error.code === "INVALID_EMAIL" || error.code === "DUPLICATE_ACCOUNT") return { email: error.messageFa };
+  if (error.code === "INVALID_PASSWORD" || error.code === "WEAK_PASSWORD") return { password: error.messageFa };
+  if (error.code === "PASSWORD_MISMATCH") return { confirmPassword: error.messageFa };
+  if (error.code === "TERMS_REQUIRED") return { agreeTerms: error.messageFa };
+  return {};
 }
 
 function LoginPage() {
@@ -8860,15 +8939,31 @@ function LoginPage() {
     window.scrollTo(0, 0);
   }, []);
   const { t, rtl } = useAuthLang();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [formError, setFormError] = React.useState("");
+  const [formNotice, setFormNotice] = React.useState("");
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const returnTo = getReturnToFromHash();
 
-  const handleSignIn = (event) => {
+  const handleSignIn = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    console.log("Sign In submitted:", data);
-    // Mock session: signing in grants full library access and honors redirect.
-    finishMockAuth();
+    setIsSubmitting(true);
+    setFormError("");
+    setFormNotice("");
+    setFieldErrors({});
+    try {
+      await signInWithPassword(String(data.email || ""), String(data.password || ""));
+      window.location.hash = toHash(returnTo);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "LoginPage.handleSignIn");
+      setFieldErrors(signInFieldErrors(appError));
+      setFormError(appError.messageFa);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
 
   return (
     <div className="vd-signin dark bg-background text-foreground">
@@ -8877,12 +8972,15 @@ function LoginPage() {
         description={t.signInDescription}
         dir={rtl ? "rtl" : "ltr"}
         labels={t.signIn}
+        isSubmitting={isSubmitting}
+        formError={formError}
+        fieldErrors={fieldErrors}
         heroImageSrc={AUTH_HERO_IMAGE()}
         testimonials={t.testimonials}
         onSignIn={handleSignIn}
-        onGoogleSignIn={() => finishMockAuth()}
-        onResetPassword={() => console.log("Reset password clicked")}
-        onCreateAccount={() => { window.location.hash = redirect ? `#/signup?redirect=${encodeURIComponent(redirect)}` : "#/signup"; }}
+        onGoogleSignIn={() => setFormError(rtl ? OAUTH_DISABLED_FA : OAUTH_DISABLED_EN)}
+        onResetPassword={() => setFormError(rtl ? "بازیابی رمز عبور در مرحله بعد به Supabase Email Templates وصل می‌شود." : "Password reset will be connected to Supabase email templates in the next phase.")}
+        onCreateAccount={() => { window.location.hash = `#/signup?returnTo=${encodeURIComponent(returnTo)}`; }}
       />
     </div>
   );
@@ -8893,14 +8991,68 @@ function SignupPage() {
     window.scrollTo(0, 0);
   }, []);
   const { t, rtl } = useAuthLang();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [formError, setFormError] = React.useState("");
+  const [fieldErrors, setFieldErrors] = React.useState({});
+  const returnTo = getReturnToFromHash();
 
-  const handleSignUp = (event) => {
+  const handleSignUp = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    console.log("Sign Up submitted:", data);
-    finishMockAuth();
+    setIsSubmitting(true);
+    setFormError("");
+    setFieldErrors({});
+    try {
+      const password = String(data.password || "");
+      const confirmPassword = String(data.confirmPassword || "");
+      if (!String(data.name || "").trim()) {
+        throw new AppError({
+          code: "UNKNOWN_SERVER_ERROR",
+          httpStatus: 400,
+          messageFa: "نام خود را وارد کنید.",
+          retryable: false,
+          logMessage: "Missing signup display name",
+        });
+      }
+      if (password !== confirmPassword) {
+        throw new AppError({
+          code: "PASSWORD_MISMATCH",
+          httpStatus: 400,
+          messageFa: "رمز عبور و تکرار آن یکسان نیستند.",
+          retryable: false,
+          logMessage: "Signup password mismatch",
+        });
+      }
+      if (!data.agreeTerms) {
+        throw new AppError({
+          code: "TERMS_REQUIRED",
+          httpStatus: 400,
+          messageFa: "برای ساخت حساب باید قوانین و حریم خصوصی را بپذیرید.",
+          retryable: false,
+          logMessage: "Signup terms not accepted",
+        });
+      }
+      const result = await signUpWithPassword({
+        email: String(data.email || ""),
+        password,
+        displayName: String(data.name || ""),
+      });
+      if (result.emailConfirmationRequired) {
+        setFormNotice(rtl ? "حساب شما ساخته شد. برای ورود، ایمیل خود را تأیید کنید و سپس وارد شوید." : "Your account was created. Confirm your email, then sign in.");
+        return;
+      }
+      window.location.hash = toHash(returnTo);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "SignupPage.handleSignUp");
+      const nextFieldErrors = signUpFieldErrors(appError);
+      if (appError.messageFa === "نام خود را وارد کنید.") nextFieldErrors.name = appError.messageFa;
+      setFieldErrors(nextFieldErrors);
+      setFormError(appError.messageFa);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  const redirect = new URLSearchParams(window.location.hash.split("?")[1] || "").get("redirect");
 
   return (
     <div className="vd-signin dark bg-background text-foreground">
@@ -8909,14 +9061,60 @@ function SignupPage() {
         description={t.signUpDescription}
         dir={rtl ? "rtl" : "ltr"}
         labels={t.signUp}
+        isSubmitting={isSubmitting}
+        formError={formError}
+        formNotice={formNotice}
+        fieldErrors={fieldErrors}
         heroImageSrc={AUTH_HERO_IMAGE()}
         testimonials={t.testimonials}
         onSignUp={handleSignUp}
-        onGoogleSignUp={() => finishMockAuth()}
-        onSignIn={() => { window.location.hash = redirect ? `#/login?redirect=${encodeURIComponent(redirect)}` : "#/login"; }}
+        onGoogleSignUp={() => setFormError(rtl ? OAUTH_DISABLED_FA : OAUTH_DISABLED_EN)}
+        onSignIn={() => { window.location.hash = `#/login?returnTo=${encodeURIComponent(returnTo)}`; }}
       />
     </div>
   );
+}
+
+function AuthLoadingScreen({ message = "در حال بررسی حساب..." }) {
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6" dir="rtl">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-5 text-center shadow-2xl">
+        <p className="text-sm font-bold text-zinc-200">{message}</p>
+      </div>
+    </main>
+  );
+}
+
+function ProtectedDashboard({ returnTo }) {
+  const safeReturnTo = sanitizeReturnTo(returnTo || getCurrentInternalPath());
+  const [authState, setAuthState] = React.useState({ loading: true, session: null });
+
+  React.useEffect(() => {
+    let alive = true;
+    restoreAuthSession()
+      .then((session) => {
+        if (alive) setAuthState({ loading: false, session });
+      })
+      .catch((error) => {
+        logAppError(toAppError(error), "ProtectedDashboard.restoreAuthSession");
+        if (alive) setAuthState({ loading: false, session: null });
+      });
+    const unsubscribe = subscribeAuthState((session) => setAuthState({ loading: false, session }));
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!authState.loading && !authState.session) {
+      window.location.hash = loginHashFor(safeReturnTo);
+    }
+  }, [authState.loading, authState.session, safeReturnTo]);
+
+  if (authState.loading) return <AuthLoadingScreen />;
+  if (!authState.session) return <AuthLoadingScreen message="برای ورود به داشبورد باید وارد حساب شوید..." />;
+  return <VidoraDashboard session={authState.session} />;
 }
 
 function useHashRoute() {
@@ -8932,14 +9130,15 @@ function useHashRoute() {
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
+  if (import.meta.env.DEV && (hash.startsWith("#/dev/auth-diagnostics") || path === "/dev/auth-diagnostics")) return <AuthDiagnostics />;
   if (hash.startsWith("#/library")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
   if (hash.startsWith("#/search")) return <SearchPage />;
-  if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <VidoraDashboard />;
+  if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <ProtectedDashboard returnTo={getCurrentInternalPath()} />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;
   if (path === "/dashboard" || path === "/panel" || path.endsWith("/dashboard")) {
-    return <VidoraDashboard />;
+    return <ProtectedDashboard returnTo="/dashboard" />;
   }
   return (
     <React.Fragment>

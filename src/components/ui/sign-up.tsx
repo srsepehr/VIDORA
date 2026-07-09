@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import type { Testimonial } from '@/components/ui/sign-in';
+import { FieldError, FormErrorAlert, FormNotice } from '@/components/ui/app-feedback';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -56,6 +57,10 @@ interface SignUpPageProps {
   testimonials?: Testimonial[];
   dir?: 'ltr' | 'rtl';
   labels?: SignUpLabels;
+  isSubmitting?: boolean;
+  formError?: string | null;
+  formNotice?: string | null;
+  fieldErrors?: Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'agreeTerms', string>>;
   onSignUp?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignUp?: () => void;
   onSignIn?: () => void;
@@ -89,6 +94,10 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
   testimonials = [],
   dir = 'ltr',
   labels,
+  isSubmitting = false,
+  formError,
+  formNotice,
+  fieldErrors,
   onSignUp,
   onGoogleSignUp,
   onSignIn,
@@ -99,10 +108,10 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
   const heading = title ?? <span className="font-light text-foreground tracking-tighter">Create Account</span>;
   const subheading = description ?? 'Join us and start learning from the world’s best videos';
 
-  const PasswordInput = ({ name, placeholder, show, onToggle }: { name: string, placeholder: string, show: boolean, onToggle: () => void }) => (
+  const PasswordInput = ({ name, placeholder, show, onToggle, autoComplete, error }: { name: string, placeholder: string, show: boolean, onToggle: () => void, autoComplete: string, error?: string }) => (
     <GlassInputWrapper>
       <div className="relative">
-        <input name={name} type={show ? 'text' : 'password'} placeholder={placeholder} className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none" />
+        <input name={name} type={show ? 'text' : 'password'} autoComplete={autoComplete} aria-invalid={Boolean(error)} placeholder={placeholder} className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none" />
         <button type="button" onClick={onToggle} className="absolute inset-y-0 right-3 flex items-center">
           {show ? <EyeOff className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" /> : <Eye className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />}
         </button>
@@ -120,39 +129,46 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
             <p className="animate-element animate-delay-200 text-muted-foreground">{subheading}</p>
 
             <form className="space-y-5" onSubmit={onSignUp}>
+              <FormErrorAlert message={formError} />
+              <FormNotice message={formNotice} />
               <div className="animate-element animate-delay-300">
                 <label className="text-sm font-medium text-muted-foreground">{t.nameLabel}</label>
                 <GlassInputWrapper>
-                  <input name="name" type="text" placeholder={t.namePlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
+                  <input name="name" type="text" autoComplete="name" aria-invalid={Boolean(fieldErrors?.name)} placeholder={t.namePlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
                 </GlassInputWrapper>
+                <FieldError message={fieldErrors?.name} />
               </div>
 
               <div className="animate-element animate-delay-400">
                 <label className="text-sm font-medium text-muted-foreground">{t.emailLabel}</label>
                 <GlassInputWrapper>
-                  <input name="email" type="email" placeholder={t.emailPlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
+                  <input name="email" type="email" autoComplete="email" aria-invalid={Boolean(fieldErrors?.email)} placeholder={t.emailPlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
                 </GlassInputWrapper>
+                <FieldError message={fieldErrors?.email} />
               </div>
 
               <div className="animate-element animate-delay-500">
                 <label className="text-sm font-medium text-muted-foreground">{t.passwordLabel}</label>
-                <PasswordInput name="password" placeholder={t.passwordPlaceholder} show={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+                <PasswordInput name="password" placeholder={t.passwordPlaceholder} show={showPassword} autoComplete="new-password" error={fieldErrors?.password} onToggle={() => setShowPassword(!showPassword)} />
+                <FieldError message={fieldErrors?.password} />
               </div>
 
               <div className="animate-element animate-delay-600">
                 <label className="text-sm font-medium text-muted-foreground">{t.confirmPasswordLabel}</label>
-                <PasswordInput name="confirmPassword" placeholder={t.confirmPasswordPlaceholder} show={showConfirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />
+                <PasswordInput name="confirmPassword" placeholder={t.confirmPasswordPlaceholder} show={showConfirmPassword} autoComplete="new-password" error={fieldErrors?.confirmPassword} onToggle={() => setShowConfirmPassword(!showConfirmPassword)} />
+                <FieldError message={fieldErrors?.confirmPassword} />
               </div>
 
               <div className="animate-element animate-delay-700 flex items-center text-sm">
                 <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" name="agreeTerms" required className="custom-checkbox" />
+                  <input type="checkbox" name="agreeTerms" required aria-invalid={Boolean(fieldErrors?.agreeTerms)} className="custom-checkbox" />
                   <span className="text-foreground/90">{t.agreeToTerms}</span>
                 </label>
               </div>
+              <FieldError message={fieldErrors?.agreeTerms} />
 
-              <button type="submit" className="animate-element animate-delay-800 w-full rounded-2xl bg-primary py-4 font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-                {t.createAccount}
+              <button type="submit" disabled={isSubmitting} className="animate-element animate-delay-800 w-full rounded-2xl bg-primary py-4 font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+                {isSubmitting ? (dir === 'rtl' ? 'در حال ساخت حساب...' : 'Creating account...') : t.createAccount}
               </button>
             </form>
 

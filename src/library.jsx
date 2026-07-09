@@ -9,7 +9,6 @@ import React from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Bookmark,
   BrainCircuit,
   Building2,
   ChevronLeft,
@@ -34,6 +33,8 @@ import {
 } from "lucide-react";
 import enDict from "./locales/en/library.json";
 import faDict from "./locales/fa/library.json";
+import { getCachedSession, restoreAuthSession, subscribeAuthState } from "./lib/auth";
+import { loginHashFor } from "./lib/return-to";
 
 const DICTS = { en: enDict, fa: faDict };
 
@@ -57,24 +58,13 @@ function makeT(lang) {
 const fmtNum = (lang, n) => Number(n).toLocaleString(lang === "fa" ? "fa-IR" : "en-US", { useGrouping: false });
 
 // ---------------------------------------------------------------------------
-// Mock viewer/auth state (guest | member | subscriber), saved list, recents
+// Viewer state is derived from the real Supabase session. Subscription checks
+// must remain server-side in the payment phase; the public library stays
+// browsable for guests, but premium playback is gated after open.
 // ---------------------------------------------------------------------------
 
 function readViewer() {
-  try {
-    const v = window.localStorage.getItem("vidora-viewer");
-    return v === "member" || v === "subscriber" ? v : "guest";
-  } catch (e) {
-    return "guest";
-  }
-}
-
-function readSaved() {
-  try {
-    return JSON.parse(window.localStorage.getItem("vidora-lib-saved") || "[]");
-  } catch (e) {
-    return [];
-  }
+  return getCachedSession() ? "member" : "guest";
 }
 
 function readRecentSearches() {
@@ -96,8 +86,7 @@ function pushRecentSearch(q) {
 }
 
 // ---------------------------------------------------------------------------
-// Content (mocked; bilingual titles/descriptions)
-// Topics: ai, startups, tech, product, companies, founders, science, language
+// Curated public seed content until a library CMS/API is connected.
 // ---------------------------------------------------------------------------
 
 const CAT_ICONS = {
@@ -470,9 +459,20 @@ function LibraryProvider({ children }) {
   const { lang } = window.useLang();
   const rtl = lang === "fa";
   const t = React.useMemo(() => makeT(lang), [lang]);
-  const [viewer] = React.useState(readViewer);
-  const [saved, setSaved] = React.useState(readSaved);
+  const [viewer, setViewer] = React.useState(readViewer);
   const [toasts, setToasts] = React.useState([]);
+
+  React.useEffect(() => {
+    let alive = true;
+    restoreAuthSession().then((session) => {
+      if (alive) setViewer(session ? "member" : "guest");
+    });
+    const unsubscribe = subscribeAuthState((session) => setViewer(session ? "member" : "guest"));
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   const showToast = React.useCallback((msg) => {
     const id = Math.random().toString(36).slice(2);
@@ -480,29 +480,11 @@ function LibraryProvider({ children }) {
     window.setTimeout(() => setToasts((list) => list.filter((item) => item.id !== id)), 2600);
   }, []);
 
-  const toggleSave = React.useCallback(
-    (slug) => {
-      if (viewer === "guest") {
-        showToast(t("watch.loginToSave"));
-        return;
-      }
-      setSaved((list) => {
-        const next = list.includes(slug) ? list.filter((s) => s !== slug) : [...list, slug];
-        try {
-          window.localStorage.setItem("vidora-lib-saved", JSON.stringify(next));
-        } catch (e) {/* ignore */}
-        showToast(t(list.includes(slug) ? "watch.unsavedToast" : "watch.savedToast"));
-        return next;
-      });
-    },
-    [viewer, showToast, t],
-  );
-
   const catName = (key) => t(`categories.${key}`);
   const title = (video) => video.title[lang] || video.title.en;
   const desc = (video) => (video.desc ? video.desc[lang] || video.desc.en : GENERIC_DESC[lang] || GENERIC_DESC.en);
 
-  const ctx = { t, lang, rtl, viewer, saved, toggleSave, showToast, catName, title, desc };
+  const ctx = { t, lang, rtl, viewer, showToast, catName, title, desc };
   return (
     <Ctx.Provider value={ctx}>
       <div className="lib-root" dir={rtl ? "rtl" : "ltr"} lang={lang}>
@@ -668,7 +650,7 @@ function LibraryHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [logoBroken, setLogoBroken] = React.useState(false);
   const goMyList = () => {
-    window.location.hash = viewer === "guest" ? "#/login?redirect=/library" : "#/dashboard/saved";
+    window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/saved") : "#/dashboard/saved";
   };
   const items = [
     { key: "home", label: t("nav.home"), go: () => (window.location.hash = "#/") },
@@ -734,37 +716,6 @@ function LibraryHeader() {
 // Primitives — one standard media card + one compact progress card
 // ---------------------------------------------------------------------------
 
-function AccessBadge({ video }) {
-  const { t } = useLib();
-  if (video.access === "subscription") {
-    return (
-      <span className="lib-badge">
-        <Lock size={10} /> {t("access.subscription")}
-      </span>
-    );
-  }
-  return <span className="lib-badge">{t(`access.${video.access}`)}</span>;
-}
-
-function SaveButton({ video }) {
-  const { t, saved, toggleSave } = useLib();
-  const isSaved = saved.includes(video.slug);
-  return (
-    <button
-      className="lib-save"
-      aria-label={t(isSaved ? "card.unsave" : "card.save")}
-      aria-pressed={isSaved}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleSave(video.slug);
-      }}
-    >
-      <Bookmark size={15} fill={isSaved ? "#fff" : "none"} />
-    </button>
-  );
-}
-
 function VideoCard({ video, flag }) {
   const { t, lang, catName, title } = useLib();
   const Icon = CAT_ICONS[video.category] || Sparkles;
@@ -776,8 +727,6 @@ function VideoCard({ video, flag }) {
           <Icon size={72} strokeWidth={1.1} />
         </span>
         <span className="lib-thumb-shade" />
-        <AccessBadge video={video} />
-        <SaveButton video={video} />
         <span className="lib-play-overlay">
           <span className="lib-play-circle">
             <Play size={19} style={{ marginInlineStart: 2 }} />
@@ -889,7 +838,7 @@ function CategoryChips({ active, onChange, keys, max = 6 }) {
 // ---------------------------------------------------------------------------
 
 function FeaturedHero({ loading }) {
-  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
+  const { t, lang, title, desc, catName } = useLib();
   const [slide, setSlide] = React.useState(0);
   const items = HERO_SLUGS.map(bySlug);
   const video = items[slide];
@@ -907,7 +856,6 @@ function FeaturedHero({ loading }) {
       </div>
     );
   }
-  const isSaved = saved.includes(video.slug);
   return (
     <section className="lib-hero" aria-label={t("hero.label")}>
       <div className="lib-hero-media" style={{ backgroundImage: `url(${BASE()}${HERO_IMAGES[video.slug]})` }} />
@@ -928,9 +876,6 @@ function FeaturedHero({ loading }) {
             <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
               <Play size={16} /> {t("hero.watch")}
             </a>
-            <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-              <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-            </button>
           </div>
         </div>
       </div>
@@ -944,24 +889,8 @@ function FeaturedHero({ loading }) {
 }
 
 function ContinueWatching() {
-  const { t, viewer } = useLib();
-  if (viewer === "guest") return null;
-  const inProgress = VIDEOS.filter((v) => v.progress).slice(0, 4);
-  if (inProgress.length === 0) return null;
-  return (
-    <section className="lib-section is-first lib-wrap" aria-label={t("continueWatching.title")}>
-      <div className="lib-sec-head">
-        <h2 className="lib-sec-title">
-          <Clock3 size={19} /> {t("continueWatching.title")}
-        </h2>
-      </div>
-      <div className="lib-cw-grid">
-        {inProgress.map((video) => (
-          <ContinueCard key={video.slug} video={video} />
-        ))}
-      </div>
-    </section>
-  );
+  // Real viewing progress will be populated from the backend in the player phase.
+  return null;
 }
 
 function TrendingSection({ loading }) {
@@ -1048,9 +977,8 @@ function NewOnVidora({ loading }) {
 }
 
 function EditorsPick() {
-  const { t, lang, title, desc, catName, saved, toggleSave } = useLib();
+  const { t, lang, title, desc, catName } = useLib();
   const video = bySlug(EDITORS_PICK_SLUG);
-  const isSaved = saved.includes(video.slug);
   return (
     <section className="lib-section lib-wrap" aria-label={t("editorsPick.label")}>
       <div className="lib-banner">
@@ -1070,9 +998,6 @@ function EditorsPick() {
               <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
                 <Play size={16} /> {t("hero.watch")}
               </a>
-              <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-                <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-              </button>
             </div>
           </div>
         </div>
@@ -1190,7 +1115,7 @@ function LibraryFooter() {
         <div className="lib-footer-links">
           <button onClick={() => (window.location.hash = "#/")}>{t("nav.home")}</button>
           <button onClick={() => document.getElementById("lib-new")?.scrollIntoView({ behavior: "smooth" })}>{t("nav.new")}</button>
-          <button onClick={() => (window.location.hash = viewer === "guest" ? "#/login" : "#/dashboard/saved")}>{t("nav.myList")}</button>
+          <button onClick={() => (window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/saved") : "#/dashboard/saved")}>{t("nav.myList")}</button>
           <button onClick={() => (window.location.hash = "#/dashboard/support")}>{t("footer.support")}</button>
         </div>
         <p className="lib-footer-rights">{t("footer.rights")}</p>
@@ -1210,12 +1135,8 @@ function readTopicFromHash() {
 }
 
 function LibraryPageInner() {
-  const [loading, setLoading] = React.useState(true);
+  const loading = false;
   const [topic, setTopic] = React.useState(readTopicFromHash);
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 650);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const pickTopic = (key) => {
     setTopic(key);
@@ -1283,7 +1204,7 @@ function SearchPageInner() {
 // ---------------------------------------------------------------------------
 
 function WatchPageInner() {
-  const { t, lang, rtl, viewer, title, desc, catName, saved, toggleSave } = useLib();
+  const { t, lang, rtl, viewer, title, desc, catName } = useLib();
   const slug = window.location.hash.replace(/^#\/watch\//, "").split("?")[0];
   const video = bySlug(slug);
   const [playing, setPlaying] = React.useState(false);
@@ -1297,15 +1218,14 @@ function WatchPageInner() {
     return null;
   }
 
-  const canWatchFull = video.access === "free" || viewer === "subscriber";
+  const canWatchFull = video.access === "free";
   const canPreview = canWatchFull || video.access === "preview";
-  const isSaved = saved.includes(video.slug);
   const durationSec = video.durationMin * 60;
   const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const similar = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category)
     .concat(VIDEOS.filter((v) => v.slug !== video.slug && v.category !== video.category))
     .slice(0, 8);
-  const gateCta = viewer === "guest" ? { label: t("watch.guestCta"), href: `#/login?redirect=/watch/${video.slug}` } : { label: t("watch.memberCta"), href: "#/dashboard/subscription" };
+  const gateCta = viewer === "guest" ? { label: t("watch.guestCta"), href: loginHashFor(`/watch/${video.slug}`) } : { label: t("watch.memberCta"), href: "#/dashboard/subscription" };
   const gateMsg = viewer === "guest" ? t("watch.guestGate") : t("watch.memberGate");
   const Icon = CAT_ICONS[video.category] || Sparkles;
 
@@ -1362,9 +1282,6 @@ function WatchPageInner() {
               <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
             </div>
           </div>
-          <button className="lib-btn is-ghost" onClick={() => toggleSave(video.slug)}>
-            <Bookmark size={16} fill={isSaved ? "#fff" : "none"} /> {t(isSaved ? "hero.saved" : "hero.save")}
-          </button>
         </div>
 
         <div className="lib-watch-cols">

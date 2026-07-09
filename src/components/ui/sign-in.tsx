@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { FieldError, FormErrorAlert } from '@/components/ui/app-feedback';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -57,6 +58,9 @@ interface SignInPageProps {
   testimonials?: Testimonial[];
   dir?: 'ltr' | 'rtl';
   labels?: SignInLabels;
+  isSubmitting?: boolean;
+  formError?: string | null;
+  fieldErrors?: Partial<Record<'email' | 'password', string>>;
   onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
@@ -91,6 +95,9 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   testimonials = [],
   dir = 'ltr',
   labels,
+  isSubmitting = false,
+  formError,
+  fieldErrors,
   onSignIn,
   onGoogleSignIn,
   onResetPassword,
@@ -111,23 +118,26 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             <p className="animate-element animate-delay-200 text-muted-foreground">{subheading}</p>
 
             <form className="space-y-5" onSubmit={onSignIn}>
+              <FormErrorAlert message={formError} />
               <div className="animate-element animate-delay-300">
                 <label className="text-sm font-medium text-muted-foreground">{t.emailLabel}</label>
                 <GlassInputWrapper>
-                  <input name="email" type="email" placeholder={t.emailPlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
+                  <input name="email" type="email" autoComplete="email" aria-invalid={Boolean(fieldErrors?.email)} placeholder={t.emailPlaceholder} className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
                 </GlassInputWrapper>
+                <FieldError message={fieldErrors?.email} />
               </div>
 
               <div className="animate-element animate-delay-400">
                 <label className="text-sm font-medium text-muted-foreground">{t.passwordLabel}</label>
                 <GlassInputWrapper>
                   <div className="relative">
-                    <input name="password" type={showPassword ? 'text' : 'password'} placeholder={t.passwordPlaceholder} className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none" />
+                    <input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" aria-invalid={Boolean(fieldErrors?.password)} placeholder={t.passwordPlaceholder} className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-3 flex items-center">
                       {showPassword ? <EyeOff className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" /> : <Eye className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />}
                     </button>
                   </div>
                 </GlassInputWrapper>
+                <FieldError message={fieldErrors?.password} />
               </div>
 
               <div className="animate-element animate-delay-500 flex items-center justify-between text-sm">
@@ -138,8 +148,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                 <a href="#" onClick={(e) => { e.preventDefault(); onResetPassword?.(); }} className="hover:underline text-zinc-900 dark:text-zinc-100 font-medium transition-colors">{t.resetPassword}</a>
               </div>
 
-              <button type="submit" className="animate-element animate-delay-600 w-full rounded-2xl bg-primary py-4 font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-                {t.signIn}
+              <button type="submit" disabled={isSubmitting} className="animate-element animate-delay-600 w-full rounded-2xl bg-primary py-4 font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+                {isSubmitting ? (dir === 'rtl' ? 'در حال ورود...' : 'Signing in...') : t.signIn}
               </button>
             </form>
 
