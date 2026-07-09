@@ -1,19 +1,20 @@
 # TEMPORARY workflow — verifies the video pipeline foundation against the
-# real Supabase project, applies the pending migration when a DB connection
-# secret is configured, and is removed once verification passes.
+# real Supabase project and pushes its per-check results back to the
+# verify-results branch so they can be read via git. Removed once done.
 name: Verify video foundation
 
 on:
+  push:
+    branches: [ci-verify-video]
   workflow_dispatch:
     inputs:
-      apply_migration:
-        description: "Apply supabase/migrations/202607090001 via SUPABASE_DB_URL"
-        type: boolean
-        default: false
       run_verification:
-        description: "Run live API verification (auth, RLS, storage, queue RPCs)"
+        description: "Run live API verification"
         type: boolean
         default: true
+
+permissions:
+  contents: write
 
 jobs:
   verify:
@@ -21,43 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe configuration
-        env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          ANON: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          URL: ${{ vars.VITE_SUPABASE_URL }}
-        run: |
-          echo "secret SUPABASE_DB_URL present: $([ -n "$DB_URL" ] && echo yes || echo no)"
-          echo "secret SUPABASE_ACCESS_TOKEN present: $([ -n "$ACCESS_TOKEN" ] && echo yes || echo no)"
-          echo "secret SUPABASE_SERVICE_ROLE_KEY present: $([ -n "$SERVICE_ROLE" ] && echo yes || echo no)"
-          echo "var VITE_SUPABASE_URL present: $([ -n "$URL" ] && echo yes || echo no)"
-          echo "var VITE_SUPABASE_ANON_KEY present: $([ -n "$ANON" ] && echo yes || echo no)"
-
-      - name: Apply pending migration
-        if: ${{ inputs.apply_migration }}
-        env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          if [ -z "$DB_URL" ]; then
-            echo "SUPABASE_DB_URL secret is not configured — cannot apply migration."
-            exit 1
-          fi
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/202607090001_video_pipeline_foundation.sql
-          echo "MIGRATION_APPLIED"
-
       - name: Live API verification
-        if: ${{ inputs.run_verification }}
         env:
           URL: ${{ vars.VITE_SUPABASE_URL }}
           ANON: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         run: |
           set -u
+          exec > >(tee /tmp/results.txt) 2>&1
           fail=0
           note() { echo "== $*"; }
           check() { # check <name> <expected> <actual>
-            if [ "$2" = "$3" ]; then echo "PASS: $1"; else echo "FAIL: $1 (expected=$2 actual=$3)"; fail=1; fi
+            if [ "$2" = "$3" ]; then echo "PASS: $1"; else echo "FAIL: $1 (expected=[$2] actual=[$3])"; fail=1; fi
           }
 
           ts=$(date +%s)
@@ -69,6 +44,10 @@ jobs:
             curl -s -X POST "$URL/auth/v1/signup" -H "apikey: $ANON" -H "Content-Type: application/json" \
               -d "{\"email\":\"$1\",\"password\":\"$pass\"}"
           }
+          login() {
+            curl -s -X POST "$URL/auth/v1/token?grant_type=password" -H "apikey: $ANON" -H "Content-Type: application/json" \
+              -d "{\"email\":\"$1\",\"password\":\"$pass\"}"
+          }
           A=$(signup "$emailA"); B=$(signup "$emailB")
           jwtA=$(echo "$A" | jq -r '.access_token // empty')
           jwtB=$(echo "$B" | jq -r '.access_token // empty')
@@ -77,68 +56,113 @@ jobs:
           check "signup user B returns session" "yes" "$([ -n "$jwtB" ] && echo yes || echo no)"
           [ -n "$jwtA" ] && [ -n "$jwtB" ] || { echo "cannot continue without sessions"; exit 1; }
 
+          # Real login (password grant) returns a fresh session for the same user.
+          L=$(login "$emailA")
+          loginUid=$(echo "$L" | jq -r '.user.id // empty')
+          check "login user A returns session for same uid" "$uidA" "$loginUid"
+
           restA() { curl -s -H "apikey: $ANON" -H "Authorization: Bearer $jwtA" "$@"; }
           restB() { curl -s -H "apikey: $ANON" -H "Authorization: Bearer $jwtB" "$@"; }
 
-          note "insert video row as A"
+          # The app inserts uploads as status 'uploading' (all the insert RLS
+          # policy allows), then promotes to 'uploaded' after the object is
+          # confirmed. Mirror that exact flow here.
+          note "insert video row as A (videos row creation)"
           video=$(restA -X POST "$URL/rest/v1/videos" -H "Content-Type: application/json" -H "Prefer: return=representation" \
-            -d "{\"user_id\":\"$uidA\",\"title\":\"verify\",\"source_type\":\"youtube\",\"source_url\":\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\",\"status\":\"created\"}")
-          vid=$(echo "$video" | jq -r '.[0].id // empty')
+            -d "{\"user_id\":\"$uidA\",\"title\":\"verify\",\"source_type\":\"upload\",\"status\":\"uploading\",\"original_filename\":\"clip.mp4\",\"mime_type\":\"video/mp4\",\"file_size_bytes\":26}")
+          vid=$(echo "$video" | jq -r 'if type=="array" then .[0].id else .id end // empty')
           check "video insert returns id" "yes" "$([ -n "$vid" ] && echo yes || echo no)"
-          [ -n "$vid" ] || { echo "$video"; exit 1; }
+          [ -n "$vid" ] || { echo "RAW: $video"; echo "$fail" > /tmp/failcount.txt; exit 1; }
 
-          note "enqueue RPC as A (twice — idempotency)"
-          j1=$(restA -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
-          j2=$(restA -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
-          jid1=$(echo "$j1" | jq -r '.id // empty'); jid2=$(echo "$j2" | jq -r '.id // empty')
-          check "enqueue returns job" "yes" "$([ -n "$jid1" ] && echo yes || echo no)"
-          check "second enqueue returns same job (idempotent)" "$jid1" "$jid2"
-          check "job status queued" "queued" "$(echo "$j1" | jq -r '.status // empty')"
-          vstat=$(restA "$URL/rest/v1/videos?id=eq.$vid&select=status" | jq -r '.[0].status // empty')
-          check "video status queued after enqueue" "queued" "$vstat"
-
-          note "cross-user isolation (B must not see or touch A's video)"
-          bread=$(restB "$URL/rest/v1/videos?id=eq.$vid&select=id" | jq 'length')
-          check "B cannot read A's video" "0" "$bread"
-          benq=$(restB -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
-          check "B cannot enqueue A's video" "yes" "$(echo "$benq" | grep -q VIDEO_NOT_FOUND && echo yes || echo no)"
-          bjobs=$(restB "$URL/rest/v1/video_jobs?video_id=eq.$vid&select=id" | jq 'length')
-          check "B cannot read A's jobs" "0" "$bjobs"
-
-          note "storage: A uploads into own folder; B is denied"
-          echo "vidora-verification-object" > /tmp/sample.mp4
+          note "storage: A uploads a real private object into its own folder"
+          echo "vidora-verification-object-bytes" > /tmp/sample.mp4
           key="$uidA/videos/$vid/source/verify$ts.mp4"
           upA=$(restA -o /dev/null -w "%{http_code}" -X POST "$URL/storage/v1/object/vidora-video-uploads/$key" \
             -H "Content-Type: video/mp4" -H "x-upsert: false" --data-binary @/tmp/sample.mp4)
-          check "A uploads to own folder" "200" "$upA"
-          upB=$(restB -o /dev/null -w "%{http_code}" -X POST "$URL/storage/v1/object/vidora-video-uploads/$key.evil" \
+          check "A uploads private source object" "200" "$upA"
+
+          note "promote video to 'uploaded' with storage_key (owner safe-update policy)"
+          patch=$(restA -o /dev/null -w "%{http_code}" -X PATCH "$URL/rest/v1/videos?id=eq.$vid" -H "Content-Type: application/json" \
+            -d "{\"storage_key\":\"$key\",\"status\":\"uploaded\"}")
+          check "owner can promote its video to uploaded" "204" "$patch"
+
+          note "enqueue RPC as A (video_jobs row creation + idempotency)"
+          j1=$(restA -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
+          j2=$(restA -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
+          jid1=$(echo "$j1" | jq -r '.id // empty'); jid2=$(echo "$j2" | jq -r '.id // empty')
+          check "enqueue creates a job row" "yes" "$([ -n "$jid1" ] && echo yes || echo no)"
+          check "second enqueue returns same job (idempotent)" "$jid1" "$jid2"
+          check "job status is queued" "queued" "$(echo "$j1" | jq -r '.status // empty')"
+          njobs=$(restA "$URL/rest/v1/video_jobs?video_id=eq.$vid&status=in.(queued,running)&select=id" | jq 'length')
+          check "exactly one active job exists (no duplicates)" "1" "$njobs"
+          vstat=$(restA "$URL/rest/v1/videos?id=eq.$vid&select=status" | jq -r '.[0].status // empty')
+          check "video status is queued after enqueue" "queued" "$vstat"
+
+          note "processing-page persistence: a fresh session reads the same state"
+          L2=$(login "$emailA"); jwt2=$(echo "$L2" | jq -r '.access_token // empty')
+          persisted=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $jwt2" "$URL/rest/v1/videos?id=eq.$vid&select=status" | jq -r '.[0].status // empty')
+          check "video state persists across a new session (refresh)" "queued" "$persisted"
+          pjob=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $jwt2" "$URL/rest/v1/video_jobs?video_id=eq.$vid&select=status&order=created_at.desc&limit=1" | jq -r '.[0].status // empty')
+          check "job state persists across a new session (refresh)" "queued" "$pjob"
+
+          note "cross-user database isolation (B must not see or touch A's data)"
+          bread=$(restB "$URL/rest/v1/videos?id=eq.$vid&select=id" | jq 'length')
+          check "B cannot read A's video row" "0" "$bread"
+          benq=$(restB -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
+          check "B cannot enqueue A's video" "yes" "$(echo "$benq" | grep -q VIDEO_NOT_FOUND && echo yes || echo no)"
+          bjobs=$(restB "$URL/rest/v1/video_jobs?video_id=eq.$vid&select=id" | jq 'length')
+          check "B cannot read A's job rows" "0" "$bjobs"
+
+          note "cross-user private storage isolation"
+          upB=$(restB -o /dev/null -w "%{http_code}" -X POST "$URL/storage/v1/object/vidora-video-uploads/$uidA/videos/$vid/source/evil.mp4" \
             -H "Content-Type: video/mp4" --data-binary @/tmp/sample.mp4)
-          check "B denied uploading into A's folder" "denied" "$(if [ "$upB" = 400 ] || [ "$upB" = 403 ]; then echo denied; else echo "$upB"; fi)"
+          check "B denied writing into A's storage folder" "denied" "$(if [ "$upB" = 400 ] || [ "$upB" = 403 ]; then echo denied; else echo "$upB"; fi)"
           infoA=$(restA -o /dev/null -w "%{http_code}" "$URL/storage/v1/object/info/authenticated/vidora-video-uploads/$key")
-          check "A sees own object" "200" "$infoA"
+          check "A can read its own object metadata" "200" "$infoA"
           infoB=$(restB -o /dev/null -w "%{http_code}" "$URL/storage/v1/object/info/authenticated/vidora-video-uploads/$key")
-          check "B cannot see A's object" "400" "$(if [ "$infoB" = 400 ] || [ "$infoB" = 403 ] || [ "$infoB" = 404 ]; then echo 400; else echo "$infoB"; fi)"
+          check "B cannot read A's object metadata" "denied" "$(if [ "$infoB" = 400 ] || [ "$infoB" = 403 ] || [ "$infoB" = 404 ]; then echo denied; else echo "$infoB"; fi)"
 
-          note "cancel RPC and safe-update policy"
+          note "cancel + retry"
           cancel=$(restA -X POST "$URL/rest/v1/rpc/cancel_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
-          check "cancel succeeds from queued" "yes" "$(echo "$cancel" | grep -qi error && echo no || echo yes)"
+          check "cancel succeeds from queued" "yes" "$(echo "$cancel" | grep -qi 'error\|SQLSTATE\|VIDEO_NOT' && echo no || echo yes)"
           vstat2=$(restA "$URL/rest/v1/videos?id=eq.$vid&select=status" | jq -r '.[0].status // empty')
-          check "video cancelled" "cancelled" "$vstat2"
+          check "video is cancelled" "cancelled" "$vstat2"
           jstat=$(restA "$URL/rest/v1/video_jobs?video_id=eq.$vid&select=status&order=created_at.desc&limit=1" | jq -r '.[0].status // empty')
-          check "job cancelled" "cancelled" "$jstat"
-
-          note "re-enqueue after cancel (retry path)"
+          check "queued job is cancelled" "cancelled" "$jstat"
           j3=$(restA -X POST "$URL/rest/v1/rpc/enqueue_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}")
-          jid3=$(echo "$j3" | jq -r '.id // empty')
-          att3=$(echo "$j3" | jq -r '.attempt // empty')
+          jid3=$(echo "$j3" | jq -r '.id // empty'); att3=$(echo "$j3" | jq -r '.attempt // empty')
           check "retry creates a new job" "yes" "$([ -n "$jid3" ] && [ "$jid3" != "$jid1" ] && echo yes || echo no)"
-          check "retry increments attempt" "2" "$att3"
+          check "retry increments attempt to 2" "2" "$att3"
 
-          note "cleanup"
+          note "delete + cleanup (owner deletes object then row)"
           restA -X POST "$URL/rest/v1/rpc/cancel_video_processing" -H "Content-Type: application/json" -d "{\"p_video_id\":\"$vid\"}" > /dev/null
           delobj=$(restA -o /dev/null -w "%{http_code}" -X DELETE "$URL/storage/v1/object/vidora-video-uploads/$key")
-          check "A deletes own object" "200" "$delobj"
+          check "A deletes its own source object" "200" "$delobj"
+          gone=$(restA -o /dev/null -w "%{http_code}" "$URL/storage/v1/object/info/authenticated/vidora-video-uploads/$key")
+          check "object is gone after delete" "denied" "$(if [ "$gone" = 400 ] || [ "$gone" = 404 ]; then echo denied; else echo "$gone"; fi)"
           delrow=$(restA -o /dev/null -w "%{http_code}" -X DELETE "$URL/rest/v1/videos?id=eq.$vid")
-          check "A deletes own video row" "204" "$delrow"
+          check "A deletes its own video row" "204" "$delrow"
+          rowgone=$(restA "$URL/rest/v1/videos?id=eq.$vid&select=id" | jq 'length')
+          check "video row is gone after delete" "0" "$rowgone"
 
-          [ "$fail" = "0" ] && echo "ALL_CHECKS_PASSED" || { echo "SOME_CHECKS_FAILED"; exit 1; }
+          echo "== SUMMARY"
+          if [ "$fail" = "0" ]; then echo "ALL_CHECKS_PASSED"; else echo "SOME_CHECKS_FAILED"; fi
+          echo "$fail" > /tmp/failcount.txt
+
+      - name: Publish results back to git
+        if: ${{ always() }}
+        run: |
+          mkdir -p verification
+          cp /tmp/results.txt verification/video-foundation-results.txt 2>/dev/null || echo "no results captured" > verification/video-foundation-results.txt
+          git config user.name "vidora-ci"
+          git config user.email "ci@vidora.local"
+          git checkout -B verify-results
+          git add -f verification/video-foundation-results.txt
+          git commit -m "Video foundation verification results (run ${{ github.run_id }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" verify-results
+
+      - name: Fail job if any check failed
+        run: |
+          fc=$(cat /tmp/failcount.txt 2>/dev/null || echo 1)
+          echo "fail count: $fc"
+          [ "$fc" = "0" ]
