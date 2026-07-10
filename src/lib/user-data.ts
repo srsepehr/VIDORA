@@ -67,7 +67,7 @@ export async function fetchUserVideos(session: AuthSession): Promise<UserVideo[]
 export async function fetchActiveSubscription(session: AuthSession): Promise<SubscriptionSummary | null> {
   const env = getBrowserEnv();
   const url = `${env.supabaseUrl}/rest/v1/subscriptions?select=id,status,included_minutes,used_minutes,ends_at,plans(name_fa,slug)&status=eq.active&order=created_at.desc&limit=1`;
-  const response = await fetch(url, { headers: headers(session) });
+  const response = await fetchWithAuth(session, url, { headers: headers(session) });
   const rows = await readJson<SubscriptionSummary[]>(response, "دریافت وضعیت اشتراک با خطا مواجه شد.");
   return rows[0] || null;
 }
