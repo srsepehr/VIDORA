@@ -1,4 +1,4 @@
-import type { AuthSession } from "./auth";
+import { fetchWithAuth, type AuthSession } from "./auth";
 import { AppError } from "./app-error";
 import { getBrowserEnv } from "./env";
 import type { SubscriptionStatus, UserVideo, VideoStatus } from "../types/database";
@@ -60,7 +60,7 @@ export async function fetchUserVideos(session: AuthSession): Promise<UserVideo[]
     "completed_at",
   ].join(",");
   const url = `${env.supabaseUrl}/rest/v1/videos?select=${select}&order=created_at.desc&limit=50`;
-  const response = await fetch(url, { headers: headers(session) });
+  const response = await fetchWithAuth(session, url, { headers: headers(session) });
   return readJson<UserVideo[]>(response, "دریافت ویدیوهای شما با خطا مواجه شد.");
 }
 
