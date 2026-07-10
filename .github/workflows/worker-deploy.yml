@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect"
+        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify]
       video_id:
         description: "video id for inspect / subtitles"
         type: string
@@ -59,3 +59,6 @@ jobs:
       - name: Inspect subtitle artifacts
         if: ${{ inputs.step == 'subtitles-inspect' }}
         run: modal run worker/modal_app.py::subs_inspect --video-id "${{ inputs.video_id }}"
+      - name: Verify stored subtitle files (facts only, no text)
+        if: ${{ inputs.step == 'subtitles-verify' }}
+        run: modal run worker/modal_app.py::verify_subs --video-id "${{ inputs.video_id }}"

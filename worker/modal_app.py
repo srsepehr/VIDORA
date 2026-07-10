@@ -235,6 +235,65 @@ def inspect_subtitles(video_id: str = ""):
     return {"video_id": video_id, "artifacts": rows}
 
 
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def verify_subtitles(video_id: str = ""):
+    """Structurally verify the stored VTT/SRT by parsing them back — returns
+    facts only (counts, header/timestamp/UTF-8 checks), NEVER the subtitle text,
+    so nothing sensitive lands in CI logs."""
+    import os
+    import tempfile
+
+    from worker.app.config import load_config
+    from worker.app.supabase import SupabaseClient
+    from worker.app import subtitles as S
+
+    cfg = load_config(require_translation=False)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    if not video_id:
+        recent = client.select_many("videos", "select=id&order=created_at.desc&limit=1")
+        video_id = recent[0]["id"] if recent else ""
+    arts = client.select_many(
+        "subtitle_artifacts",
+        f"video_id=eq.{video_id}&language=eq.fa&select=format,status,storage_path,cue_count,content_hash",
+    )
+    out = {"video_id": video_id, "formats": {}}
+    for a in arts:
+        if a["status"] != "ready" or not a.get("storage_path"):
+            out["formats"][a["format"]] = {"status": a["status"]}
+            continue
+        tmp = tempfile.mktemp(suffix="." + a["format"])
+        try:
+            client.download_storage_object(cfg.results_bucket, a["storage_path"], tmp, max_bytes=5_000_000)
+            with open(tmp, encoding="utf-8") as fh:
+                text = fh.read()
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        cues = S.parse_vtt(text) if a["format"] == "vtt" else S.parse_srt(text)
+        monotonic = all(cues[i].end_ms <= cues[i + 1].start_ms for i in range(len(cues) - 1)) if len(cues) > 1 else True
+        persian = any("؀" <= ch <= "ۿ" for ch in text)
+        header_ok = text.startswith("WEBVTT") if a["format"] == "vtt" else text.lstrip().startswith("1")
+        out["formats"][a["format"]] = {
+            "status": "ready",
+            "bytes": len(text.encode("utf-8")),
+            "header_ok": header_ok,
+            "parsed_cue_count": len(cues),
+            "db_cue_count": a.get("cue_count"),
+            "cue_count_matches": len(cues) == a.get("cue_count"),
+            "timestamps_monotonic": monotonic,
+            "persian_present": persian,
+            "final_newline": text.endswith("\n"),
+            "utf8_roundtrip": text.encode("utf-8").decode("utf-8") == text,
+        }
+    return out
+
+
+@app.local_entrypoint()
+def verify_subs(video_id: str = ""):
+    import json
+    print("verify_subtitles:", json.dumps(verify_subtitles.remote(video_id), ensure_ascii=False, indent=2))
+
+
 @app.local_entrypoint()
 def subs(video_id: str = "", force: bool = False):
     import json
