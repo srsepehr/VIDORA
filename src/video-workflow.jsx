@@ -16,6 +16,7 @@ import {
   submitVideoUrl,
   validateVideoFile,
 } from "./lib/video-service";
+import { ProcessedVideoReview } from "./video-review.jsx";
 
 // ---------------------------------------------------------------------------
 // Status metadata (labels only — state itself always comes from the backend)
@@ -328,7 +329,7 @@ export function VideoProcessingDetail({ session, videoId, isFa, onBack, onDelete
   // Reliable polling: refresh while the video is in an active state; stop on
   // terminal states; network errors keep the loop alive (retry next tick).
   React.useEffect(() => {
-    const shouldPoll = state.video && isActiveVideoStatus(state.video.status);
+    const shouldPoll = state.video && isActiveVideoStatus(state.video.status) && !(state.video.status === "translating" && state.job?.status === "completed");
     if (!shouldPoll) return undefined;
     timerRef.current = window.setInterval(load, POLL_INTERVAL_MS);
     return () => window.clearInterval(timerRef.current);
@@ -384,6 +385,11 @@ export function VideoProcessingDetail({ session, videoId, isFa, onBack, onDelete
   }
 
   const { video, job } = state;
+
+  if (video.status === "translating" && job?.status === "completed") {
+    return <ProcessedVideoReview session={session} video={video} job={job} isFa={isFa} onBack={onBack} onDeleted={onDeleted} />;
+  }
+
   const stageIndex = video ? currentStageIndex(video.status) : -1;
   const isFailed = video?.status === "failed";
   const isCancelled = video?.status === "cancelled";
