@@ -33,14 +33,16 @@ compileTs("src/lib/access-policy.ts", "access-policy.mjs");
 compileTs("src/lib/video-config.ts", "video-config.mjs");
 compileTs("src/lib/video-sources.ts", "video-sources.mjs");
 compileTs("src/lib/video-storage.ts", "video-storage.mjs");
-compileTs("src/lib/video-service.ts", "video-service.mjs");\ncompileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
+compileTs("src/lib/video-service.ts", "video-service.mjs");
+compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
 const videoSources = await load("video-sources.mjs");
 const videoStorage = await load("video-storage.mjs");
 const videoService = await load("video-service.mjs");
-const accessPolicy = await load("access-policy.mjs");\nconst transcriptReview = await load("transcript-review.mjs");
+const accessPolicy = await load("access-policy.mjs");
+const transcriptReview = await load("transcript-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -380,9 +382,15 @@ test("display-mode copy preserves chronological text without UI labels", () => {
     { start_ms: 0, source_text: "First", translated_text_fa: "اول" },
     { start_ms: 2000, source_text: "Second", translated_text_fa: "دوم" },
   ];
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "source"), "First\nSecond");
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "fa"), "اول\nدوم");
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "both"), "First\nاول\n\nSecond\nدوم");
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "source"), "First
+Second");
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "fa"), "اول
+دوم");
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "both"), "First
+اول
+
+Second
+دوم");
   assert.match(transcriptReview.buildTranscriptCopy(segments, "source", true), /^\[00:00\]/);
 });
 
