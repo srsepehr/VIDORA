@@ -160,10 +160,17 @@ def inspect(video_id: str = ""):
     job = client.select_one("video_jobs", f"video_id=eq.{video_id}&select=*&order=created_at.desc&limit=1") or {}
     segs = client.select_many(
         "transcript_segments",
-        f"video_id=eq.{video_id}&select=segment_index,source_language,source_text,translated_text_fa&order=segment_index.asc",
+        f"video_id=eq.{video_id}&select=segment_index,start_ms,end_ms,source_language,source_text,translated_text_fa,translation_provider,translation_model&order=segment_index.asc",
     )
     translated = [s for s in segs if (s.get("translated_text_fa") or "").strip()]
+    empty_source = [s for s in segs if not (s.get("source_text") or "").strip()]
+    invalid_timestamps = [
+        s for s in segs
+        if int(s.get("start_ms") or 0) < 0 or int(s.get("end_ms") or 0) <= int(s.get("start_ms") or 0)
+    ]
     distinct = len({s["segment_index"] for s in segs})
+    providers = sorted({s["translation_provider"] for s in segs if s.get("translation_provider")})
+    models = sorted({s["translation_model"] for s in segs if s.get("translation_model")})
     return {
         "video_id": video_id,
         "video_status": video.get("status"),
@@ -181,13 +188,12 @@ def inspect(video_id: str = ""):
         "job_error_code": job.get("error_code"),
         "segments_total": len(segs),
         "segments_translated": len(translated),
+        "segments_missing_source": len(empty_source),
+        "invalid_timestamp_rows": len(invalid_timestamps),
         "distinct_segment_indexes": distinct,
         "duplicate_rows": len(segs) - distinct,
-        "samples": [
-            {"i": s["segment_index"], "src": (s.get("source_text") or "")[:80],
-             "fa": (s.get("translated_text_fa") or "")[:80]}
-            for s in segs[:4]
-        ],
+        "translation_providers": providers,
+        "translation_models": models,
     }
 
 
