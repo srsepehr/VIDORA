@@ -2,7 +2,7 @@
 // owner-scoped reads. All requests run with the signed-in user's JWT against
 // PostgREST + Storage, so RLS is the source of truth for ownership.
 import { AppError, logAppError, toAppError } from "./app-error";
-import type { AuthSession } from "./auth";
+import { fetchWithAuth, getValidAuthSession, type AuthSession } from "./auth";
 import { getAccessPolicy } from "./access-policy";
 import { getBrowserEnv } from "./env";
 import { extensionOf, getVideoUploadConfig, normalizeFilenameForDisplay } from "./video-config";
@@ -154,7 +154,7 @@ export interface VideoJobDispatcher {
 
 export class SupabaseQueueDispatcher implements VideoJobDispatcher {
   async enqueueVideoProcessing({ session, videoId }: EnqueueVideoInput): Promise<DispatchResult> {
-    const response = await fetch(rest("/rpc/enqueue_video_processing"), {
+    const response = await fetchWithAuth(session, rest("/rpc/enqueue_video_processing"), {
       method: "POST",
       headers: restHeaders(session),
       body: JSON.stringify({ p_video_id: videoId }),
@@ -171,7 +171,7 @@ export const jobDispatcher: VideoJobDispatcher = new SupabaseQueueDispatcher();
 // ---------------------------------------------------------------------------
 
 async function insertVideo(session: AuthSession, row: Record<string, unknown>): Promise<UserVideo> {
-  const response = await fetch(rest("/videos"), {
+  const response = await fetchWithAuth(session, rest("/videos"), {
     method: "POST",
     headers: restHeaders(session, { Prefer: "return=representation" }),
     body: JSON.stringify(row),
@@ -194,7 +194,7 @@ async function insertVideo(session: AuthSession, row: Record<string, unknown>): 
 }
 
 async function patchVideo(session: AuthSession, videoId: string, patch: Record<string, unknown>): Promise<void> {
-  const response = await fetch(rest(`/videos?id=eq.${videoId}`), {
+  const response = await fetchWithAuth(session, rest(`/videos?id=eq.${videoId}`), {
     method: "PATCH",
     headers: restHeaders(session),
     body: JSON.stringify(patch),
@@ -203,7 +203,7 @@ async function patchVideo(session: AuthSession, videoId: string, patch: Record<s
 }
 
 export async function fetchVideoById(session: AuthSession, videoId: string): Promise<UserVideo | null> {
-  const response = await fetch(rest(`/videos?id=eq.${encodeURIComponent(videoId)}&select=*`), {
+  const response = await fetchWithAuth(session, rest(`/videos?id=eq.${encodeURIComponent(videoId)}&select=*`), {
     headers: restHeaders(session),
   });
   const rows = await restJson<UserVideo[]>(response, "دریافت اطلاعات ویدیو ناموفق بود.", "fetchVideoById");
@@ -211,7 +211,7 @@ export async function fetchVideoById(session: AuthSession, videoId: string): Pro
 }
 
 export async function fetchLatestJob(session: AuthSession, videoId: string): Promise<VideoJob | null> {
-  const response = await fetch(rest(`/video_jobs?video_id=eq.${encodeURIComponent(videoId)}&select=*&order=created_at.desc&limit=1`), {
+  const response = await fetchWithAuth(session, rest(`/video_jobs?video_id=eq.${encodeURIComponent(videoId)}&select=*&order=created_at.desc&limit=1`), {
     headers: restHeaders(session),
   });
   const rows = await restJson<VideoJob[]>(response, "دریافت وضعیت پردازش ناموفق بود.", "fetchLatestJob");
@@ -237,7 +237,8 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
   let cancelled = false;
 
   const promise = (async () => {
-    const decision = await getAccessPolicy().canUploadVideo(session.user.id);
+    const activeSession = await getValidAuthSession(session);
+    const decision = await getAccessPolicy().canUploadVideo(activeSession.user.id);
     if (!decision.allowed) {
       throw new AppError({
         code: "AUTH_REQUIRED",
@@ -251,8 +252,8 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
 
     callbacks.onPhase("creating");
     const displayName = normalizeFilenameForDisplay(file.name);
-    const video = await insertVideo(session, {
-      user_id: session.user.id,
+    const video = await insertVideo(activeSession, {
+      user_id: activeSession.user.id,
       source_type: "upload",
       original_filename: displayName,
       title: displayName.replace(/\.[a-z0-9]+$/i, ""),
@@ -261,10 +262,10 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
       status: "uploading",
     });
 
-    const target = videoStorage.createUploadTarget({ userId: session.user.id, videoId: video.id, filename: file.name });
+    const target = videoStorage.createUploadTarget({ userId: activeSession.user.id, videoId: video.id, filename: file.name });
 
     callbacks.onPhase("uploading");
-    const handle = videoStorage.uploadObject(session, target, file, callbacks.onProgress);
+    const handle = videoStorage.uploadObject(activeSession, target, file, callbacks.onProgress);
     abortUpload = handle.abort;
     if (cancelled) handle.abort();
     try {
@@ -273,7 +274,7 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
       // Best-effort: keep the row but mark it failed/cancelled so the list is honest.
       const appError = toAppError(error);
       const isCancel = appError.code === "UPLOAD_CANCELLED";
-      await patchVideo(session, video.id, {
+      await patchVideo(activeSession, video.id, {
         status: isCancel ? "cancelled" : "failed",
         failure_code: appError.code,
         failure_message_fa: appError.messageFa,
@@ -292,10 +293,10 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
         logMessage: "Uploaded object missing at verification",
       });
     }
-    await patchVideo(session, video.id, { storage_key: target.storageKey, status: "uploaded" });
+    await patchVideo(activeSession, video.id, { storage_key: target.storageKey, status: "uploaded" });
 
     callbacks.onPhase("queueing");
-    await jobDispatcher.enqueueVideoProcessing({ session, videoId: video.id });
+    await jobDispatcher.enqueueVideoProcessing({ session: activeSession, videoId: video.id });
 
     callbacks.onPhase("done");
     return { ...video, storage_key: target.storageKey, status: "queued" as const };
@@ -357,7 +358,7 @@ export interface VideoListPage {
 }
 
 export async function fetchVideosPage(session: AuthSession, offset: number, limit: number): Promise<VideoListPage> {
-  const response = await fetch(rest(`/videos?select=*&order=created_at.desc&offset=${offset}&limit=${limit}`), {
+  const response = await fetchWithAuth(session, rest(`/videos?select=*&order=created_at.desc&offset=${offset}&limit=${limit}`), {
     headers: restHeaders(session, { Prefer: "count=exact" }),
   });
   const videos = await restJson<UserVideo[]>(response, "دریافت فهرست ویدیوها ناموفق بود.", "fetchVideosPage");
@@ -367,7 +368,7 @@ export async function fetchVideosPage(session: AuthSession, offset: number, limi
 }
 
 export async function cancelVideoProcessing(session: AuthSession, videoId: string): Promise<void> {
-  const response = await fetch(rest("/rpc/cancel_video_processing"), {
+  const response = await fetchWithAuth(session, rest("/rpc/cancel_video_processing"), {
     method: "POST",
     headers: restHeaders(session),
     body: JSON.stringify({ p_video_id: videoId }),
@@ -399,7 +400,7 @@ export async function deleteVideo(session: AuthSession, video: UserVideo): Promi
       logAppError(toAppError(error), "deleteVideo.storage");
     });
   }
-  const response = await fetch(rest(`/videos?id=eq.${encodeURIComponent(video.id)}`), {
+  const response = await fetchWithAuth(session, rest(`/videos?id=eq.${encodeURIComponent(video.id)}`), {
     method: "DELETE",
     headers: restHeaders(session),
   });
