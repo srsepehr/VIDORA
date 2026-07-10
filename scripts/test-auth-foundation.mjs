@@ -28,10 +28,13 @@ function compileTs(source, targetName) {
 compileTs("src/lib/app-error.ts", "app-error.mjs");
 compileTs("src/lib/env-core.ts", "env-core.mjs");
 compileTs("src/lib/return-to.ts", "return-to.mjs");
+fs.writeFileSync(path.join(tmp, "env.mjs"), `export function getBrowserEnv() { return { supabaseUrl: "https://test.supabase.co", supabaseAnonKey: "anon-test", appUrl: "http://localhost" }; }`);
+compileTs("src/lib/auth.ts", "auth.mjs");
 
 const appError = await import(pathToFileURL(path.join(tmp, "app-error.mjs")));
 const envCore = await import(pathToFileURL(path.join(tmp, "env-core.mjs")));
 const returnTo = await import(pathToFileURL(path.join(tmp, "return-to.mjs")));
+const auth = await import(pathToFileURL(path.join(tmp, "auth.mjs")));
 
 test("missing and placeholder environment is classified as configuration", () => {
   assert.throws(
@@ -96,4 +99,93 @@ test("signup route owns the notice state it renders", () => {
 
   assert.match(signupSource, /const \[formNotice, setFormNotice\] = React\.useState\(""\);/);
   assert.match(signupSource, /formNotice=\{formNotice\}/);
+});
+
+
+test("protected requests force one session refresh and retry exactly once", async () => {
+  const values = new Map();
+  global.window = {
+    location: { origin: "http://localhost" },
+    sessionStorage: {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    },
+  };
+
+  const now = Math.floor(Date.now() / 1000);
+  const stale = {
+    accessToken: "stale-access",
+    refreshToken: "stale-refresh",
+    expiresAt: now + 3600,
+    user: { id: "user-1", email: "user@example.com" },
+  };
+  window.sessionStorage.setItem("vidora.supabase.session.v1", JSON.stringify(stale));
+
+  let refreshCalls = 0;
+  let resourceCalls = 0;
+  global.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url.includes("/auth/v1/token")) {
+      refreshCalls += 1;
+      return new Response(JSON.stringify({
+        access_token: "fresh-access",
+        refresh_token: "fresh-refresh",
+        expires_at: now + 7200,
+        user: stale.user,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    resourceCalls += 1;
+    const headers = new Headers(init.headers);
+    const authorized = headers.get("Authorization") === "Bearer fresh-access";
+    return new Response("{}", { status: authorized ? 200 : 401 });
+  };
+
+  const response = await auth.fetchWithAuth(stale, "https://test.supabase.co/rest/v1/videos");
+  assert.equal(response.status, 200);
+  assert.equal(refreshCalls, 1);
+  assert.equal(resourceCalls, 2);
+  assert.equal(auth.getCachedSession().accessToken, "fresh-access");
+});
+
+test("concurrent expired-session checks share one refresh request", async () => {
+  const values = new Map();
+  global.window = {
+    location: { origin: "http://localhost" },
+    sessionStorage: {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    },
+  };
+
+  const now = Math.floor(Date.now() / 1000);
+  const expired = {
+    accessToken: "expired-access",
+    refreshToken: "expired-refresh",
+    expiresAt: now - 10,
+    user: { id: "user-2", email: "user2@example.com" },
+  };
+  window.sessionStorage.setItem("vidora.supabase.session.v1", JSON.stringify(expired));
+
+  let refreshCalls = 0;
+  global.fetch = async () => {
+    refreshCalls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return new Response(JSON.stringify({
+      access_token: "shared-access",
+      refresh_token: "shared-refresh",
+      expires_at: now + 3600,
+      user: expired.user,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const [first, second] = await Promise.all([
+    auth.getValidAuthSession(expired),
+    auth.getValidAuthSession(expired),
+  ]);
+  assert.equal(refreshCalls, 1);
+  assert.equal(first.accessToken, "shared-access");
+  assert.equal(second.accessToken, "shared-access");
 });
