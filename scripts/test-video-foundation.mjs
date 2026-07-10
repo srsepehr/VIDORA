@@ -27,20 +27,20 @@ function compileTs(source, targetName) {
 
 compileTs("src/lib/app-error.ts", "app-error.mjs");
 compileTs("src/lib/env-core.ts", "env-core.mjs");
-compileTs("src/lib/env.ts", "env.mjs");
+fs.writeFileSync(path.join(tmp, "env.mjs"), `export function getBrowserEnv() { return { supabaseUrl: "https://test.supabase.co", supabaseAnonKey: "anon-test", appUrl: "http://localhost" }; }`);
 compileTs("src/lib/auth.ts", "auth.mjs");
 compileTs("src/lib/access-policy.ts", "access-policy.mjs");
 compileTs("src/lib/video-config.ts", "video-config.mjs");
 compileTs("src/lib/video-sources.ts", "video-sources.mjs");
 compileTs("src/lib/video-storage.ts", "video-storage.mjs");
-compileTs("src/lib/video-service.ts", "video-service.mjs");
+compileTs("src/lib/video-service.ts", "video-service.mjs");\ncompileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
 const videoSources = await load("video-sources.mjs");
 const videoStorage = await load("video-storage.mjs");
 const videoService = await load("video-service.mjs");
-const accessPolicy = await load("access-policy.mjs");
+const accessPolicy = await load("access-policy.mjs");\nconst transcriptReview = await load("transcript-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -275,4 +275,122 @@ test("pipeline migration declares the idempotency index and guarded RPCs", () =>
   assert.match(sql, /VIDEO_SOURCE_MISSING/);
   assert.match(sql, /max_attempts/);
   assert.match(sql, /lease_expires_at/);
+});
+
+
+// ---------------------------------------------------------------------------
+// Processed-video review: private playback + transcript behavior
+// ---------------------------------------------------------------------------
+
+test("signed playback URL refreshes a rejected session once", async () => {
+  const values = new Map();
+  const now = Math.floor(Date.now() / 1000);
+  const session = {
+    accessToken: "stale-access",
+    refreshToken: "stale-refresh",
+    expiresAt: now + 3600,
+    user: { id: "user-1", email: "owner@example.com" },
+  };
+  values.set("vidora.supabase.session.v1", JSON.stringify(session));
+  global.window = {
+    location: { origin: "http://localhost" },
+    sessionStorage: {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    },
+  };
+
+  let storageCalls = 0;
+  let refreshCalls = 0;
+  global.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url.includes("/auth/v1/token")) {
+      refreshCalls += 1;
+      return new Response(JSON.stringify({
+        access_token: "fresh-access",
+        refresh_token: "fresh-refresh",
+        expires_at: now + 7200,
+        user: session.user,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    storageCalls += 1;
+    const authorized = new Headers(init.headers).get("Authorization") === "Bearer fresh-access";
+    if (!authorized) return new Response("{}", { status: 401 });
+    return new Response(JSON.stringify({ signedURL: "/object/sign/vidora-video-uploads/private?token=redacted" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  const adapter = new videoStorage.SupabaseVideoStorage();
+  const url = await adapter.createSignedReadUrl(session, "user-1/videos/video-1/source/a.mp4", 300);
+  assert.match(url, /\/storage\/v1\/object\/sign\/vidora-video-uploads\/private/);
+  assert.equal(storageCalls, 2);
+  assert.equal(refreshCalls, 1);
+});
+
+test("transcript preparation sorts chronologically and reports malformed data", () => {
+  const rows = [
+    { id: "b", video_id: "v", segment_index: 1, start_ms: 2000, end_ms: 3000, source_text: "Second", translated_text_fa: "دوم" },
+    { id: "a", video_id: "v", segment_index: 0, start_ms: 0, end_ms: 1000, source_text: "First", translated_text_fa: "اول" },
+  ];
+  const clean = transcriptReview.prepareTranscript(rows);
+  assert.deepEqual(clean.segments.map((row) => row.id), ["a", "b"]);
+  assert.equal(clean.isComplete, true);
+
+  const malformed = transcriptReview.prepareTranscript([
+    ...rows,
+    { id: "dup", video_id: "v", segment_index: 1, start_ms: 4000, end_ms: 3000, source_text: "", translated_text_fa: null },
+  ]);
+  assert.deepEqual(malformed.duplicateIndexes, [1]);
+  assert.deepEqual(malformed.invalidIndexes, [1]);
+  assert.deepEqual(malformed.missingSourceIndexes, [1]);
+  assert.deepEqual(malformed.missingTranslationIndexes, [1]);
+  assert.equal(malformed.isComplete, false);
+});
+
+test("active segment lookup handles boundaries and only small gaps", () => {
+  const segments = [
+    { start_ms: 0, end_ms: 1000 },
+    { start_ms: 1200, end_ms: 2000 },
+    { start_ms: 4000, end_ms: 5000 },
+  ];
+  assert.equal(transcriptReview.findActiveSegmentIndex(segments, 500), 0);
+  assert.equal(transcriptReview.findActiveSegmentIndex(segments, 1100), 0);
+  assert.equal(transcriptReview.findActiveSegmentIndex(segments, 3000), -1);
+  assert.equal(transcriptReview.findActiveSegmentIndex(segments, 4500), 2);
+  assert.equal(transcriptReview.findActiveSegmentIndex(segments, 6000), -1);
+});
+
+test("search matches source and normalized Persian variants", () => {
+  const segment = { source_text: "Building useful AI agents", translated_text_fa: "ساخت عامل‌های هوش مصنوعی کاربردی" };
+  assert.equal(transcriptReview.segmentMatchesQuery(segment, "USEFUL ai"), true);
+  assert.equal(transcriptReview.segmentMatchesQuery(segment, "عامل هاي"), false);
+  assert.equal(
+    transcriptReview.normalizeTranscriptSearch("يادگيري كاربردي"),
+    transcriptReview.normalizeTranscriptSearch("یادگیری کاربردی"),
+  );
+  const zwnj = { source_text: "", translated_text_fa: "عامل‌های هوشمند" };
+  assert.equal(transcriptReview.segmentMatchesQuery(zwnj, "عاملهای"), true);
+});
+
+test("display-mode copy preserves chronological text without UI labels", () => {
+  const segments = [
+    { start_ms: 0, source_text: "First", translated_text_fa: "اول" },
+    { start_ms: 2000, source_text: "Second", translated_text_fa: "دوم" },
+  ];
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "source"), "First\nSecond");
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "fa"), "اول\nدوم");
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "both"), "First\nاول\n\nSecond\nدوم");
+  assert.match(transcriptReview.buildTranscriptCopy(segments, "source", true), /^\[00:00\]/);
+});
+
+test("review UI uses semantic seek controls and no subtitle-generation features", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  assert.match(source, /<button[\s\S]*className="vdr-segment-main"/);
+  assert.match(source, /player\.currentTime\s*=/);
+  assert.match(source, /onTimeUpdate=\{handleTimeUpdate\}/);
+  assert.match(source, /navigator\.clipboard\.writeText/);
+  assert.doesNotMatch(source, /<track|WebVTT|SRT|burned-in/i);
 });
