@@ -10,6 +10,7 @@ the lease and surface cancellation between and within stages.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -21,7 +22,10 @@ from .errors import (
     STAGE_EXTRACTING,
     STAGE_TRANSCRIBING,
     STAGE_TRANSLATING,
+    STAGE_SUBTITLES,
 )
+
+log = logging.getLogger("vidora.worker.pipeline")
 from . import media
 from .queue import ClaimedJob, Queue
 from .storage import acquire_source
@@ -142,7 +146,22 @@ class Pipeline:
                 dev_detail=f"{len(remaining)} segment(s) untranslated at completion",
             )
 
-        # 6) phase complete: video ends at 'translating' with full transcript.
+        # 6) soft subtitles (best-effort). A failure here must NOT fail the job
+        # or the transcript/translation — it only records a failed artifact so
+        # the review page stays usable. Uses the stdlib builder, no AI models.
+        self._advance(job.id, STAGE_SUBTITLES, percent=0)
+        try:
+            from .subtitle_generation import generate_subtitles_for_video
+            sub = generate_subtitles_for_video(self.config, self.client, job.video_id)
+            log.info("job=%s subtitles: %s", job.id, sub.get("status"))
+        except Cancelled:
+            raise
+        except WorkerError as err:
+            log.warning("job=%s subtitle generation failed (non-fatal): %s", job.id, err.to_log())
+        except Exception as exc:  # never let subtitles fail the whole job
+            log.warning("job=%s subtitle generation errored (non-fatal): %r", job.id, exc)
+
+        # 7) phase complete: video ends at 'translating' with full transcript.
         ok, cancelled = self.queue.complete(job.id, video_status=STAGE_TRANSLATING)
         if cancelled:
             raise Cancelled()

@@ -70,6 +70,15 @@ image = (
     .add_local_python_source("worker")
 )
 
+# Subtitle generation is pure stdlib (deterministic builder) — NO torch,
+# whisper, transformers, or ffmpeg. A separate lightweight image proves that
+# subtitle-only work never loads AI models and keeps backfill cheap.
+subtitle_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .env({"TRANSLATION_PROVIDER": "local_nllb", "RESULTS_BUCKET": "vidora-video-results"})
+    .add_local_python_source("worker")
+)
+
 app = modal.App("vidora-worker")
 
 # The owner creates this once: `modal secret create vidora-worker SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...`
@@ -195,6 +204,47 @@ def inspect(video_id: str = ""):
         "translation_providers": providers,
         "translation_models": models,
     }
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=300, max_containers=1)
+def generate_subtitles(video_id: str, force: bool = False):
+    """Lightweight, internal/manual subtitle generation + backfill. Loads NO AI
+    models. Invoked via `modal run` (Modal-token authenticated) — it is NOT a
+    public web endpoint and never accepts arbitrary IDs unauthenticated."""
+    from worker.app.subtitle_generation import backfill_subtitles
+
+    return backfill_subtitles(video_id, force=force)
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def inspect_subtitles(video_id: str = ""):
+    """Read back subtitle artifact metadata (no processing) for verification."""
+    from worker.app.config import load_config
+    from worker.app.supabase import SupabaseClient
+
+    cfg = load_config(require_translation=False)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    if not video_id:
+        recent = client.select_many("videos", "select=id&order=created_at.desc&limit=1")
+        video_id = recent[0]["id"] if recent else ""
+    rows = client.select_many(
+        "subtitle_artifacts",
+        f"video_id=eq.{video_id}&select=format,language,status,content_hash,builder_version,cue_count,"
+        f"source_segment_count,storage_path,validation_warnings,error_code&order=format.asc",
+    )
+    return {"video_id": video_id, "artifacts": rows}
+
+
+@app.local_entrypoint()
+def subs(video_id: str = "", force: bool = False):
+    import json
+    print("generate_subtitles:", json.dumps(generate_subtitles.remote(video_id, force), ensure_ascii=False, indent=2))
+
+
+@app.local_entrypoint()
+def subs_inspect(video_id: str = ""):
+    import json
+    print("inspect_subtitles:", json.dumps(inspect_subtitles.remote(video_id), ensure_ascii=False, indent=2))
 
 
 @app.local_entrypoint()

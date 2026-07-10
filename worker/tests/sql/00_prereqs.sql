@@ -14,6 +14,26 @@ create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('app.current_user', true), '')::uuid
 $$;
 
+-- Supabase's shared updated_at trigger function (used by artifact tables).
+create or replace function public.set_updated_at() returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+-- Minimal storage schema stubs so migrations that declare storage.objects
+-- policies load against a plain Postgres.
+create schema if not exists storage;
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text,
+  name text
+);
+create or replace function storage.foldername(name text) returns text[] language sql immutable as $$
+  select string_to_array(name, '/')
+$$;
+
 -- auth.users stub (video_jobs.user_id FKs to it in the real schema; here we
 -- keep it minimal and do not enforce the FK to avoid seeding users).
 create table if not exists auth.users (id uuid primary key);
@@ -76,6 +96,10 @@ create table if not exists public.video_jobs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- The subtitle-artifact RLS policy checks ownership through public.videos, so
+-- the client role needs read access to it (as it does in the real schema).
+grant select on public.videos to authenticated;
 
 create table if not exists public.transcript_segments (
   id uuid primary key default gen_random_uuid(),

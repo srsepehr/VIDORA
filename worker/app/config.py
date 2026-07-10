@@ -39,6 +39,7 @@ class Config:
     supabase_url: str
     service_role_key: str
     upload_bucket: str
+    results_bucket: str
 
     # Queue / lease behaviour
     worker_id: str
@@ -111,6 +112,7 @@ def load_config(*, require_translation: bool = True) -> Config:
         supabase_url=supabase_url,
         service_role_key=service_role_key,
         upload_bucket=_opt("UPLOAD_BUCKET", "vidora-video-uploads"),
+        results_bucket=_opt("RESULTS_BUCKET", "vidora-video-results"),
         worker_id=worker_id,
         lease_seconds=_int("LEASE_SECONDS", 120),
         heartbeat_seconds=_int("HEARTBEAT_SECONDS", 20),

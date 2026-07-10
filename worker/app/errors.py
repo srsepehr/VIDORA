@@ -107,6 +107,29 @@ TRANSLATION_INVALID_RESPONSE = _reg(
 TRANSLATION_INCOMPLETE = _reg(
     "TRANSLATION_INCOMPLETE", "ترجمه همه بخش‌ها کامل نشد.", True, STAGE_TRANSLATING)
 
+# --- subtitles -------------------------------------------------------------
+STAGE_SUBTITLES = "generating_subtitles"
+SUBTITLE_TRANSCRIPT_MISSING = _reg(
+    "SUBTITLE_TRANSCRIPT_MISSING", "متن این ویدیو برای ساخت زیرنویس یافت نشد.", False, STAGE_SUBTITLES)
+SUBTITLE_TRANSLATION_INCOMPLETE = _reg(
+    "SUBTITLE_TRANSLATION_INCOMPLETE", "ترجمه فارسی همه بخش‌ها کامل نیست؛ زیرنویس ساخته نشد.", False, STAGE_SUBTITLES)
+SUBTITLE_TIMESTAMP_INVALID = _reg(
+    "SUBTITLE_TIMESTAMP_INVALID", "زمان‌بندی بخش‌های متن برای ساخت زیرنویس نامعتبر است.", False, STAGE_SUBTITLES)
+SUBTITLE_NO_CUES = _reg(
+    "SUBTITLE_NO_CUES", "هیچ زیرنویس قابل نمایشی ساخته نشد.", False, STAGE_SUBTITLES)
+SUBTITLE_VALIDATION_FAILED = _reg(
+    "SUBTITLE_VALIDATION_FAILED", "بررسی صحت زیرنویس ناموفق بود.", False, STAGE_SUBTITLES)
+SUBTITLE_SERIALIZATION_FAILED = _reg(
+    "SUBTITLE_SERIALIZATION_FAILED", "ساخت فایل زیرنویس ناموفق بود.", True, STAGE_SUBTITLES)
+SUBTITLE_STORAGE_FAILED = _reg(
+    "SUBTITLE_STORAGE_FAILED", "ذخیره فایل زیرنویس ناموفق بود.", True, STAGE_SUBTITLES)
+SUBTITLE_PERSIST_FAILED = _reg(
+    "SUBTITLE_PERSIST_FAILED", "ثبت اطلاعات زیرنویس ناموفق بود.", True, STAGE_SUBTITLES)
+SUBTITLE_DURATION_MISMATCH = _reg(
+    "SUBTITLE_DURATION_MISMATCH", "زمان‌بندی زیرنویس با مدت ویدیو هم‌خوانی ندارد.", False, STAGE_SUBTITLES)
+SUBTITLE_STALE = _reg(
+    "SUBTITLE_STALE", "زیرنویس فعلی با متن به‌روزشده هم‌خوان نیست.", True, STAGE_SUBTITLES)
+
 # --- lifecycle -------------------------------------------------------------
 JOB_TIMEOUT = _reg("JOB_TIMEOUT", "زمان پردازش این ویدیو به پایان رسید.", True, STAGE_ACQUIRING)
 JOB_CANCELLED = _reg("JOB_CANCELLED", "پردازش این ویدیو لغو شد.", False, STAGE_ACQUIRING)

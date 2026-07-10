@@ -492,7 +492,7 @@ class TestPipeline(unittest.TestCase):
                     stack.enter_context(patch)
                 p.process(ClaimedJob("j1", "v1", "u1", "acquiring_source", 1, 3))
 
-        self.assertEqual(q.stages, ["validating", "extracting_audio", "transcribing", "translating"])
+        self.assertEqual(q.stages, ["validating", "extracting_audio", "transcribing", "translating", "generating_subtitles"])
         self.assertEqual(len(q.upserts[0]), 2)
         self.assertEqual(q.upserts[0][0]["source_language"], "en")
         # both segments translated

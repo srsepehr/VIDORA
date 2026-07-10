@@ -7,14 +7,18 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "deploy | health | drain (one job) | inspect (read DB state)"
+        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect]
       video_id:
-        description: "optional video id for inspect"
+        description: "video id for inspect / subtitles"
         type: string
         default: ""
+      force:
+        description: "force subtitle regeneration"
+        type: boolean
+        default: false
 
 jobs:
   modal:
@@ -49,3 +53,9 @@ jobs:
       - name: Inspect DB state
         if: ${{ inputs.step == 'inspect' }}
         run: modal run worker/modal_app.py::look --video-id "${{ inputs.video_id }}"
+      - name: Generate subtitles (backfill, lightweight, no AI models)
+        if: ${{ inputs.step == 'subtitles' }}
+        run: modal run worker/modal_app.py::subs --video-id "${{ inputs.video_id }}" ${{ inputs.force && '--force' || '' }}
+      - name: Inspect subtitle artifacts
+        if: ${{ inputs.step == 'subtitles-inspect' }}
+        run: modal run worker/modal_app.py::subs_inspect --video-id "${{ inputs.video_id }}"

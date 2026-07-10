@@ -43,9 +43,11 @@ $RUN "$PGBIN/pg_ctl" -D "$PGDATA" -o "-k $SOCK -c listen_addresses=''" -w start 
 export PGUSER=postgres
 $RUN "$PGBIN/createdb" -h "$SOCK" "$DB" 2>/dev/null
 
+SUBTITLE_MIGRATION="$REPO/supabase/migrations/202607110001_subtitle_artifacts.sql"
 psql -qX -v ON_ERROR_STOP=1 -f "$HERE/sql/00_prereqs.sql" >/dev/null || { echo "prereqs load failed"; exit 1; }
 psql -qX -v ON_ERROR_STOP=1 -f "$MIGRATION" >/dev/null || { echo "migration load failed"; exit 1; }
-ok "migration + prereqs load cleanly into Postgres"
+psql -qX -v ON_ERROR_STOP=1 -f "$SUBTITLE_MIGRATION" >/dev/null || { echo "subtitle migration load failed"; exit 1; }
+ok "migrations + prereqs load cleanly into Postgres"
 
 U=11111111-1111-1111-1111-111111111111
 
@@ -159,6 +161,39 @@ q "select public.update_transcript_translations('$UVID','$TR'::jsonb,'openai_com
 eq "translation written for seg 0" "سلام" "$(q "select translated_text_fa from public.transcript_segments where video_id='$UVID' and segment_index=0;")"
 eq "empty translation skipped for seg 1" "" "$(q "select coalesce(translated_text_fa,'') from public.transcript_segments where video_id='$UVID' and segment_index=1;")"
 eq "translation provenance recorded" "qwen" "$(q "select translation_model from public.transcript_segments where video_id='$UVID' and segment_index=0;")"
+
+# ---- 13. subtitle_artifacts: idempotent upsert + constraints + RLS ---------
+IDS=$(seed_job translating completed 1 3 NULL true); SUBVID=${IDS%|*}
+HASH1=abc123
+up1=$(q "select status from public.upsert_subtitle_artifact('$SUBVID','fa','vtt','ready','$SUBVID/videos/$SUBVID/subtitles/$HASH1/fa.vtt','$HASH1','sub-v1',3,3,'[]'::jsonb,null,null);")
+eq "subtitle upsert creates ready row" "ready" "$up1"
+eq "one artifact row exists" "1" "$(q "select count(*) from public.subtitle_artifacts where video_id='$SUBVID' and format='vtt';")"
+# re-upsert same format -> still one row (idempotent on unique video/lang/format)
+q "select public.upsert_subtitle_artifact('$SUBVID','fa','vtt','ready','$SUBVID/videos/$SUBVID/subtitles/$HASH1/fa.vtt','$HASH1','sub-v1',3,3,'[]'::jsonb,null,null);" >/dev/null
+eq "re-upsert does not duplicate artifact rows" "1" "$(q "select count(*) from public.subtitle_artifacts where video_id='$SUBVID' and format='vtt';")"
+# srt is a separate row
+q "select public.upsert_subtitle_artifact('$SUBVID','fa','srt','ready','$SUBVID/videos/$SUBVID/subtitles/$HASH1/fa.srt','$HASH1','sub-v1',3,3,'[]'::jsonb,null,null);" >/dev/null
+eq "srt artifact is a distinct row" "2" "$(q "select count(*) from public.subtitle_artifacts where video_id='$SUBVID';")"
+# a failed status must not clobber the ready storage_path/hash
+q "select public.upsert_subtitle_artifact('$SUBVID','fa','vtt','failed',null,null,null,null,null,'[]'::jsonb,'SUBTITLE_STORAGE_FAILED','boom');" >/dev/null
+eq "failed upsert preserves prior ready storage_path" "$SUBVID/videos/$SUBVID/subtitles/$HASH1/fa.vtt" "$(q "select storage_path from public.subtitle_artifacts where video_id='$SUBVID' and format='vtt';")"
+eq "failed upsert records error_code" "SUBTITLE_STORAGE_FAILED" "$(q "select error_code from public.subtitle_artifacts where video_id='$SUBVID' and format='vtt';")"
+# invalid format rejected by check constraint
+badfmt=$(psql -qtAX -c "select public.upsert_subtitle_artifact('$SUBVID','fa','txt','ready',null,null,null,null,null,'[]'::jsonb,null,null);" 2>&1 | tr -d '\n')
+eq "invalid format rejected" "rejected" "$(echo "$badfmt" | grep -qi 'violates check constraint\|invalid' && echo rejected || echo "$badfmt")"
+# mark stale keeps a matching hash
+q "select public.upsert_subtitle_artifact('$SUBVID','fa','vtt','ready','$SUBVID/videos/$SUBVID/subtitles/$HASH1/fa.vtt','$HASH1','sub-v1',3,3,'[]'::jsonb,null,null);" >/dev/null
+q "select public.mark_subtitle_artifacts_stale('$SUBVID', 'differenthash');" >/dev/null
+eq "mark_stale sets ready rows stale when hash differs" "stale" "$(q "select status from public.subtitle_artifacts where video_id='$SUBVID' and format='vtt';")"
+# client roles cannot call the worker upsert
+DENY3=$(psql -qtAX -c "set role authenticated; select public.upsert_subtitle_artifact('$SUBVID','fa','vtt','ready',null,null,null,null,null,'[]'::jsonb,null,null);" 2>&1 | tr -d '\n')
+eq "authenticated role denied subtitle upsert" "denied" "$(echo "$DENY3" | grep -qi 'permission denied' && echo denied || echo "$DENY3")"
+# owner (RLS) can read only own artifact metadata
+OWN=$(q "select user_id from public.videos where id='$SUBVID';")
+canread=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','$OWN',true); select count(*) from public.subtitle_artifacts where video_id='$SUBVID';" 2>&1 | tail -1 | tr -d '[:space:]')
+eq "owner reads own artifact metadata via RLS" "2" "$canread"
+otherread=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','22222222-2222-2222-2222-222222222222',true); select count(*) from public.subtitle_artifacts where video_id='$SUBVID';" 2>&1 | tail -1 | tr -d '[:space:]')
+eq "another user cannot read artifact metadata" "0" "$otherread"
 
 echo "---------------------------------------------"
 echo "queue RPC tests: $pass passed, $fail failed"

@@ -103,6 +103,35 @@ class SupabaseClient:
             raise WorkerError(SOURCE_OBJECT_MISSING, dev_detail="empty object")
         return written
 
+    def upload_storage_object(self, bucket: str, key: str, data: bytes, content_type: str) -> None:
+        """Upload bytes to a private bucket with the service role (overwrites the
+        same key — subtitle paths are hash-addressed so this is safe)."""
+        resp = http_client.request(
+            "POST",
+            f"{self.base_url}/storage/v1/object/{bucket}/{key}",
+            headers=self._headers({"Content-Type": content_type, "x-upsert": "true"}),
+            body=data,
+            timeout=60.0,
+        )
+        if not resp.ok:
+            raise WorkerError(
+                "SUBTITLE_STORAGE_FAILED",
+                dev_detail=f"upload {bucket}/{key} http {resp.status}: {resp.body[:200]!r}",
+                retryable=resp.status >= 500,
+            )
+
+    def delete_storage_object(self, bucket: str, key: str) -> None:
+        """Best-effort delete; a missing object (404) is not an error."""
+        resp = http_client.request(
+            "DELETE", f"{self.base_url}/storage/v1/object/{bucket}/{key}", headers=self._headers(), timeout=30.0
+        )
+        if not resp.ok and resp.status != 404:
+            raise WorkerError(
+                "SUBTITLE_STORAGE_FAILED",
+                dev_detail=f"delete {bucket}/{key} http {resp.status}",
+                retryable=resp.status >= 500,
+            )
+
     def ping(self) -> bool:
         resp = http_client.request("GET", f"{self.base_url}/rest/v1/", headers=self._headers(), timeout=10.0)
         return resp.status in (200, 400, 404)  # any structured reply proves connectivity
