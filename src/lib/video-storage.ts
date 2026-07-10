@@ -77,6 +77,44 @@ function storageHeaders(session: AuthSession): Record<string, string> {
   };
 }
 
+/**
+ * Create a short-lived signed read URL for an object in any private bucket.
+ * Ownership is enforced by the bucket's RLS select policy, not the path. Used
+ * for subtitle artifacts in the results bucket. Never persist the returned URL.
+ */
+export async function createSignedUrlForBucket(
+  session: AuthSession,
+  bucket: string,
+  storageKey: string,
+  expiresInSeconds: number,
+): Promise<string> {
+  const response = await fetchWithAuth(session, storageUrl(`/object/sign/${bucket}/${storageKey}`), {
+    method: "POST",
+    headers: { ...storageHeaders(session), "Content-Type": "application/json" },
+    body: JSON.stringify({ expiresIn: expiresInSeconds }),
+  });
+  if (!response.ok) {
+    throw new AppError({
+      code: response.status === 404 ? "STORAGE_OBJECT_MISSING" : "STORAGE_FAILURE",
+      httpStatus: response.status,
+      messageFa: "دسترسی امن به فایل زیرنویس ممکن نشد.",
+      retryable: response.status >= 500,
+      logMessage: `Signed subtitle URL failed with ${response.status}`,
+    });
+  }
+  const payload = (await response.json()) as { signedURL?: string };
+  if (!payload.signedURL) {
+    throw new AppError({
+      code: "STORAGE_FAILURE",
+      httpStatus: 500,
+      messageFa: "دسترسی امن به فایل زیرنویس ممکن نشد.",
+      retryable: true,
+      logMessage: "Signed subtitle URL response missing signedURL",
+    });
+  }
+  return `${getBrowserEnv().supabaseUrl}/storage/v1${payload.signedURL}`;
+}
+
 export class SupabaseVideoStorage implements VideoStorage {
   createUploadTarget(input: CreateUploadTargetInput): UploadTarget {
     return {

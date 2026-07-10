@@ -35,6 +35,7 @@ compileTs("src/lib/video-sources.ts", "video-sources.mjs");
 compileTs("src/lib/video-storage.ts", "video-storage.mjs");
 compileTs("src/lib/video-service.ts", "video-service.mjs");
 compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
+compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
@@ -43,6 +44,7 @@ const videoStorage = await load("video-storage.mjs");
 const videoService = await load("video-service.mjs");
 const accessPolicy = await load("access-policy.mjs");
 const transcriptReview = await load("transcript-review.mjs");
+const subtitleReview = await load("subtitle-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -394,11 +396,63 @@ Second
   assert.match(transcriptReview.buildTranscriptCopy(segments, "source", true), /^\[00:00\]/);
 });
 
-test("review UI uses semantic seek controls and no subtitle-generation features", () => {
+test("review UI uses semantic seek controls", () => {
   const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
   assert.match(source, /<button[\s\S]*className="vdr-segment-main"/);
   assert.match(source, /player\.currentTime\s*=/);
   assert.match(source, /onTimeUpdate=\{handleTimeUpdate\}/);
   assert.match(source, /navigator\.clipboard\.writeText/);
-  assert.doesNotMatch(source, /<track|WebVTT|SRT|burned-in/i);
+});
+
+// ---------------------------------------------------------------------------
+// Soft subtitles (consume-only frontend)
+// ---------------------------------------------------------------------------
+
+test("subtitle availability derives from status + builder version", () => {
+  const artifact = (over) => ({ format: "vtt", language: "fa", status: "ready", content_hash: "h",
+    builder_version: subtitleReview.SUBTITLE_BUILDER_VERSION, cue_count: 3, storage_path: "p", validation_warnings: [], error_code: null, ...over });
+  assert.equal(subtitleReview.deriveSubtitleAvailability([artifact({})]).state, "ready");
+  assert.equal(subtitleReview.deriveSubtitleAvailability([artifact({ status: "generating" })]).state, "generating");
+  assert.equal(subtitleReview.deriveSubtitleAvailability([artifact({ status: "failed" })]).state, "failed");
+  assert.equal(subtitleReview.deriveSubtitleAvailability([artifact({ status: "stale" })]).state, "stale");
+  // A ready artifact from a different builder version is treated as stale.
+  assert.equal(subtitleReview.deriveSubtitleAvailability([artifact({ builder_version: "sub-vOLD" })]).state, "stale");
+  // No vtt artifact at all -> none.
+  assert.equal(subtitleReview.deriveSubtitleAvailability([]).state, "none");
+});
+
+test("subtitle downloadable only when ready with a storage path", () => {
+  assert.equal(subtitleReview.isSubtitleDownloadable({ status: "ready", storage_path: "p" }), true);
+  assert.equal(subtitleReview.isSubtitleDownloadable({ status: "ready", storage_path: null }), false);
+  assert.equal(subtitleReview.isSubtitleDownloadable({ status: "failed", storage_path: "p" }), false);
+  assert.equal(subtitleReview.isSubtitleDownloadable(null), false);
+});
+
+test("subtitle filenames and language metadata are correct", () => {
+  assert.equal(subtitleReview.subtitleFilename("vtt"), "vidora-fa.vtt");
+  assert.equal(subtitleReview.subtitleFilename("srt"), "vidora-fa.srt");
+  assert.equal(subtitleReview.SUBTITLE_LANG, "fa");
+  assert.equal(subtitleReview.SUBTITLE_LABEL, "فارسی");
+  // Must NOT use the NLLB model code as the track language.
+  assert.notEqual(subtitleReview.SUBTITLE_LANG, "pes_Arab");
+});
+
+test("frontend builder version matches the worker builder version (no drift)", () => {
+  const py = fs.readFileSync(path.join(root, "worker/app/subtitle_config.py"), "utf8");
+  const match = py.match(/BUILDER_VERSION\s*=\s*"([^"]+)"/);
+  assert.ok(match, "worker BUILDER_VERSION not found");
+  assert.equal(subtitleReview.SUBTITLE_BUILDER_VERSION, match[1]);
+});
+
+test("review page attaches a Persian VTT track and secure downloads, and never generates artifacts", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  assert.match(source, /kind="subtitles"/);
+  assert.match(source, /srcLang=\{SUBTITLE_LANG\}/);
+  assert.match(source, /label=\{SUBTITLE_LABEL\}/);
+  assert.match(source, /downloadSubtitle\(subtitles\.(vtt|srt)\)/);
+  // Default-on is applied via TextTrack mode, and refresh is bounded.
+  assert.match(source, /track\.mode = show \? "showing" : "hidden"/);
+  assert.match(source, /subtitleRetryRef\.current >= 1/);
+  // The browser must not build authoritative subtitle files.
+  assert.doesNotMatch(source, /WEBVTT|to_vtt|buildCues|content_hash/);
 });

@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { Download, Subtitles } from "lucide-react";
 import { logAppError, toAppError } from "./lib/app-error";
 import { formatFileSize } from "./lib/video-config";
 import { videoStorage } from "./lib/video-storage";
@@ -26,6 +27,15 @@ import {
   prepareTranscript,
   segmentMatchesQuery,
 } from "./lib/transcript-review";
+import {
+  SUBTITLE_LABEL,
+  SUBTITLE_LANG,
+  createSubtitleSignedUrl,
+  deriveSubtitleAvailability,
+  downloadSubtitleArtifact,
+  fetchSubtitleArtifacts,
+  isSubtitleDownloadable,
+} from "./lib/subtitle-review";
 import "./video-review.css";
 
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -139,10 +149,15 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [copyNotice, setCopyNotice] = React.useState("");
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [subtitles, setSubtitles] = React.useState({ state: "none", vtt: null, srt: null });
+  const [subtitleUrl, setSubtitleUrl] = React.useState("");
+  const [subtitlesOn, setSubtitlesOn] = React.useState(true);
   const videoRef = React.useRef(null);
   const listRef = React.useRef(null);
   const rowRefs = React.useRef(new Map());
   const mediaRetryRef = React.useRef(0);
+  const subtitleRetryRef = React.useRef(0);
+  const subtitleBlobRef = React.useRef("");
   const resumePlaybackRef = React.useRef(null);
   const noticeTimerRef = React.useRef(null);
 
@@ -195,13 +210,67 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     }
   }, [session, video.storage_key, video.source_type]);
 
+  const loadSubtitles = React.useCallback(async () => {
+    try {
+      const artifacts = await fetchSubtitleArtifacts(session, video.id);
+      setSubtitles(deriveSubtitleAvailability(artifacts));
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadSubtitles");
+      setSubtitles({ state: "none", vtt: null, srt: null });
+    }
+  }, [session, video.id]);
+
+  const applySubtitleMode = React.useCallback((show) => {
+    const player = videoRef.current;
+    if (!player || !player.textTracks) return;
+    for (const track of player.textTracks) {
+      if (track.kind === "subtitles" && track.language === SUBTITLE_LANG) {
+        track.mode = show ? "showing" : "hidden";
+      }
+    }
+  }, []);
+
+  // Fetch the private VTT through a fresh short-lived signed URL and expose it
+  // to the <track> as a same-origin blob: URL. This avoids any cross-origin
+  // <track> CORS requirement and keeps the signed URL out of the DOM. The
+  // signed URL is never persisted.
+  const loadSubtitleUrl = React.useCallback(async () => {
+    if (subtitles.state !== "ready" || !subtitles.vtt?.storage_path) {
+      if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
+      setSubtitleUrl("");
+      return;
+    }
+    try {
+      const signedUrl = await createSubtitleSignedUrl(session, subtitles.vtt.storage_path);
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error(`subtitle fetch ${response.status}`);
+      const blob = await response.blob();
+      if (subtitleBlobRef.current) URL.revokeObjectURL(subtitleBlobRef.current);
+      const blobUrl = URL.createObjectURL(blob);
+      subtitleBlobRef.current = blobUrl;
+      setSubtitleUrl(blobUrl);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadSubtitleUrl");
+      setSubtitleUrl("");
+    }
+  }, [session, subtitles]);
+
   React.useEffect(() => {
     loadTranscript();
     loadSignedUrl();
+    loadSubtitles();
     return () => {
       if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+      if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
     };
-  }, [loadTranscript, loadSignedUrl]);
+  }, [loadTranscript, loadSignedUrl, loadSubtitles]);
+
+  React.useEffect(() => {
+    subtitleRetryRef.current = 0;
+    loadSubtitleUrl();
+  }, [loadSubtitleUrl]);
 
   React.useEffect(() => {
     try {
@@ -280,12 +349,43 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
 
   const handleLoadedMetadata = React.useCallback(() => {
     const player = videoRef.current;
+    applySubtitleMode(subtitlesOn);
     const resume = resumePlaybackRef.current;
     if (!player || !resume) return;
     player.currentTime = Math.min(resume.time, Number.isFinite(player.duration) ? player.duration : resume.time);
     if (resume.shouldPlay) player.play().catch(() => {});
     resumePlaybackRef.current = null;
-  }, []);
+  }, [applySubtitleMode, subtitlesOn]);
+
+  const handleTrackLoad = React.useCallback(() => {
+    applySubtitleMode(subtitlesOn);
+  }, [applySubtitleMode, subtitlesOn]);
+
+  // A genuine subtitle media-access failure (e.g. an expired signed URL) gets a
+  // single fresh URL — never a regenerate, never an infinite loop.
+  const handleTrackError = React.useCallback(() => {
+    if (subtitleRetryRef.current >= 1 || subtitles.state !== "ready") return;
+    subtitleRetryRef.current += 1;
+    loadSubtitleUrl();
+  }, [loadSubtitleUrl, subtitles.state]);
+
+  const toggleSubtitles = React.useCallback(() => {
+    setSubtitlesOn((previous) => {
+      const next = !previous;
+      applySubtitleMode(next);
+      return next;
+    });
+  }, [applySubtitleMode]);
+
+  const downloadSubtitle = React.useCallback(async (artifact) => {
+    try {
+      await downloadSubtitleArtifact(session, artifact);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.downloadSubtitle");
+      announceCopy(appError.messageFa);
+    }
+  }, [session, announceCopy]);
 
   if (transcriptState.loading) {
     return <ReviewState icon={<Loader2 size={28} className="vd-spin" />} title="در حال دریافت متن و ترجمه..." text="اطلاعات پردازش‌شده از فضای امن Vidora دریافت می‌شود." />;
@@ -331,6 +431,14 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     : null;
   const activeId = activeIndex >= 0 ? segments[activeIndex]?.id : "";
   const title = video.title || video.original_filename || "ویدیوی بدون عنوان";
+
+  const subtitleStatusText = {
+    ready: "زیرنویس فارسی آماده است",
+    generating: "در حال آماده‌سازی زیرنویس فارسی",
+    failed: "ساخت زیرنویس انجام نشد؛ ترجمه متنی همچنان در دسترس است",
+    stale: "زیرنویس فارسی با متن به‌روزشده هم‌خوان نیست",
+    none: "ترجمه متنی آماده است، اما فایل زیرنویس هنوز ساخته نشده",
+  }[subtitles.state];
 
   return (
     <section className="vdr-review" dir={isFa ? "rtl" : "ltr"}>
@@ -380,7 +488,20 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                 onError={handleMediaError}
                 onLoadedMetadata={handleLoadedMetadata}
                 aria-label={`پخش ${title}`}
-              />
+              >
+                {subtitleUrl ? (
+                  <track
+                    key={subtitleUrl}
+                    kind="subtitles"
+                    srcLang={SUBTITLE_LANG}
+                    label={SUBTITLE_LABEL}
+                    src={subtitleUrl}
+                    default
+                    onLoad={handleTrackLoad}
+                    onError={handleTrackError}
+                  />
+                ) : null}
+              </video>
             ) : null}
             {mediaState.error ? (
               <div className="vdr-media-state is-error" role="alert">
@@ -389,6 +510,28 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                 <button type="button" className="vd-secondary" onClick={() => { mediaRetryRef.current = 0; loadSignedUrl(); }}>تلاش دوباره</button>
               </div>
             ) : null}
+          </div>
+          <div className="vdr-subtitle-bar" data-state={subtitles.state}>
+            <span className="vdr-subtitle-status">
+              <Subtitles size={15} /> {subtitleStatusText}
+            </span>
+            <div className="vdr-subtitle-actions">
+              {subtitles.state === "ready" && subtitleUrl ? (
+                <button type="button" className="vd-secondary" onClick={toggleSubtitles} aria-pressed={subtitlesOn}>
+                  {subtitlesOn ? "خاموش کردن زیرنویس" : "روشن کردن زیرنویس"}
+                </button>
+              ) : null}
+              {isSubtitleDownloadable(subtitles.vtt) ? (
+                <button type="button" className="vdr-download" onClick={() => downloadSubtitle(subtitles.vtt)}>
+                  <Download size={14} /> دانلود WebVTT
+                </button>
+              ) : null}
+              {isSubtitleDownloadable(subtitles.srt) ? (
+                <button type="button" className="vdr-download" onClick={() => downloadSubtitle(subtitles.srt)}>
+                  <Download size={14} /> دانلود SRT
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="vdr-player-meta">
             <span>تاریخ آپلود: {new Date(video.created_at).toLocaleString("fa-IR")}</span>

@@ -119,6 +119,86 @@
   padding: 12px 2px 0;
 }
 
+/* Subtitle status + controls bar */
+.vdr-subtitle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(24, 24, 27, 0.1);
+  background: rgba(244, 244, 245, 0.7);
+}
+
+.vdr-subtitle-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 640;
+  line-height: 1.6;
+  color: #3f3f46;
+}
+
+.vdr-subtitle-bar[data-state="ready"] .vdr-subtitle-status { color: #14532d; }
+.vdr-subtitle-bar[data-state="failed"] .vdr-subtitle-status,
+.vdr-subtitle-bar[data-state="stale"] .vdr-subtitle-status { color: #7c2d12; }
+
+.vdr-subtitle-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vdr-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid rgba(24, 24, 27, 0.16);
+  background: rgba(255, 255, 255, 0.6);
+  color: #18181b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 640;
+  cursor: pointer;
+}
+
+.vdr-download:hover { background: #fff; }
+
+/* Native Persian subtitle cue styling — supported ::cue properties only, legible
+   over light and dark video content. Direction/order is handled by the browser
+   from the RTL text; a subtle background keeps it readable on any frame. */
+.vdr-player::cue {
+  background: rgba(9, 9, 11, 0.72);
+  color: #fafafa;
+  font-size: 1.05em;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .vdr-subtitle-bar {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(39, 39, 42, 0.6);
+  }
+  .vdr-subtitle-status { color: #d4d4d8; }
+  .vdr-subtitle-bar[data-state="ready"] .vdr-subtitle-status { color: #86efac; }
+  .vdr-subtitle-bar[data-state="failed"] .vdr-subtitle-status,
+  .vdr-subtitle-bar[data-state="stale"] .vdr-subtitle-status { color: #fdba74; }
+  .vdr-download {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fafafa;
+  }
+  .vdr-download:hover { background: rgba(255, 255, 255, 0.16); }
+}
+
 .vdr-transcript-card {
   display: grid;
   grid-template-rows: auto auto auto minmax(280px, 62vh);
