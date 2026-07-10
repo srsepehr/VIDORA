@@ -4,7 +4,7 @@
 // ever needed (or allowed) in the browser. The adapter interface is
 // deliberately provider-shaped so a future S3/R2 backend can replace it.
 import { AppError } from "./app-error";
-import type { AuthSession } from "./auth";
+import { fetchWithAuth, type AuthSession } from "./auth";
 import { getBrowserEnv } from "./env";
 import { UPLOAD_BUCKET, extensionOf } from "./video-config";
 
@@ -149,7 +149,7 @@ export class SupabaseVideoStorage implements VideoStorage {
   }
 
   async createSignedReadUrl(session: AuthSession, storageKey: string, expiresInSeconds: number): Promise<string> {
-    const response = await fetch(storageUrl(`/object/sign/${UPLOAD_BUCKET}/${storageKey}`), {
+    const response = await fetchWithAuth(session, storageUrl(`/object/sign/${UPLOAD_BUCKET}/${storageKey}`), {
       method: "POST",
       headers: { ...storageHeaders(session), "Content-Type": "application/json" },
       body: JSON.stringify({ expiresIn: expiresInSeconds }),
@@ -177,14 +177,14 @@ export class SupabaseVideoStorage implements VideoStorage {
   }
 
   async objectExists(session: AuthSession, storageKey: string): Promise<boolean> {
-    const response = await fetch(storageUrl(`/object/info/authenticated/${UPLOAD_BUCKET}/${storageKey}`), {
+    const response = await fetchWithAuth(session, storageUrl(`/object/info/authenticated/${UPLOAD_BUCKET}/${storageKey}`), {
       headers: storageHeaders(session),
     });
     return response.ok;
   }
 
   async deleteObject(session: AuthSession, storageKey: string): Promise<void> {
-    const response = await fetch(storageUrl(`/object/${UPLOAD_BUCKET}/${storageKey}`), {
+    const response = await fetchWithAuth(session, storageUrl(`/object/${UPLOAD_BUCKET}/${storageKey}`), {
       method: "DELETE",
       headers: storageHeaders(session),
     });
