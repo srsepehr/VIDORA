@@ -34,6 +34,7 @@ export type SignUpResult =
 
 const SESSION_KEY = "vidora.supabase.session.v1";
 const listeners = new Set<(session: AuthSession | null) => void>();
+let refreshInFlight: Promise<AuthSession | null> | null = null;
 
 function authHeaders(token?: string): HeadersInit {
   const env = getBrowserEnv();
@@ -99,22 +100,91 @@ async function requestAuth(path: string, body: Record<string, unknown>, token?: 
   return payload;
 }
 
-export async function refreshAuthSession(session = getCachedSession()): Promise<AuthSession | null> {
-  if (!session) return null;
-  const now = Math.floor(Date.now() / 1000);
-  if (session.expiresAt > now + 60) return session;
+function preferLatestSession(session: AuthSession | null): AuthSession | null {
+  const cached = getCachedSession();
+  if (!session) return cached;
+  if (!cached || cached.user.id !== session.user.id) return session;
+  return cached;
+}
 
-  try {
-    const payload = await requestAuth("/auth/v1/token?grant_type=refresh_token", { refresh_token: session.refreshToken });
-    const next = normalizeSession(payload);
-    saveSession(next);
-    return next;
-  } catch (error) {
-    const appError = toAppError(error);
-    logAppError(appError, "refreshAuthSession");
-    saveSession(null);
-    return null;
-  }
+function sessionExpiredError(): AppError {
+  return new AppError({
+    code: "SESSION_EXPIRED",
+    httpStatus: 401,
+    messageFa: "نشست شما منقضی شده است. لطفاً دوباره وارد شوید.",
+    retryable: false,
+    logMessage: "No valid Supabase session is available",
+  });
+}
+
+export async function refreshAuthSession(
+  session = getCachedSession(),
+  options: { force?: boolean } = {},
+): Promise<AuthSession | null> {
+  const candidate = preferLatestSession(session);
+  if (!candidate) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!options.force && candidate.expiresAt > now + 60) return candidate;
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const payload = await requestAuth("/auth/v1/token?grant_type=refresh_token", {
+        refresh_token: candidate.refreshToken,
+      });
+      const next = normalizeSession(payload);
+      saveSession(next);
+      return next;
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "refreshAuthSession");
+
+      // A second refresh may already have rotated the token. Never erase that
+      // newer session because an older refresh request failed.
+      const latest = getCachedSession();
+      if (latest && latest.user.id === candidate.user.id && latest.refreshToken !== candidate.refreshToken) {
+        return latest;
+      }
+      saveSession(null);
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+export async function getValidAuthSession(session = getCachedSession()): Promise<AuthSession> {
+  const active = await refreshAuthSession(session);
+  if (!active) throw sessionExpiredError();
+  return active;
+}
+
+export async function fetchWithAuth(
+  session: AuthSession,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const env = getBrowserEnv();
+  const run = (active: AuthSession) => {
+    const headers = new Headers(init.headers);
+    headers.set("apikey", env.supabaseAnonKey);
+    headers.set("Authorization", `Bearer ${active.accessToken}`);
+    return fetch(input, { ...init, headers });
+  };
+
+  let active = await getValidAuthSession(session);
+  let response = await run(active);
+  if (response.status !== 401 && response.status !== 403) return response;
+
+  // The server can reject a token before its local expiry (rotation, clock
+  // skew, or revocation). Force one refresh and retry exactly once.
+  active = await refreshAuthSession(active, { force: true }) as AuthSession;
+  if (!active) throw sessionExpiredError();
+  response = await run(active);
+  return response;
 }
 
 export async function restoreAuthSession(): Promise<AuthSession | null> {
