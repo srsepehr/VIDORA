@@ -141,6 +141,62 @@ def health():
     return out
 
 
+@app.function(image=image, secrets=[secret], timeout=120, max_containers=1)
+def inspect(video_id: str = ""):
+    """Read back the live DB state for verification (no processing). Defaults to
+    the most recently created video when no id is given."""
+    from worker.app.config import load_config
+    from worker.app.supabase import SupabaseClient
+
+    cfg = load_config(require_translation=False)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    if not video_id:
+        recent = client.select_many("videos", "select=id&order=created_at.desc&limit=1")
+        video_id = recent[0]["id"] if recent else ""
+    if not video_id:
+        return {"error": "no videos found"}
+
+    video = client.select_one("videos", f"id=eq.{video_id}&select=*") or {}
+    job = client.select_one("video_jobs", f"video_id=eq.{video_id}&select=*&order=created_at.desc&limit=1") or {}
+    segs = client.select_many(
+        "transcript_segments",
+        f"video_id=eq.{video_id}&select=segment_index,source_language,source_text,translated_text_fa&order=segment_index.asc",
+    )
+    translated = [s for s in segs if (s.get("translated_text_fa") or "").strip()]
+    distinct = len({s["segment_index"] for s in segs})
+    return {
+        "video_id": video_id,
+        "video_status": video.get("status"),
+        "detected_language": video.get("detected_language"),
+        "duration_seconds": video.get("duration_seconds"),
+        "source_type": video.get("source_type"),
+        "failure_code": video.get("failure_code"),
+        "failure_message_fa": video.get("failure_message_fa"),
+        "job_status": job.get("status"),
+        "job_worker_id": job.get("worker_id"),
+        "job_attempt": job.get("attempt"),
+        "job_max_attempts": job.get("max_attempts"),
+        "job_started_at": job.get("started_at"),
+        "job_finished_at": job.get("finished_at"),
+        "job_error_code": job.get("error_code"),
+        "segments_total": len(segs),
+        "segments_translated": len(translated),
+        "distinct_segment_indexes": distinct,
+        "duplicate_rows": len(segs) - distinct,
+        "samples": [
+            {"i": s["segment_index"], "src": (s.get("source_text") or "")[:80],
+             "fa": (s.get("translated_text_fa") or "")[:80]}
+            for s in segs[:4]
+        ],
+    }
+
+
+@app.local_entrypoint()
+def look(video_id: str = ""):
+    import json
+    print("inspect:", json.dumps(inspect.remote(video_id), ensure_ascii=False, indent=2))
+
+
 @app.local_entrypoint()
 def main(max_jobs: int = 1):
     # Default to a single job so a dev trigger never processes more than the one

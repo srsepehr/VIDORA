@@ -7,10 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "deploy | health | drain (drain processes exactly one job)"
+        description: "deploy | health | drain (one job) | inspect (read DB state)"
         type: choice
         default: health
-        options: [deploy, health, drain]
+        options: [deploy, health, drain, inspect]
+      video_id:
+        description: "optional video id for inspect"
+        type: string
+        default: ""
 
 jobs:
   modal:
@@ -42,3 +46,6 @@ jobs:
       - name: Drain one job
         if: ${{ inputs.step == 'drain' }}
         run: modal run worker/modal_app.py::main --max-jobs 1
+      - name: Inspect DB state
+        if: ${{ inputs.step == 'inspect' }}
+        run: modal run worker/modal_app.py::look --video-id "${{ inputs.video_id }}"
