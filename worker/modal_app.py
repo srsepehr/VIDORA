@@ -58,6 +58,7 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
     .pip_install(
+        "numpy<2",  # torch 2.2.x is built against numpy 1.x; numpy 2 breaks it
         "faster-whisper==1.0.3",
         "transformers==4.44.2",
         "torch==2.2.2",

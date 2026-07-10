@@ -4,6 +4,7 @@
 #   - faster-whisper: speech-to-text (CPU)
 #   - transformers + torch + sentencepiece: NLLB-200 translation (CPU)
 # The hosted OpenAI-compatible translation adapter needs no extra dependency.
+numpy<2
 faster-whisper==1.0.3
 transformers==4.44.2
 torch==2.2.2
