@@ -382,15 +382,15 @@ test("display-mode copy preserves chronological text without UI labels", () => {
     { start_ms: 0, source_text: "First", translated_text_fa: "اول" },
     { start_ms: 2000, source_text: "Second", translated_text_fa: "دوم" },
   ];
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "source"), "First
-Second");
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "fa"), "اول
-دوم");
-  assert.equal(transcriptReview.buildTranscriptCopy(segments, "both"), "First
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "source"), `First
+Second`);
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "fa"), `اول
+دوم`);
+  assert.equal(transcriptReview.buildTranscriptCopy(segments, "both"), `First
 اول
 
 Second
-دوم");
+دوم`);
   assert.match(transcriptReview.buildTranscriptCopy(segments, "source", true), /^\[00:00\]/);
 });
 
