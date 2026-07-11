@@ -15,6 +15,7 @@ loaded on this path.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from .config import Config, load_config
@@ -49,17 +50,31 @@ _RETRYABLE_VALIDATION = {"INSIGHT_INVALID_OUTPUT", "INSIGHT_GROUNDING_FAILED", "
 
 
 def _attempt_with_repair(provider: VideoInsightProvider, system: str, user: str, validate):
-    """One normal attempt + at most ONE controlled repair regeneration."""
+    """One normal attempt + at most ONE controlled repair regeneration.
+
+    The repair request includes the rejected structured payload and an explicit
+    non-empty schema. Small local models otherwise tend to repeat omissions
+    because they cannot see their previous assistant turn in this provider seam.
+    """
+    first_payload = provider.complete_json(system, user)
     try:
-        return validate(provider.complete_json(system, user))
+        return validate(first_payload)
     except WorkerError as err:
         if err.code not in _RETRYABLE_VALIDATION:
             raise
+        rejected = json.dumps(first_payload, ensure_ascii=False, separators=(",", ":"))
         correction = (
-            "Your previous reply was invalid: "
-            f"{err.dev_detail[:200]}. Return ONLY the required valid JSON object, "
-            "in Persian, using only segment indexes that exist in the input, with "
-            "each segment index in at most one chapter."
+            "Regenerate the entire answer. The rejected JSON was: "
+            f"{rejected[:2000]}\n"
+            f"Validation error: {err.dev_detail[:200]}. "
+            "Return ONLY one valid JSON object with ALL of these exact keys: "
+            '{"short_summary":"...","detailed_summary":"...",'
+            '"key_takeaways":[{"text":"...","segment_indexes":[0]}],'
+            '"chapters":[{"title":"...","description":"...",'
+            '"segment_indexes":[0]}]}. '
+            "key_takeaways and chapters MUST each contain at least one object. "
+            "Write user-facing text in Persian, copy only real segment indexes "
+            "from the input, and use each segment index in at most one chapter."
         )
         return validate(provider.complete_json(system, user, correction))
 

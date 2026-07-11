@@ -45,9 +45,11 @@ class FakeProvider:
     def __init__(self, outputs):
         self.outputs = list(outputs)
         self.calls = []  # (system_prefix, has_correction)
+        self.corrections = []
 
     def complete_json(self, system, user, correction=None):
         self.calls.append((system[:40], bool(correction)))
+        self.corrections.append(correction)
         if not self.outputs:
             raise WorkerError("INSIGHT_PROVIDER_UNAVAILABLE", dev_detail="no more fake outputs")
         return self.outputs.pop(0)
@@ -147,6 +149,23 @@ class TestOrchestration(unittest.TestCase):
         self.assertEqual(out["status"], "generated")
         self.assertEqual(len(provider.calls), 2)
         self.assertTrue(provider.calls[1][1])  # second call carried a correction
+
+    def test_repair_includes_rejected_payload_and_non_empty_schema(self):
+        client = FakeClient()
+        rejected = {
+            "short_summary": "خلاصه کوتاه",
+            "detailed_summary": "خلاصه کامل",
+            "key_takeaways": [],
+            "chapters": [{"title": "بخش اصلی", "segment_indexes": [0, 1, 2]}],
+        }
+        provider = FakeProvider([rejected, good_payload()])
+        out = G.generate_insights_for_video(CFG, client, "vid1", provider=provider)
+        self.assertEqual(out["status"], "generated")
+        correction = provider.corrections[1]
+        self.assertIn('"key_takeaways":[]', correction)
+        self.assertIn('"key_takeaways":[{"text":"..."', correction)
+        self.assertIn("MUST each contain at least one object", correction)
+        self.assertNotIn(ROWS[0]["source_text"], correction)
 
     def test_persistent_invalid_output_fails_once(self):
         client = FakeClient()
