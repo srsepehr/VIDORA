@@ -414,7 +414,10 @@ def inspect_insights(video_id: str = ""):
 @app.local_entrypoint()
 def insights(video_id: str = "", force: bool = False):
     import json
-    print("generate_insights:", json.dumps(generate_insights.remote(video_id, force), ensure_ascii=False, indent=2))
+    result = generate_insights.remote(video_id, force)
+    print("generate_insights:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
 
 
 @app.local_entrypoint()
