@@ -36,6 +36,14 @@ import {
   fetchSubtitleArtifacts,
   isSubtitleDownloadable,
 } from "./lib/subtitle-review";
+import {
+  INSIGHT_STATE_FA,
+  activeChapterIndex,
+  deriveInsightState,
+  fetchVideoChapters,
+  fetchVideoInsight,
+  takeawaySeekMs,
+} from "./lib/insight-review";
 import "./video-review.css";
 
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -152,6 +160,17 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [subtitles, setSubtitles] = React.useState({ state: "none", vtt: null, srt: null });
   const [subtitleUrl, setSubtitleUrl] = React.useState("");
   const [subtitlesOn, setSubtitlesOn] = React.useState(true);
+  const [tab, setTab] = React.useState(() => {
+    try {
+      const stored = window.sessionStorage.getItem(`vidora.review-tab.${video.id}`);
+      return ["transcript", "summary", "chapters"].includes(stored) ? stored : "transcript";
+    } catch {
+      return "transcript";
+    }
+  });
+  const [insightState, setInsightState] = React.useState({ loading: true, state: "none", insight: null, chapters: [] });
+  const [activeChapter, setActiveChapter] = React.useState(-1);
+  const [selectedChapter, setSelectedChapter] = React.useState(-1);
   const videoRef = React.useRef(null);
   const listRef = React.useRef(null);
   const rowRefs = React.useRef(new Map());
@@ -221,6 +240,23 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     }
   }, [session, video.id]);
 
+  const loadInsights = React.useCallback(async () => {
+    setInsightState((previous) => ({ ...previous, loading: true }));
+    try {
+      const [insight, chapters] = await Promise.all([
+        fetchVideoInsight(session, video.id),
+        fetchVideoChapters(session, video.id),
+      ]);
+      const state = deriveInsightState(insight);
+      setInsightState({ loading: false, state, insight, chapters: state === "ready" || state === "stale" ? chapters : [] });
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadInsights");
+      // Insight availability must never block transcript review.
+      setInsightState({ loading: false, state: "none", insight: null, chapters: [] });
+    }
+  }, [session, video.id]);
+
   const applySubtitleMode = React.useCallback((show) => {
     const player = videoRef.current;
     if (!player || !player.textTracks) return;
@@ -261,11 +297,20 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     loadTranscript();
     loadSignedUrl();
     loadSubtitles();
+    loadInsights();
     return () => {
       if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
       if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
     };
-  }, [loadTranscript, loadSignedUrl, loadSubtitles]);
+  }, [loadTranscript, loadSignedUrl, loadSubtitles, loadInsights]);
+
+  React.useEffect(() => {
+    try {
+      window.sessionStorage.setItem(`vidora.review-tab.${video.id}`, tab);
+    } catch {
+      // Tab preference is non-critical.
+    }
+  }, [tab, video.id]);
 
   React.useEffect(() => {
     subtitleRetryRef.current = 0;
@@ -325,9 +370,38 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const handleTimeUpdate = React.useCallback(() => {
     const player = videoRef.current;
     if (!player) return;
-    const nextIndex = findActiveSegmentIndex(segments, player.currentTime * 1000);
+    const timeMs = player.currentTime * 1000;
+    const nextIndex = findActiveSegmentIndex(segments, timeMs);
     setActiveIndex((current) => current === nextIndex ? current : nextIndex);
-  }, [segments]);
+    const nextChapter = activeChapterIndex(insightState.chapters, timeMs);
+    setActiveChapter((current) => current === nextChapter ? current : nextChapter);
+  }, [segments, insightState.chapters]);
+
+  const seekToMs = React.useCallback((milliseconds) => {
+    const player = videoRef.current;
+    if (!player) return;
+    const target = Math.max(0, milliseconds / 1000);
+    player.currentTime = Number.isFinite(player.duration) ? Math.min(target, player.duration) : target;
+    player.focus();
+  }, []);
+
+  const seekToChapter = React.useCallback((chapter, position) => {
+    setSelectedChapter(position);
+    seekToMs(chapter.start_ms);
+  }, [seekToMs]);
+
+  const seekToTakeaway = React.useCallback((takeaway) => {
+    // Seek to the first supporting transcript segment (reuses the transcript's
+    // own seek + highlight behavior).
+    const refs = [...(takeaway.segment_indexes || [])].sort((a, b) => a - b);
+    for (const ref of refs) {
+      const segment = segments.find((s) => s.segment_index === ref);
+      if (segment) {
+        seekToSegment(segment);
+        return;
+      }
+    }
+  }, [segments, seekToSegment]);
 
   const handleMediaError = React.useCallback(() => {
     const player = videoRef.current;
@@ -540,6 +614,101 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
         </article>
 
         <article className="vd-card vdr-transcript-card">
+          <div className="vdr-tabs" role="tablist" aria-label="بخش‌های بررسی ویدیو">
+            {[
+              ["transcript", "متن و ترجمه"],
+              ["summary", "خلاصه"],
+              ["chapters", "فصل‌ها"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={tab === value}
+                className={tab === value ? "is-active" : ""}
+                onClick={() => setTab(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "summary" ? (
+            <div className="vdr-insight-panel" role="tabpanel" aria-label="خلاصه و نکات کلیدی">
+              {insightState.loading ? (
+                <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال دریافت خلاصه...</p>
+              ) : insightState.state === "ready" || insightState.state === "stale" ? (
+                <>
+                  {insightState.state === "stale" ? (
+                    <p className="vdr-insight-status is-warning" role="status">{INSIGHT_STATE_FA.stale} نسخه قبلی در ادامه نمایش داده می‌شود.</p>
+                  ) : null}
+                  <section className="vdr-insight-block">
+                    <h3>خلاصه کوتاه</h3>
+                    <p dir="rtl">{insightState.insight?.short_summary}</p>
+                  </section>
+                  <section className="vdr-insight-block">
+                    <h3>خلاصه کامل</h3>
+                    <p dir="rtl">{insightState.insight?.detailed_summary}</p>
+                  </section>
+                  <section className="vdr-insight-block">
+                    <h3>نکات کلیدی</h3>
+                    <ul className="vdr-takeaways">
+                      {(insightState.insight?.key_takeaways || []).map((takeaway, position) => (
+                        <li key={position}>
+                          <span dir="rtl">{takeaway.text}</span>
+                          {takeawaySeekMs(takeaway, segments) !== null ? (
+                            <button type="button" onClick={() => seekToTakeaway(takeaway)}>
+                              <Play size={13} /> رفتن به بخش مرتبط
+                            </button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  {insightState.insight?.generated_at ? (
+                    <p className="vdr-insight-meta">تاریخ ساخت: {new Date(insightState.insight.generated_at).toLocaleString("fa-IR")}</p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="vdr-insight-status" role="status">{INSIGHT_STATE_FA[insightState.state]}</p>
+              )}
+            </div>
+          ) : null}
+
+          {tab === "chapters" ? (
+            <div className="vdr-insight-panel" role="tabpanel" aria-label="فصل‌های ویدیو">
+              {insightState.loading ? (
+                <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال دریافت فصل‌ها...</p>
+              ) : (insightState.state === "ready" || insightState.state === "stale") && insightState.chapters.length ? (
+                <>
+                  {insightState.state === "stale" ? (
+                    <p className="vdr-insight-status is-warning" role="status">{INSIGHT_STATE_FA.stale}</p>
+                  ) : null}
+                  <ol className="vdr-chapters" aria-label="فهرست فصل‌ها">
+                    {insightState.chapters.map((chapter, position) => (
+                      <li key={chapter.chapter_index}>
+                        <button
+                          type="button"
+                          className={`vdr-chapter${activeChapter === position ? " is-active" : ""}${selectedChapter === position ? " is-selected" : ""}`}
+                          onClick={() => seekToChapter(chapter, position)}
+                        >
+                          <time dir="ltr">{formatTranscriptTimestamp(chapter.start_ms)}</time>
+                          <span className="vdr-chapter-copy">
+                            <b dir="rtl">{chapter.title}</b>
+                            {chapter.description ? <small dir="rtl">{chapter.description}</small> : null}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : (
+                <p className="vdr-insight-status" role="status">{INSIGHT_STATE_FA[insightState.state === "ready" ? "none" : insightState.state]}</p>
+              )}
+            </div>
+          ) : null}
+
+          {tab === "transcript" ? (<>
           <div className="vdr-toolbar">
             <div className="vdr-search">
               <Search size={17} />
@@ -610,6 +779,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
               <li className="vdr-no-results">نتیجه‌ای در متن اصلی یا ترجمه فارسی پیدا نشد.</li>
             )}
           </ol>
+          </>) : null}
         </article>
       </div>
 

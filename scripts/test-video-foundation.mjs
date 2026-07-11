@@ -36,6 +36,7 @@ compileTs("src/lib/video-storage.ts", "video-storage.mjs");
 compileTs("src/lib/video-service.ts", "video-service.mjs");
 compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
+compileTs("src/lib/insight-review.ts", "insight-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
@@ -45,6 +46,7 @@ const videoService = await load("video-service.mjs");
 const accessPolicy = await load("access-policy.mjs");
 const transcriptReview = await load("transcript-review.mjs");
 const subtitleReview = await load("subtitle-review.mjs");
+const insightReview = await load("insight-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -442,6 +444,82 @@ test("frontend builder version matches the worker builder version (no drift)", (
   const match = py.match(/BUILDER_VERSION\s*=\s*"([^"]+)"/);
   assert.ok(match, "worker BUILDER_VERSION not found");
   assert.equal(subtitleReview.SUBTITLE_BUILDER_VERSION, match[1]);
+});
+
+// ---------------------------------------------------------------------------
+// Video insights (consume-only frontend)
+// ---------------------------------------------------------------------------
+
+test("insight state derives from status + schema version", () => {
+  const insight = (over) => ({ status: "ready", language: "fa", short_summary: "خلاصه", detailed_summary: "کامل",
+    key_takeaways: [], provider: "local_transformers", model: "qwen",
+    schema_version: insightReview.INSIGHT_SCHEMA_VERSION, source_segment_count: 3, generated_at: "2026-07-12", ...over });
+  assert.equal(insightReview.deriveInsightState(insight({})), "ready");
+  assert.equal(insightReview.deriveInsightState(insight({ status: "generating" })), "generating");
+  assert.equal(insightReview.deriveInsightState(insight({ status: "failed" })), "failed");
+  assert.equal(insightReview.deriveInsightState(insight({ status: "stale" })), "stale");
+  // Ready row from a different schema version is stale, never shown as current.
+  assert.equal(insightReview.deriveInsightState(insight({ schema_version: "ins-s0" })), "stale");
+  assert.equal(insightReview.deriveInsightState(null), "none");
+});
+
+test("insight Persian state messages are accurate and non-empty", () => {
+  for (const state of ["none", "generating", "ready", "failed", "stale"]) {
+    assert.ok(insightReview.INSIGHT_STATE_FA[state].length > 5, state);
+  }
+  assert.match(insightReview.INSIGHT_STATE_FA.failed, /متن و زیرنویس همچنان در دسترس/);
+  assert.match(insightReview.INSIGHT_STATE_FA.stale, /تغییر کرده/);
+});
+
+test("takeaway seek resolves the first real supporting segment or null", () => {
+  const segments = [
+    { segment_index: 0, start_ms: 0 },
+    { segment_index: 1, start_ms: 9500 },
+    { segment_index: 2, start_ms: 20000 },
+  ];
+  assert.equal(insightReview.takeawaySeekMs({ text: "x", segment_indexes: [2, 1] }, segments), 9500);
+  assert.equal(insightReview.takeawaySeekMs({ text: "x", segment_indexes: [0] }, segments), 0);
+  // No real supporting segment -> null -> no seek button rendered.
+  assert.equal(insightReview.takeawaySeekMs({ text: "x", segment_indexes: [9] }, segments), null);
+  assert.equal(insightReview.takeawaySeekMs({ text: "x", segment_indexes: [] }, segments), null);
+});
+
+test("active chapter lookup uses chronological non-overlapping ranges", () => {
+  const chapters = [
+    { chapter_index: 0, start_ms: 0, end_ms: 9500 },
+    { chapter_index: 1, start_ms: 9500, end_ms: 29900 },
+  ];
+  assert.equal(insightReview.activeChapterIndex(chapters, 0), 0);
+  assert.equal(insightReview.activeChapterIndex(chapters, 9499), 0);
+  assert.equal(insightReview.activeChapterIndex(chapters, 9500), 1);
+  assert.equal(insightReview.activeChapterIndex(chapters, 29900), -1);
+  assert.equal(insightReview.activeChapterIndex([], 5), -1);
+});
+
+test("frontend insight schema version matches the worker (no drift)", () => {
+  const py = fs.readFileSync(path.join(root, "worker/app/insight_config.py"), "utf8");
+  const match = py.match(/SCHEMA_VERSION\s*=\s*"([^"]+)"/);
+  assert.ok(match, "worker SCHEMA_VERSION not found");
+  assert.equal(insightReview.INSIGHT_SCHEMA_VERSION, match[1]);
+});
+
+test("review page adds insight tabs with seek actions and keeps transcript usable", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  // Tabs exist with the required Persian labels and tab semantics.
+  assert.match(source, /role="tablist"/);
+  assert.match(source, /متن و ترجمه/);
+  assert.match(source, /"summary", "خلاصه"/);
+  assert.match(source, /"chapters", "فصل‌ها"/);
+  // Chapter click seeks the existing player; takeaway seek reuses segment seek.
+  assert.match(source, /seekToChapter\(chapter, position\)/);
+  assert.match(source, /seekToTakeaway\(takeaway\)/);
+  assert.match(source, /takeawaySeekMs\(takeaway, segments\) !== null/);
+  // Insight failure never hides transcript review (fallback state in loader).
+  assert.match(source, /setInsightState\(\{ loading: false, state: "none", insight: null, chapters: \[\] \}\)/);
+  // Insight status messages come from the shared Persian map; no raw errors.
+  assert.match(source, /INSIGHT_STATE_FA\[/);
+  // The browser never writes insights (read-only consumption).
+  assert.doesNotMatch(source, /persist_video_insight|set_video_insight_status|mark_video_insights_stale/);
 });
 
 test("review page attaches a Persian VTT track and secure downloads, and never generates artifacts", () => {

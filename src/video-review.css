@@ -200,9 +200,172 @@
 }
 
 .vdr-transcript-card {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(280px, 62vh);
+  display: flex;
+  flex-direction: column;
   padding: 0;
+}
+
+/* Review tabs (متن و ترجمه / خلاصه / فصل‌ها) */
+.vdr-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+  border-bottom: 1px solid #e4e4e7;
+}
+
+.vdr-tabs button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 640;
+  color: #71717a;
+  padding: 8px 12px 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.vdr-tabs button.is-active {
+  color: #18181b;
+  border-bottom-color: #18181b;
+}
+
+.vdr-tabs button:focus-visible {
+  outline: 2px solid #18181b;
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* Insight panels (summary / chapters) */
+.vdr-insight-panel {
+  min-height: 280px;
+  max-height: 62vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.vdr-insight-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #52525b;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.vdr-insight-status.is-warning { color: #7c2d12; }
+
+.vdr-insight-block h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 720;
+  color: #18181b;
+}
+
+.vdr-insight-block p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 2;
+  color: #27272a;
+}
+
+.vdr-takeaways {
+  margin: 0;
+  padding: 0 18px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.vdr-takeaways li {
+  font-size: 14.5px;
+  line-height: 1.9;
+  color: #27272a;
+}
+
+.vdr-takeaways li button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: 8px;
+  border: 1px solid rgba(24, 24, 27, 0.16);
+  background: none;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 640;
+  color: #3f3f46;
+  cursor: pointer;
+}
+
+.vdr-takeaways li button:hover { background: #f4f4f5; }
+
+.vdr-insight-meta {
+  margin: 0;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.vdr-chapters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.vdr-chapter {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: start;
+  border: 1px solid rgba(24, 24, 27, 0.1);
+  background: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vdr-chapter:hover { background: #f4f4f5; }
+
+.vdr-chapter.is-active,
+.vdr-chapter.is-selected {
+  border-color: #18181b;
+  background: #fafafa;
+}
+
+.vdr-chapter time {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #52525b;
+  padding-top: 2px;
+}
+
+.vdr-chapter-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vdr-chapter-copy b {
+  font-size: 14px;
+  font-weight: 700;
+  color: #18181b;
+}
+
+.vdr-chapter-copy small {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #71717a;
 }
 
 .vdr-toolbar,
@@ -304,7 +467,8 @@
 }
 
 .vdr-list {
-  min-height: 0;
+  min-height: 280px;
+  max-height: 62vh;
   margin: 0;
   padding: 8px;
   overflow: auto;
@@ -459,7 +623,8 @@
 
 @media (max-width: 1100px) {
   .vdr-grid { grid-template-columns: 1fr; }
-  .vdr-transcript-card { grid-template-rows: auto auto auto minmax(300px, 56vh); }
+  .vdr-list,
+  .vdr-insight-panel { min-height: 300px; max-height: 56vh; }
 }
 
 @media (max-width: 720px) {
@@ -472,7 +637,8 @@
   .vdr-player-card,
   .vdr-transcript-card { width: 100%; }
   .vdr-player-shell { aspect-ratio: 16 / 10; }
-  .vdr-transcript-card { grid-template-rows: auto auto auto minmax(360px, 62vh); }
+  .vdr-list,
+  .vdr-insight-panel { min-height: 360px; max-height: 62vh; }
   .vdr-copy-all button { flex: 1; }
   .vdr-segment-main { grid-template-columns: 44px minmax(0, 1fr); padding-inline: 7px; }
   .vdr-segment-actions { flex-direction: column; }
