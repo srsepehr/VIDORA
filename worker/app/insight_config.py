@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Bump when the prompt wording/instructions change in a way that affects output.
-PROMPT_VERSION = "ins-p1"
+PROMPT_VERSION = "ins-p2"
 # Bump when the persisted/validated output structure changes.
 SCHEMA_VERSION = "ins-s1"
 
