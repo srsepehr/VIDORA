@@ -87,7 +87,7 @@ class TestGeneration(unittest.TestCase):
         self.assertEqual(len(client.uploads), 2)  # vtt + srt
         # both content types correct, UTF-8 Persian present
         cts = sorted(ct for _, ct, _ in client.uploads)
-        self.assertEqual(cts, ["application/x-subrip; charset=utf-8", "text/vtt; charset=utf-8"])
+        self.assertEqual(cts, ["application/x-subrip", "text/vtt"])
         for _, _, data in client.uploads:
             self.assertIn("سلام".encode("utf-8"), data)
         ready = [a for a in client.artifacts if a["status"] == "ready"]

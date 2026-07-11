@@ -24,10 +24,13 @@ from .subtitle_config import SUBTITLE_LANG, BUILDER_VERSION
 from .subtitles import SourceSegment, build_artifacts, content_hash
 from .supabase import SupabaseClient
 
-VTT_MIME = "text/vtt; charset=utf-8"
+# The results bucket's allowed_mime_types allowlist matches these values
+# exactly (a charset parameter would be rejected). The stored bytes are UTF-8,
+# so Persian is preserved regardless of the header parameter.
+VTT_MIME = "text/vtt"
 # SRT has no registered IANA type; application/x-subrip is the de-facto value the
-# results bucket already allows. charset preserves Persian UTF-8.
-SRT_MIME = "application/x-subrip; charset=utf-8"
+# results bucket already allows.
+SRT_MIME = "application/x-subrip"
 
 _FORMATS = ("vtt", "srt")
 

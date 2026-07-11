@@ -212,8 +212,15 @@ def generate_subtitles(video_id: str, force: bool = False):
     models. Invoked via `modal run` (Modal-token authenticated) — it is NOT a
     public web endpoint and never accepts arbitrary IDs unauthenticated."""
     from worker.app.subtitle_generation import backfill_subtitles
+    from worker.app.errors import WorkerError
 
-    return backfill_subtitles(video_id, force=force)
+    # Return the classified error instead of raising, so the stable code + safe
+    # detail survive to the caller (a raised WorkerError loses fidelity when
+    # reconstructed across the Modal boundary).
+    try:
+        return backfill_subtitles(video_id, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:300], "retryable": err.retryable}
 
 
 @app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
