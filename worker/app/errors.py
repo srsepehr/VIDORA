@@ -130,6 +130,31 @@ SUBTITLE_DURATION_MISMATCH = _reg(
 SUBTITLE_STALE = _reg(
     "SUBTITLE_STALE", "زیرنویس فعلی با متن به‌روزشده هم‌خوان نیست.", True, STAGE_SUBTITLES)
 
+# --- insights (summary / takeaways / chapters) ------------------------------
+# Insight state is tracked independently from video/job status; this stage tag
+# is classification metadata only and is never written to public.videos.status.
+STAGE_INSIGHTS = "generating_insights"
+INSIGHT_TRANSCRIPT_MISSING = _reg(
+    "INSIGHT_TRANSCRIPT_MISSING", "متن این ویدیو برای ساخت خلاصه یافت نشد.", False, STAGE_INSIGHTS)
+INSIGHT_TRANSLATION_INCOMPLETE = _reg(
+    "INSIGHT_TRANSLATION_INCOMPLETE", "ترجمه فارسی همه بخش‌ها کامل نیست؛ خلاصه ساخته نشد.", False, STAGE_INSIGHTS)
+INSIGHT_TRANSCRIPT_TOO_LARGE = _reg(
+    "INSIGHT_TRANSCRIPT_TOO_LARGE", "متن این ویدیو برای پردازش خلاصه بیش از حد بزرگ است.", False, STAGE_INSIGHTS)
+INSIGHT_MODEL_LOAD_FAILED = _reg(
+    "INSIGHT_MODEL_LOAD_FAILED", "بارگذاری مدل خلاصه‌سازی ناموفق بود.", True, STAGE_INSIGHTS)
+INSIGHT_PROVIDER_UNAVAILABLE = _reg(
+    "INSIGHT_PROVIDER_UNAVAILABLE", "سرویس خلاصه‌سازی در دسترس نیست.", True, STAGE_INSIGHTS)
+INSIGHT_INVALID_OUTPUT = _reg(
+    "INSIGHT_INVALID_OUTPUT", "خروجی خلاصه‌سازی نامعتبر بود.", True, STAGE_INSIGHTS)
+INSIGHT_GROUNDING_FAILED = _reg(
+    "INSIGHT_GROUNDING_FAILED", "خلاصه ساخته‌شده با متن ویدیو هم‌خوان نبود.", True, STAGE_INSIGHTS)
+INSIGHT_CHAPTERS_INVALID = _reg(
+    "INSIGHT_CHAPTERS_INVALID", "فصل‌بندی ساخته‌شده نامعتبر بود.", True, STAGE_INSIGHTS)
+INSIGHT_PERSIST_FAILED = _reg(
+    "INSIGHT_PERSIST_FAILED", "ثبت خلاصه و فصل‌ها ناموفق بود.", True, STAGE_INSIGHTS)
+INSIGHT_STALE = _reg(
+    "INSIGHT_STALE", "متن ویدیو تغییر کرده و خلاصه باید دوباره ساخته شود.", True, STAGE_INSIGHTS)
+
 # --- lifecycle -------------------------------------------------------------
 JOB_TIMEOUT = _reg("JOB_TIMEOUT", "زمان پردازش این ویدیو به پایان رسید.", True, STAGE_ACQUIRING)
 JOB_CANCELLED = _reg("JOB_CANCELLED", "پردازش این ویدیو لغو شد.", False, STAGE_ACQUIRING)

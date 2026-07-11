@@ -7,16 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify"
+        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect]
       video_id:
-        description: "video id for inspect / subtitles"
+        description: "video id for inspect / subtitles / insights"
         type: string
         default: ""
       force:
-        description: "force subtitle regeneration"
+        description: "force regeneration (subtitles / insights)"
         type: boolean
         default: false
 
@@ -62,3 +62,9 @@ jobs:
       - name: Verify stored subtitle files (facts only, no text)
         if: ${{ inputs.step == 'subtitles-verify' }}
         run: modal run worker/modal_app.py::verify_subs --video-id "${{ inputs.video_id }}"
+      - name: Generate insights (summary/takeaways/chapters — structural output only)
+        if: ${{ inputs.step == 'insights' }}
+        run: modal run worker/modal_app.py::insights --video-id "${{ inputs.video_id }}" ${{ inputs.force && '--force' || '' }}
+      - name: Inspect insight state (structural facts only)
+        if: ${{ inputs.step == 'insights-inspect' }}
+        run: modal run worker/modal_app.py::insights_inspect --video-id "${{ inputs.video_id }}"

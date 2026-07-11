@@ -119,21 +119,26 @@ class Worker:
         deadline = time.time() + max_seconds
         reaped = self.queue.reap_expired()
         processed = 0
+        completed_video_ids: list[str] = []
         while processed < max_jobs and time.time() < deadline and not self._stop:
             job = self.queue.claim_next()
             if job is None:
                 break
             log.info("drain claimed job=%s video=%s attempt=%s", job.id, job.video_id, job.attempt)
-            self._process(job)
+            if self._process(job):
+                completed_video_ids.append(job.video_id)
             processed += 1
-        summary = {"reaped": reaped, "processed": processed}
+        summary = {"reaped": reaped, "processed": processed, "video_ids": completed_video_ids}
         log.info("drain complete: %s", summary)
         return summary
 
-    def _process(self, job):
+    def _process(self, job) -> bool:
+        """Returns True when the job completed its phase successfully (used to
+        trigger best-effort post-processing like insight generation)."""
         try:
             self.pipeline.process(job)
             log.info("job=%s completed translation phase", job.id)
+            return True
         except Cancelled:
             self.queue.cancel(job.id)
             log.info("job=%s cancelled by user", job.id)
@@ -147,6 +152,7 @@ class Worker:
             err = WorkerError(INTERNAL_PROCESSING_ERROR, dev_detail=repr(exc))
             log.exception("job=%s unexpected error", job.id)
             self.queue.fail(job.id, err.code, err.dev_detail, err.message_fa, err.retryable)
+        return False
 
     def _maybe_reap(self):
         now = time.time()

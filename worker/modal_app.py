@@ -79,6 +79,36 @@ subtitle_image = (
     .add_local_python_source("worker")
 )
 
+# Insight generation (summary / takeaways / chapters) runs a small local
+# instruct model on CPU. Its image has transformers+torch (the model genuinely
+# requires them) but NO faster-whisper, NO NLLB bake, NO ffmpeg — insight-only
+# work never touches transcription, translation, or the source video. The
+# model is downloaded at build time so no invocation re-downloads it.
+INSIGHT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+
+
+def _bake_insight_model():
+    from huggingface_hub import snapshot_download
+
+    snapshot_download(INSIGHT_MODEL, cache_dir="/models")
+
+
+insight_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(
+        "numpy<2",  # torch 2.2.x is built against numpy 1.x
+        "torch==2.2.2",
+        "transformers==4.44.2",
+    )
+    .env({
+        "INSIGHT_MODEL": INSIGHT_MODEL,
+        "STT_DOWNLOAD_ROOT": "/models",
+        "OMP_NUM_THREADS": "4",
+    })
+    .run_function(_bake_insight_model)
+    .add_local_python_source("worker")
+)
+
 app = modal.App("vidora-worker")
 
 # The owner creates this once: `modal secret create vidora-worker SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...`
@@ -98,7 +128,21 @@ def drain(max_jobs: int = 3):
     """Process available jobs then exit (scale to zero). One container only."""
     from worker.app.main import run_drain
 
-    return run_drain(max_jobs=max_jobs, max_seconds=1400.0)
+    result = run_drain(max_jobs=max_jobs, max_seconds=1400.0)
+    _spawn_insights_for(result)
+    return result
+
+
+def _spawn_insights_for(drain_result: dict) -> None:
+    """Best-effort post-processing: kick off insight generation for each video
+    that just completed its translation phase. Runs as a separate scale-to-zero
+    function; any failure here never affects the finished job, transcript,
+    translations, or subtitles."""
+    for video_id in drain_result.get("video_ids") or []:
+        try:
+            generate_insights.spawn(video_id)
+        except Exception:  # noqa: BLE001 — insight kick-off is strictly best-effort
+            pass
 
 
 @app.function(image=image, secrets=[secret], timeout=1500, max_containers=1)
@@ -108,7 +152,9 @@ def trigger():
     work starts without any always-on poller. Still scale-to-zero."""
     from worker.app.main import run_drain
 
-    return run_drain(max_jobs=1, max_seconds=1400.0)
+    result = run_drain(max_jobs=1, max_seconds=1400.0)
+    _spawn_insights_for(result)
+    return result
 
 
 @app.function(image=image, secrets=[secret], timeout=600, max_containers=1)
@@ -293,6 +339,88 @@ def verify_subtitles(video_id: str = ""):
             "utf8_roundtrip": text.encode("utf-8").decode("utf-8") == text,
         }
     return out
+
+
+@app.function(
+    image=insight_image,
+    secrets=[secret],
+    timeout=1200,          # CPU generation for a short video fits comfortably
+    max_containers=1,
+    cpu=4.0,
+    memory=12288,          # Qwen2.5-1.5B fp32 (~6.2 GB) + headroom
+    retries=0,
+)
+def generate_insights(video_id: str, force: bool = False):
+    """Internal/manual insight generation + backfill (Modal-token authenticated,
+    NOT a public endpoint). Returns structural metadata or a classified error —
+    never generated content, so nothing private reaches CI logs."""
+    from worker.app.errors import WorkerError
+    from worker.app.insight_generation import backfill_insights
+
+    try:
+        return backfill_insights(video_id, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:300], "retryable": err.retryable}
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def inspect_insights(video_id: str = ""):
+    """Read back insight/chapter state for verification — structural fields only
+    (status, versions, counts, timing ranges); no summary or title text."""
+    from worker.app.config import load_config
+    from worker.app.supabase import SupabaseClient
+
+    cfg = load_config(require_translation=False)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    if not video_id:
+        recent = client.select_many("videos", "select=id&order=created_at.desc&limit=1")
+        video_id = recent[0]["id"] if recent else ""
+    insight = client.select_one(
+        "video_insights",
+        f"video_id=eq.{video_id}&select=status,language,content_hash,provider,model,prompt_version,"
+        f"schema_version,source_segment_count,error_code,generated_at,short_summary,detailed_summary,key_takeaways",
+    ) or {}
+    chapters = client.select_many(
+        "video_chapters",
+        f"video_id=eq.{video_id}&select=chapter_index,start_ms,end_ms,title,source_segment_indexes&order=chapter_index.asc",
+    )
+    takeaways = insight.get("key_takeaways") or []
+    return {
+        "video_id": video_id,
+        "status": insight.get("status"),
+        "language": insight.get("language"),
+        "hash_prefix": (insight.get("content_hash") or "")[:12],
+        "provider": insight.get("provider"),
+        "model": insight.get("model"),
+        "prompt_version": insight.get("prompt_version"),
+        "schema_version": insight.get("schema_version"),
+        "source_segment_count": insight.get("source_segment_count"),
+        "error_code": insight.get("error_code"),
+        "generated_at": insight.get("generated_at"),
+        "short_summary_chars": len(insight.get("short_summary") or ""),
+        "detailed_summary_chars": len(insight.get("detailed_summary") or ""),
+        "takeaway_count": len(takeaways),
+        "takeaway_ref_counts": [len(t.get("segment_indexes") or []) for t in takeaways if isinstance(t, dict)],
+        "chapter_count": len(chapters),
+        "chapters": [
+            {"index": c["chapter_index"], "start_ms": c["start_ms"], "end_ms": c["end_ms"],
+             "title_chars": len(c.get("title") or ""),
+             "segment_refs": c.get("source_segment_indexes")}
+            for c in chapters
+        ],
+    }
+
+
+@app.local_entrypoint()
+def insights(video_id: str = "", force: bool = False):
+    import json
+    print("generate_insights:", json.dumps(generate_insights.remote(video_id, force), ensure_ascii=False, indent=2))
+
+
+@app.local_entrypoint()
+def insights_inspect(video_id: str = ""):
+    import json
+    print("inspect_insights:", json.dumps(inspect_insights.remote(video_id), ensure_ascii=False, indent=2))
 
 
 @app.local_entrypoint()

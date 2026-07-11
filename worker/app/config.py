@@ -73,6 +73,9 @@ class Config:
     nllb_model: str
     nllb_target_lang: str
 
+    # Insight generation (local CPU instruct model; zero external API)
+    insight_model: str
+
     # Health server
     health_host: str
     health_port: int
@@ -136,6 +139,7 @@ def load_config(*, require_translation: bool = True) -> Config:
         translation_max_retries=_int("TRANSLATION_MAX_RETRIES", 3),
         nllb_model=_opt("NLLB_MODEL", "facebook/nllb-200-distilled-600M"),
         nllb_target_lang=_opt("NLLB_TARGET_LANG", "pes_Arab"),
+        insight_model=_opt("INSIGHT_MODEL", "Qwen/Qwen2.5-1.5B-Instruct"),
         health_host=_opt("HEALTH_HOST", "0.0.0.0"),
         health_port=_int("HEALTH_PORT", 8080),
         work_dir=_opt("WORK_DIR", "/tmp/vidora-worker"),

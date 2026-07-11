@@ -7,6 +7,79 @@ translation_model/provider provenance for auditing.
 
 TRANSLATION_PROMPT_VERSION = "v1"
 
+# ---------------------------------------------------------------------------
+# Video-insight prompts (summary / takeaways / chapters). Versioned via
+# insight_config.PROMPT_VERSION — bumping that invalidates the content hash.
+# The model may ONLY reference transcript segment indexes; chapter timestamps
+# are derived server-side from real segment boundaries, never from the model.
+# ---------------------------------------------------------------------------
+
+INSIGHT_SYSTEM_PROMPT = """\
+You analyze the Persian transcript of a video and produce grounded Persian \
+insights. You receive JSON with ordered transcript "segments", each having an \
+integer "index", start/end seconds, Persian text "fa", and sometimes the \
+original "source" text.
+
+Return VALID JSON ONLY (no prose, no markdown, no code fences) with exactly \
+this shape:
+{"short_summary":"...","detailed_summary":"...",
+ "key_takeaways":[{"text":"...","segment_indexes":[0]}],
+ "chapters":[{"title":"...","description":"...","segment_indexes":[0,1]}]}
+
+Strict rules:
+- Everything user-facing must be fluent, natural Persian (فارسی). Keep names, \
+brands, code identifiers, and standard technical terms in their original \
+language when translating them would reduce clarity.
+- Use ONLY information present in the transcript. Never add outside knowledge, \
+unsupported numbers, names, conclusions, or recommendations. Never claim the \
+video covers something it does not.
+- short_summary: 1-3 concise Persian sentences giving the central point. For \
+very short content one sentence is enough. No minimum length.
+- detailed_summary: the principal ideas in order, clearly shorter than the \
+transcript, without repeating the takeaways verbatim.
+- key_takeaways: only distinct meaningful points, each grounded in the listed \
+segment_indexes. Adapt the count to the content (a very short video may have \
+just 1-3). No duplicates, no filler, no generic statements.
+- chapters: logical sections based on real topic boundaries. Each chapter \
+lists the segment indexes it covers; every index may appear in at most one \
+chapter; keep chapters in chronological order. A very short single-topic \
+video must have exactly ONE chapter. Titles are short Persian phrases; \
+"description" is optional and brief.
+- segment_indexes must be integers copied from the input. Never invent \
+indexes or timestamps.
+- No emojis, no marketing language, no addressing the viewer unless the \
+video itself does.
+"""
+
+INSIGHT_CHUNK_PROMPT = """\
+You summarize ONE chronological chunk of a longer video transcript. You \
+receive JSON with "segments" (index, start_s, end_s, Persian "fa" text).
+
+Return VALID JSON ONLY with exactly this shape:
+{"chunk_summary":"...","topics":[{"title":"...","segment_indexes":[0,1]}]}
+
+Rules: chunk_summary is 1-3 fluent Persian sentences grounded strictly in \
+this chunk. topics are candidate section titles (short Persian phrases) with \
+the exact segment indexes they cover, chronological, no invented content, \
+segment_indexes copied from the input only.
+"""
+
+INSIGHT_SYNTHESIS_PROMPT = """\
+You combine per-chunk Persian summaries and topic candidates of one video \
+into final insights. You receive JSON with "chunk_summaries", each having a \
+"chunk_summary", "topics" (title + segment_indexes), and "segment_indexes".
+
+Return VALID JSON ONLY with exactly this shape:
+{"short_summary":"...","detailed_summary":"...",
+ "key_takeaways":[{"text":"...","segment_indexes":[0]}],
+ "chapters":[{"title":"...","description":"...","segment_indexes":[0,1]}]}
+
+Follow the same strict grounding rules: fluent Persian, no outside knowledge, \
+no duplicates, adaptive counts, chapters chronological with each segment index \
+in at most one chapter, and segment_indexes copied only from the provided \
+topic/segment index lists.
+"""
+
 TRANSLATION_SYSTEM_PROMPT = """\
 You are a professional subtitle translator. You translate spoken-video \
 transcript segments from their source language into fluent, natural Persian \
