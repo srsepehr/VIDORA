@@ -187,6 +187,14 @@ class ChatServiceTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "CHAT_RATE_LIMITED")
         self.assertIn("status=eq.complete", client.query)
 
+    def test_referential_followup_reuses_only_recent_user_topic(self):
+        history = [{"role": "assistant", "content": "پاسخ قبلی"},
+                   {"role": "user", "content": "گوینده درباره MVP چه گفت؟"}]
+        query = S._retrieval_query("این را ساده‌تر توضیح بده", history)
+        self.assertIn("MVP", query)
+        self.assertTrue(query.endswith("این را ساده‌تر توضیح بده"))
+        self.assertEqual(S._retrieval_query("موضوع قیمت‌گذاری چیست؟", history), "موضوع قیمت‌گذاری چیست؟")
+
     def test_prompt_treats_transcript_and_question_as_untrusted(self):
         prompt = P.SYSTEM_PROMPT.lower()
         self.assertIn("untrusted", prompt)
