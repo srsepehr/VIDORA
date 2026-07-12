@@ -49,6 +49,8 @@ psql -qX -v ON_ERROR_STOP=1 -f "$HERE/sql/00_prereqs.sql" >/dev/null || { echo "
 psql -qX -v ON_ERROR_STOP=1 -f "$MIGRATION" >/dev/null || { echo "migration load failed"; exit 1; }
 psql -qX -v ON_ERROR_STOP=1 -f "$SUBTITLE_MIGRATION" >/dev/null || { echo "subtitle migration load failed"; exit 1; }
 psql -qX -v ON_ERROR_STOP=1 -f "$INSIGHT_MIGRATION" >/dev/null || { echo "insight migration load failed"; exit 1; }
+CHAT_MIGRATION="$REPO/supabase/migrations/202607120002_video_chat.sql"
+psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_MIGRATION" >/dev/null || { echo "chat migration load failed"; exit 1; }
 ok "migrations + prereqs load cleanly into Postgres"
 
 U=11111111-1111-1111-1111-111111111111
@@ -246,6 +248,55 @@ eq "another user cannot read chapters" "0" "$xchap"
 q "delete from public.videos where id='$INSVID';" >/dev/null
 eq "video delete cascades insights" "0" "$(q "select count(*) from public.video_insights where video_id='$INSVID';")"
 eq "video delete cascades chapters" "0" "$(q "select count(*) from public.video_chapters where video_id='$INSVID';")"
+
+# ---- 15. video chat: atomic index, retrieval, history, citations, RLS ------
+IDS=$(seed_job translating completed 1 3 NULL true); CHATVID=${IDS%|*}
+q "insert into auth.users(id) values('$U') on conflict do nothing;" >/dev/null
+q "insert into public.transcript_segments(video_id,segment_index,start_ms,end_ms,source_text,translated_text_fa) values ('$CHATVID',0,0,10000,'hello world','سلام دنیا'),('$CHATVID',1,10000,20000,'talk to users','با کاربران صحبت کنید');" >/dev/null
+VEC=$(python3 -c 'print("["+",".join(["1"]+["0"]*383)+"]")')
+CHUNKS="[{\"chunk_index\":0,\"start_ms\":0,\"end_ms\":20000,\"source_segment_indexes\":[0,1],\"text_fa\":\"سلام دنیا با کاربران صحبت کنید\",\"source_text\":\"hello world talk to users\",\"content_hash\":\"chunkA\",\"embedding\":\"$VEC\"}]"
+q "select public.persist_video_chat_index('$CHATVID','indexA','chat-chunk-v1','local_transformers','e5','e5-v1',384,'$CHUNKS'::jsonb);" >/dev/null
+eq "chat index persisted ready" "ready" "$(q "select status from public.video_chat_indexes where video_id='$CHATVID';")"
+eq "chat index has one chunk" "1" "$(q "select count(*) from public.video_chat_chunks where video_id='$CHATVID';")"
+q "select public.persist_video_chat_index('$CHATVID','indexA','chat-chunk-v1','local_transformers','e5','e5-v1',384,'$CHUNKS'::jsonb);" >/dev/null
+eq "chat re-index keeps one index" "1" "$(q "select count(*) from public.video_chat_indexes where video_id='$CHATVID';")"
+eq "chat re-index keeps one chunk" "1" "$(q "select count(*) from public.video_chat_chunks where video_id='$CHATVID';")"
+eq "per-video vector retrieval finds the chunk" "1" "$(q "select count(*) from public.match_video_chat_chunks('$CHATVID','indexA','$VEC'::extensions.vector,5,0.7);")"
+OTHER=$(q "insert into public.videos(user_id,source_type,status) values('$U','upload','translating') returning id;")
+eq "retrieval never crosses video boundary" "0" "$(q "select count(*) from public.match_video_chat_chunks('$OTHER','indexA','$VEC'::extensions.vector,5,0.0);")"
+SID=$(q "select id from public.get_or_create_video_chat_session('$CHATVID','$U');")
+REQ=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+CITS='[{"citation_index":0,"start_ms":0,"end_ms":10000,"source_segment_indexes":[0],"chunk_ids":[]}]'
+q "select public.persist_video_chat_exchange('$SID','$CHATVID','$U','$REQ','پرسش','پاسخ فارسی',false,'local','qwen','p1','s1','rh','$CITS'::jsonb);" >/dev/null
+eq "chat exchange creates user+assistant" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
+eq "chat exchange creates citation" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
+q "select public.persist_video_chat_exchange('$SID','$CHATVID','$U','$REQ','پرسش','پاسخ فارسی',false,'local','qwen','p1','s1','rh','$CITS'::jsonb);" >/dev/null
+eq "request retry creates no duplicate messages" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
+eq "request retry creates no duplicate citations" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
+CONFLICT=$(q "select (public.persist_video_chat_exchange('$SID','$CHATVID','$U','$REQ','پرسش متفاوت','پاسخ دیگر',false,'local','qwen','p1','s1','different-hash','$CITS'::jsonb)->>'conflict');")
+eq "request id reuse with different payload is rejected structurally" "true" "$CONFLICT"
+eq "conflicting request creates no duplicate messages" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
+eq "conflicting request creates no duplicate citations" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
+FAILREQ=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+q "select public.persist_video_chat_failure('$SID','$CHATVID','$U','$FAILREQ','پرسش ناموفق','failure-hash','CHAT_PROVIDER_UNAVAILABLE');" >/dev/null
+eq "classified chat failure is persisted" "failed|CHAT_PROVIDER_UNAVAILABLE" "$(q "select status||'|'||error_code from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ' and role='user';")"
+q "select public.persist_video_chat_exchange('$SID','$CHATVID','$U','$FAILREQ','پرسش ناموفق','پاسخ بازیابی‌شده',false,'local','qwen','p1','s1','failure-hash','$CITS'::jsonb);" >/dev/null
+eq "retry recovers failed user message without duplication" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ';")"
+eq "recovered user message is complete" "complete|" "$(q "select status||'|'||coalesce(error_code,'') from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ' and role='user';")"
+DENYCHAT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id) values('$SID','$CHATVID','$U','assistant','forged',gen_random_uuid());" 2>&1 | tr -d '\n')
+eq "browser cannot forge assistant messages" "denied" "$(echo "$DENYCHAT" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$DENYCHAT")"
+DENYCIT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_message_citations(message_id,video_id,citation_index,start_ms,end_ms,source_segment_indexes) select id,'$CHATVID',9,0,10,'[0]' from public.video_chat_messages limit 1;" 2>&1 | tr -d '\n')
+eq "browser cannot forge chat citations" "denied" "$(echo "$DENYCIT" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$DENYCIT")"
+DENYIDX=$(psql -qtAX -c "set role authenticated; select public.persist_video_chat_index('$CHATVID','x','x','x','x','x',384,'[]'::jsonb);" 2>&1 | tr -d '\n')
+eq "authenticated denied chat index RPC" "denied" "$(echo "$DENYIDX" | grep -qi 'permission denied' && echo denied || echo "$DENYIDX")"
+DENYFAIL=$(psql -qtAX -c "set role authenticated; select public.persist_video_chat_failure('$SID','$CHATVID','$U',gen_random_uuid(),'x','h','CHAT_INVALID_OUTPUT');" 2>&1 | tr -d '\n')
+eq "authenticated denied chat failure RPC" "denied" "$(echo "$DENYFAIL" | grep -qi 'permission denied' && echo denied || echo "$DENYFAIL")"
+OWNCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','$U',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
+eq "owner reads own chat messages" "4" "$OWNCHAT"
+XCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','33333333-3333-3333-3333-333333333333',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
+eq "another user cannot read chat messages" "0" "$XCHAT"
+DENYCHUNKS=$(psql -qtAX -c "set role authenticated; select count(*) from public.video_chat_chunks;" 2>&1 | tr -d '\n')
+eq "browser cannot read private embeddings/chunks" "denied" "$(echo "$DENYCHUNKS" | grep -qi 'permission denied' && echo denied || echo "$DENYCHUNKS")"
 
 echo "---------------------------------------------"
 echo "queue RPC tests: $pass passed, $fail failed"

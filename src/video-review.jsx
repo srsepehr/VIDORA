@@ -7,9 +7,11 @@ import {
   FileText,
   Languages,
   Loader2,
+  MessageCircle,
   Play,
   RefreshCw,
   Search,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -44,6 +46,7 @@ import {
   fetchVideoInsight,
   takeawaySeekMs,
 } from "./lib/insight-review";
+import { askVideoQuestion, fetchVideoChatHistory, formatCitation } from "./lib/video-chat";
 import "./video-review.css";
 
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -163,7 +166,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [tab, setTab] = React.useState(() => {
     try {
       const stored = window.sessionStorage.getItem(`vidora.review-tab.${video.id}`);
-      return ["transcript", "summary", "chapters"].includes(stored) ? stored : "transcript";
+      return ["transcript", "summary", "chapters", "chat"].includes(stored) ? stored : "transcript";
     } catch {
       return "transcript";
     }
@@ -171,6 +174,8 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [insightState, setInsightState] = React.useState({ loading: true, state: "none", insight: null, chapters: [] });
   const [activeChapter, setActiveChapter] = React.useState(-1);
   const [selectedChapter, setSelectedChapter] = React.useState(-1);
+  const [chatState, setChatState] = React.useState({ loading: true, messages: [], error: "", sending: false });
+  const [chatInput, setChatInput] = React.useState("");
   const videoRef = React.useRef(null);
   const listRef = React.useRef(null);
   const rowRefs = React.useRef(new Map());
@@ -179,6 +184,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const subtitleBlobRef = React.useRef("");
   const resumePlaybackRef = React.useRef(null);
   const noticeTimerRef = React.useRef(null);
+  const chatEndRef = React.useRef(null);
 
   const loadTranscript = React.useCallback(async () => {
     setTranscriptState({ loading: true, error: "", report: null });
@@ -257,6 +263,18 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     }
   }, [session, video.id]);
 
+  const loadChat = React.useCallback(async () => {
+    setChatState((previous) => ({ ...previous, loading: true, error: "" }));
+    try {
+      const messages = await fetchVideoChatHistory(session, video.id);
+      setChatState({ loading: false, messages, error: "", sending: false });
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadChat");
+      setChatState((previous) => ({ ...previous, loading: false, error: appError.messageFa, sending: false }));
+    }
+  }, [session, video.id]);
+
   const applySubtitleMode = React.useCallback((show) => {
     const player = videoRef.current;
     if (!player || !player.textTracks) return;
@@ -298,11 +316,12 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     loadSignedUrl();
     loadSubtitles();
     loadInsights();
+    loadChat();
     return () => {
       if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
       if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
     };
-  }, [loadTranscript, loadSignedUrl, loadSubtitles, loadInsights]);
+  }, [loadTranscript, loadSignedUrl, loadSubtitles, loadInsights, loadChat]);
 
   React.useEffect(() => {
     try {
@@ -402,6 +421,40 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
       }
     }
   }, [segments, seekToSegment]);
+
+  const seekToCitation = React.useCallback((citation) => {
+    seekToMs(citation.start_ms);
+    const firstRef = (citation.source_segment_indexes || [])[0];
+    const segment = segments.find((item) => item.segment_index === firstRef);
+    if (segment) {
+      setSelectedId(segment.id);
+      setActiveIndex(findActiveSegmentIndex(segments, segment.start_ms));
+    }
+  }, [seekToMs, segments]);
+
+  const submitChatQuestion = React.useCallback(async (rawQuestion) => {
+    const question = rawQuestion.trim();
+    if (!question || chatState.sending) return;
+    const requestId = crypto.randomUUID();
+    setChatInput("");
+    setChatState((previous) => ({ ...previous, sending: true, error: "",
+      messages: [...previous.messages, { id: "pending-" + requestId, role: "user", content: question,
+        not_in_video: false, request_id: requestId, created_at: new Date().toISOString(), citations: [] }] }));
+    try {
+      await askVideoQuestion(session, video.id, question, requestId);
+      const messages = await fetchVideoChatHistory(session, video.id);
+      setChatState({ loading: false, messages, error: "", sending: false });
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.submitChatQuestion");
+      setChatState((previous) => ({ ...previous, sending: false, error: appError.messageFa,
+        messages: previous.messages.filter((message) => message.id !== "pending-" + requestId) }));
+    }
+  }, [chatState.sending, session, video.id]);
+
+  React.useEffect(() => {
+    if (tab === "chat" && !chatState.loading) chatEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [tab, chatState.messages.length, chatState.sending, chatState.loading]);
 
   const handleMediaError = React.useCallback(() => {
     const player = videoRef.current;
@@ -619,6 +672,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
               ["transcript", "متن و ترجمه"],
               ["summary", "خلاصه"],
               ["chapters", "فصل‌ها"],
+              ["chat", "پرسش از ویدیو"],
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -705,6 +759,55 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
               ) : (
                 <p className="vdr-insight-status" role="status">{INSIGHT_STATE_FA[insightState.state === "ready" ? "none" : insightState.state]}</p>
               )}
+            </div>
+          ) : null}
+
+          {tab === "chat" ? (
+            <div className="vdr-chat-panel" role="tabpanel" aria-label="پرسش از ویدیو">
+              <header className="vdr-chat-heading">
+                <MessageCircle size={18} />
+                <span><b>پرسش از ویدیو</b><small>پاسخ‌ها فقط بر اساس متن همین ویدیو و همراه با زمان دقیق ارائه می‌شوند.</small></span>
+              </header>
+              <div className="vdr-chat-messages" aria-live="polite">
+                {chatState.loading ? <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال دریافت گفت‌وگو...</p> : null}
+                {!chatState.loading && chatState.messages.length === 0 ? (
+                  <div className="vdr-chat-empty">
+                    <p>یک پرسش پیشنهادی را انتخاب کنید یا سؤال خودتان را بنویسید.</p>
+                    <div className="vdr-chat-starters">
+                      {["این ویدیو درباره چیست؟", "مهم‌ترین نکات را بگو", "چه اقدام‌هایی پیشنهاد شده؟", "سخت‌ترین بخش را ساده توضیح بده", "یک چک‌لیست عملی بساز"].map((question) => (
+                        <button key={question} type="button" onClick={() => submitChatQuestion(question)} disabled={chatState.sending}>{question}</button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {chatState.messages.map((message) => (
+                  <article key={message.id} className={"vdr-chat-message is-" + message.role}>
+                    <span className="vdr-chat-role">{message.role === "user" ? "شما" : "Vidora"}</span>
+                    <p dir="rtl">{message.content}</p>
+                    {message.role === "assistant" && message.not_in_video ? <small className="vdr-chat-not-found">این پاسخ به نبود اطلاعات کافی در ویدیو اشاره می‌کند.</small> : null}
+                    {message.citations?.length ? (
+                      <div className="vdr-chat-citations" aria-label="منابع زمانی پاسخ">
+                        {message.citations.map((citation) => (
+                          <button key={citation.citation_index} type="button" onClick={() => seekToCitation(citation)} aria-label={"رفتن به زمان " + formatCitation(citation)}>
+                            <Play size={12} /> <span dir="ltr">{formatCitation(citation)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {message.role === "assistant" ? <button className="vdr-chat-copy" type="button" onClick={() => copyText(message.content, "پاسخ کپی شد.")}><Copy size={13} /> کپی پاسخ</button> : null}
+                  </article>
+                ))}
+                {chatState.sending ? <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال بررسی متن ویدیو...</p> : null}
+                {chatState.error ? <p className="vdr-chat-error" role="alert">{chatState.error}</p> : null}
+                <span ref={chatEndRef} />
+              </div>
+              <form className="vdr-chat-form" onSubmit={(event) => { event.preventDefault(); submitChatQuestion(chatInput); }}>
+                <label className="vdr-sr-only" htmlFor={"video-chat-" + video.id}>پرسش درباره ویدیو</label>
+                <textarea id={"video-chat-" + video.id} value={chatInput} onChange={(event) => setChatInput(event.target.value)}
+                  placeholder="پرسش خود را درباره این ویدیو بنویسید..." maxLength={800} rows={2} disabled={chatState.sending}
+                  onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitChatQuestion(chatInput); } }} />
+                <button type="submit" disabled={chatState.sending || !chatInput.trim()} aria-label="ارسال پرسش"><Send size={17} /></button>
+              </form>
             </div>
           ) : null}
 
