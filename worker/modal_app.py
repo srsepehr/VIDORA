@@ -164,6 +164,12 @@ def _spawn_insights_for(drain_result: dict) -> None:
             generate_insights.spawn(video_id)
         except Exception:  # noqa: BLE001 — insight kick-off is strictly best-effort
             pass
+        try:
+            # Chat indexing is transcript-only and independent. It never blocks
+            # or changes the completed video-processing job.
+            build_chat_index.spawn(video_id)
+        except Exception:  # noqa: BLE001 — indexing kick-off is strictly best-effort
+            pass
 
 
 @app.function(image=image, secrets=[secret], timeout=1500, max_containers=1)
