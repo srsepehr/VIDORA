@@ -2,7 +2,7 @@ import { AppError } from "./app-error";
 import { fetchWithAuth, type AuthSession } from "./auth";
 import { getBrowserEnv } from "./env";
 
-export const VIDEO_CHAT_URL = (import.meta.env.VITE_VIDEO_CHAT_URL as string | undefined)
+export const VIDEO_CHAT_URL = (import.meta.env?.VITE_VIDEO_CHAT_URL as string | undefined)
   || "https://sepehrrahimpour8--vidora-worker-chat-api.modal.run";
 
 export interface ChatCitation {
