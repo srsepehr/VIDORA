@@ -93,7 +93,7 @@ def _safe_question(raw: object, max_chars: int) -> str:
 def _rate_limit(client: SupabaseClient, user_id: str, video_id: str, config) -> None:
     cutoff = (datetime.now(timezone.utc) - timedelta(seconds=config.rate_window_seconds)).isoformat()
     rows = client.select_many("video_chat_messages",
-        f"user_id=eq.{user_id}&role=eq.user&created_at=gte.{cutoff}&select=id,video_id&limit=100")
+        f"user_id=eq.{user_id}&role=eq.user&status=eq.complete&created_at=gte.{cutoff}&select=id,video_id&limit=100")
     if len(rows) >= config.user_window_questions or sum(1 for row in rows if row.get("video_id") == video_id) >= config.video_window_questions:
         raise WorkerError("CHAT_RATE_LIMITED", dev_detail="configured window exceeded", retryable=True)
 
