@@ -155,6 +155,37 @@ INSIGHT_PERSIST_FAILED = _reg(
 INSIGHT_STALE = _reg(
     "INSIGHT_STALE", "متن ویدیو تغییر کرده و خلاصه باید دوباره ساخته شود.", True, STAGE_INSIGHTS)
 
+# --- grounded video chat ---------------------------------------------------
+# Chat state is independent from the video processing lifecycle. This stage is
+# used only for safe error classification and is never written to videos.status.
+STAGE_VIDEO_CHAT = "video_chat"
+CHAT_AUTH_REQUIRED = _reg(
+    "CHAT_AUTH_REQUIRED", "برای پرسش از ویدیو ابتدا وارد حساب شوید.", False, STAGE_VIDEO_CHAT)
+CHAT_ACCESS_DENIED = _reg(
+    "CHAT_ACCESS_DENIED", "شما به این ویدیو دسترسی ندارید.", False, STAGE_VIDEO_CHAT)
+CHAT_VIDEO_NOT_FOUND = _reg(
+    "CHAT_VIDEO_NOT_FOUND", "ویدیوی موردنظر یافت نشد.", False, STAGE_VIDEO_CHAT)
+CHAT_QUESTION_EMPTY = _reg(
+    "CHAT_QUESTION_EMPTY", "پرسش نمی‌تواند خالی باشد.", False, STAGE_VIDEO_CHAT)
+CHAT_QUESTION_TOO_LONG = _reg(
+    "CHAT_QUESTION_TOO_LONG", "متن پرسش بیش از حد طولانی است.", False, STAGE_VIDEO_CHAT)
+CHAT_RATE_LIMITED = _reg(
+    "CHAT_RATE_LIMITED", "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.", True, STAGE_VIDEO_CHAT)
+CHAT_TRANSCRIPT_MISSING = _reg(
+    "CHAT_TRANSCRIPT_MISSING", "متن این ویدیو برای پاسخ‌گویی یافت نشد.", False, STAGE_VIDEO_CHAT)
+CHAT_TRANSLATION_INCOMPLETE = _reg(
+    "CHAT_TRANSLATION_INCOMPLETE", "ترجمه فارسی این ویدیو هنوز کامل نیست.", False, STAGE_VIDEO_CHAT)
+CHAT_INDEX_MISSING = _reg(
+    "CHAT_INDEX_MISSING", "نمایه پرسش‌وپاسخ این ویدیو هنوز آماده نیست.", True, STAGE_VIDEO_CHAT)
+CHAT_STALE_INDEX = _reg(
+    "CHAT_STALE_INDEX", "متن ویدیو تغییر کرده و نمایه باید دوباره ساخته شود.", True, STAGE_VIDEO_CHAT)
+CHAT_PROVIDER_UNAVAILABLE = _reg(
+    "CHAT_PROVIDER_UNAVAILABLE", "سرویس پاسخ‌گویی در دسترس نیست. دوباره تلاش کنید.", True, STAGE_VIDEO_CHAT)
+CHAT_INVALID_OUTPUT = _reg(
+    "CHAT_INVALID_OUTPUT", "پاسخ معتبری از مدل دریافت نشد. دوباره تلاش کنید.", True, STAGE_VIDEO_CHAT)
+CHAT_GROUNDING_FAILED = _reg(
+    "CHAT_GROUNDING_FAILED", "پاسخ ساخته‌شده به بخش معتبری از ویدیو متصل نبود.", True, STAGE_VIDEO_CHAT)
+
 # --- lifecycle -------------------------------------------------------------
 JOB_TIMEOUT = _reg("JOB_TIMEOUT", "زمان پردازش این ویدیو به پایان رسید.", True, STAGE_ACQUIRING)
 JOB_CANCELLED = _reg("JOB_CANCELLED", "پردازش این ویدیو لغو شد.", False, STAGE_ACQUIRING)
