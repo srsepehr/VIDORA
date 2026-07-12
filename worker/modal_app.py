@@ -456,6 +456,13 @@ def inspect_chat_index(video_id: str):
 
 
 @app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288)
+def diagnose_chat(video_id: str):
+    """Modal-token-only structural chat diagnostic. Returns no private text."""
+    from worker.app.chat_service import diagnose_chat_pipeline
+    return diagnose_chat_pipeline(video_id)
+
+
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288)
 @modal.asgi_app()
 def chat_api():
     """Authenticated scale-to-zero chat API for the GitHub Pages frontend."""
@@ -501,6 +508,7 @@ def chat_api():
             return JSONResponse({"error": {"code": "CHAT_QUESTION_TOO_LONG", "message_fa": messages["CHAT_QUESTION_TOO_LONG"]}}, status_code=413)
         auth = request.headers.get("authorization", "")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        body: dict = {}
         try:
             body = json.loads(raw_body)
             if not isinstance(body, dict):
@@ -519,9 +527,26 @@ def chat_api():
             status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 409 if err.code == "CHAT_REQUEST_CONFLICT" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
             return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
                 headers={"Retry-After": "3600"} if err.code == "CHAT_RATE_LIMITED" else None)
-        except Exception:
+        except Exception as exc:
+            # Log only the exception class. Never log tokens, request bodies,
+            # transcript evidence, prompts, or generated content.
+            print(json.dumps({"event": "chat_api_unhandled",
+                              "error_type": type(exc).__name__}, sort_keys=True), flush=True)
+            try:
+                persist_chat_failure(body, token, "CHAT_PROVIDER_UNAVAILABLE")
+            except Exception:
+                pass
             return JSONResponse({"error": {"code": "CHAT_PROVIDER_UNAVAILABLE", "message_fa": messages["CHAT_PROVIDER_UNAVAILABLE"]}}, status_code=500)
     return api
+
+
+@app.local_entrypoint()
+def chat_diagnose(video_id: str = ""):
+    import json
+    result = diagnose_chat.remote(video_id)
+    print("diagnose_chat:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
 
 
 @app.local_entrypoint()

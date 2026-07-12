@@ -10,7 +10,7 @@ on:
         description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect | chat-index | chat-index-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect, chat-diagnose]
       video_id:
         description: "video id for inspect / subtitles / insights / chat"
         type: string
@@ -74,3 +74,6 @@ jobs:
       - name: Inspect chat index (structural facts only)
         if: ${{ inputs.step == 'chat-index-inspect' }}
         run: modal run worker/modal_app.py::chat_index_inspect --video-id "${{ inputs.video_id }}"
+      - name: Diagnose chat retrieval and generation (structural facts only)
+        if: ${{ inputs.step == 'chat-diagnose' }}
+        run: modal run worker/modal_app.py::chat_diagnose --video-id "${{ inputs.video_id }}"

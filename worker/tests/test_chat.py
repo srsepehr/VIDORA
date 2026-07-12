@@ -195,6 +195,42 @@ class ChatServiceTests(unittest.TestCase):
         self.assertTrue(query.endswith("این را ساده‌تر توضیح بده"))
         self.assertEqual(S._retrieval_query("موضوع قیمت‌گذاری چیست؟", history), "موضوع قیمت‌گذاری چیست؟")
 
+    def test_authentication_retries_transient_transport_failure(self):
+        calls = []
+        original_request, original_sleep = S.http_client.request, S.time.sleep
+        def fake_request(*_args, **_kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise OSError("temporary dns failure")
+            return SimpleNamespace(ok=True, status=200, json=lambda: {"id": "u1"})
+        S.http_client.request = fake_request
+        S.time.sleep = lambda _seconds: None
+        try:
+            user = S._authenticate(SimpleNamespace(base_url="https://example.test", key="key"), "token")
+        finally:
+            S.http_client.request, S.time.sleep = original_request, original_sleep
+        self.assertEqual(user["id"], "u1")
+        self.assertEqual(len(calls), 2)
+
+    def test_authentication_classifies_exhausted_transport_failure(self):
+        original_request, original_sleep = S.http_client.request, S.time.sleep
+        S.http_client.request = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("offline"))
+        S.time.sleep = lambda _seconds: None
+        try:
+            with self.assertRaises(WorkerError) as ctx:
+                S._authenticate(SimpleNamespace(base_url="https://example.test", key="key"), "token")
+        finally:
+            S.http_client.request, S.time.sleep = original_request, original_sleep
+        self.assertEqual(ctx.exception.code, "CHAT_PROVIDER_UNAVAILABLE")
+        self.assertTrue(ctx.exception.retryable)
+
+    def test_deployed_diagnostic_returns_only_structural_metadata(self):
+        source = (Path(__file__).parents[1] / "modal_app.py").read_text()
+        self.assertIn("def diagnose_chat(video_id: str)", source)
+        self.assertIn("error_type", source)
+        self.assertIn("persist_chat_failure(body, token, \"CHAT_PROVIDER_UNAVAILABLE\")", source)
+        self.assertNotIn("print(raw_body", source)
+
     def test_prompt_treats_transcript_and_question_as_untrusted(self):
         prompt = P.SYSTEM_PROMPT.lower()
         self.assertIn("untrusted", prompt)

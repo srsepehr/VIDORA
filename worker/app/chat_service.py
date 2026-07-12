@@ -71,11 +71,28 @@ def backfill_chat_index(video_id: str, force: bool = False) -> dict:
 def _authenticate(client: SupabaseClient, token: str) -> dict:
     if not token:
         raise WorkerError("CHAT_AUTH_REQUIRED", dev_detail="missing bearer token")
-    response = http_client.request("GET", f"{client.base_url}/auth/v1/user",
-        headers={"apikey": client.key, "Authorization": f"Bearer {token}"}, timeout=15.0)
+    response = None
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            response = http_client.request("GET", f"{client.base_url}/auth/v1/user",
+                headers={"apikey": client.key, "Authorization": f"Bearer {token}"}, timeout=15.0)
+            break
+        except (OSError, TimeoutError) as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(0.2 * (attempt + 1))
+    if response is None:
+        raise WorkerError("CHAT_PROVIDER_UNAVAILABLE",
+            dev_detail=f"auth transport unavailable: {type(last_error).__name__}",
+            retryable=True)
     if not response.ok:
         raise WorkerError("CHAT_AUTH_REQUIRED", dev_detail=f"auth http {response.status}")
-    user = response.json() or {}
+    try:
+        user = response.json() or {}
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WorkerError("CHAT_PROVIDER_UNAVAILABLE",
+            dev_detail=f"auth response decode: {type(exc).__name__}", retryable=True)
     if not user.get("id"):
         raise WorkerError("CHAT_AUTH_REQUIRED", dev_detail="auth user missing id")
     return user
@@ -224,6 +241,70 @@ def persist_chat_failure(body: dict, access_token: str, error_code: str) -> None
     client.rpc("persist_video_chat_failure", {"p_session_id": session["id"], "p_video_id": video_id,
         "p_user_id": user["id"], "p_request_id": request_id, "p_question": question,
         "p_request_hash": request_hash, "p_error_code": error_code})
+
+
+def diagnose_chat_pipeline(video_id: str, question: str = "این ویدیو درباره چیست؟") -> dict:
+    """Run retrieval and local generation without auth or persistence.
+
+    This Modal-token-only diagnostic returns structural facts and safe error
+    metadata. It never returns transcript text, evidence, prompts, or answers.
+    """
+    stage = "configuration"
+    try:
+        config = load_chat_config()
+        cfg = load_config(require_translation=False)
+        client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+        stage = "transcript"
+        rows, segments = _segments(client, video_id)
+        index_hash = canonical_index_hash(video_id, segments, target_chars=config.chunk_target_chars)
+        stage = "index"
+        index = client.select_one("video_chat_indexes",
+            f"video_id=eq.{video_id}&select=id,status,content_hash,embedding_model")
+        if not index or index.get("status") != "ready":
+            raise WorkerError("CHAT_INDEX_MISSING", dev_detail="ready index missing")
+        if index.get("content_hash") != index_hash:
+            raise WorkerError("CHAT_STALE_INDEX", dev_detail="index hash mismatch")
+        stage = "embedding"
+        vector = LocalE5EmbeddingProvider().embed_query(question)
+        stage = "retrieval"
+        semantic = client.rpc("match_video_chat_chunks", {"p_video_id": video_id,
+            "p_content_hash": index_hash,
+            "p_query_embedding": "[" + ",".join(f"{v:.8f}" for v in vector) + "]",
+            "p_top_k": config.top_k, "p_min_score": config.min_similarity}) or []
+        all_chunks = client.select_many("video_chat_chunks",
+            f"video_id=eq.{video_id}&select=id,chunk_index,start_ms,end_ms,source_segment_indexes,text_fa,source_text&order=chunk_index.asc")
+        lexical = []
+        for row in all_chunks:
+            score = lexical_score(question, row)
+            if score >= 0.34:
+                lexical.append({**row, "lexical_score": score, "score": score})
+        evidence = merge_retrieval(semantic, lexical, config.top_k)
+        if not evidence:
+            return {"status": "ok", "stage": "retrieval", "evidence_count": 0,
+                    "not_in_video": True, "citation_count": 0}
+        stage = "generation"
+        provider = LocalQwenVideoChatProvider(max_new_tokens=config.max_answer_tokens)
+        raw = provider.answer(question, evidence, [])
+        stage = "validation"
+        try:
+            result = validate_chat_payload(raw, evidence, rows)
+            repaired = False
+        except WorkerError as first:
+            repaired_raw = provider.repair(question, evidence, [], raw, first.dev_detail)
+            result = validate_chat_payload(repaired_raw, evidence, rows)
+            repaired = True
+        return {"status": "ok", "stage": "complete", "evidence_count": len(evidence),
+                "not_in_video": result["not_in_video"],
+                "citation_count": len(result["citations"]),
+                "answer_chars": len(result["answer"]), "repaired": repaired,
+                "provider": CHAT_PROVIDER, "model": CHAT_MODEL}
+    except WorkerError as err:
+        return {"status": "error", "stage": stage, "code": err.code,
+                "retryable": err.retryable, "detail": err.dev_detail[:240]}
+    except Exception as exc:
+        return {"status": "error", "stage": stage,
+                "code": "CHAT_PROVIDER_UNAVAILABLE",
+                "retryable": True, "error_type": type(exc).__name__}
 
 
 def inspect_chat_index(video_id: str) -> dict:
