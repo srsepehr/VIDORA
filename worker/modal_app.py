@@ -501,6 +501,8 @@ def chat_api():
                 raise ValueError("request body must be an object")
             result = ask_video(body, token)
             return JSONResponse(result)
+        except (json.JSONDecodeError, ValueError):
+            return JSONResponse({"error": {"code": "CHAT_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=400)
         except WorkerError as err:
             status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 409 if err.code == "CHAT_REQUEST_CONFLICT" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
             return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
