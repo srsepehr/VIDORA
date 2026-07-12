@@ -179,8 +179,17 @@ declare u public.video_chat_messages; a public.video_chat_messages; c jsonb;
 begin
   if not exists(select 1 from public.video_chat_sessions s where s.id=p_session_id and s.video_id=p_video_id and s.user_id=p_user_id)
     then raise exception 'session access denied'; end if;
+  -- Serialize retries for the same client request so concurrent delivery cannot
+  -- create duplicate rows. The request fingerprint also prevents accidental
+  -- reuse of one request id for different question text.
+  perform pg_advisory_xact_lock(hashtextextended(p_session_id::text || ':' || p_request_id::text, 0));
   select * into a from public.video_chat_messages where session_id=p_session_id and request_id=p_request_id and role='assistant';
-  if found then return jsonb_build_object('session_id',p_session_id,'assistant_message_id',a.id,'reused',true); end if;
+  if found then
+    if a.request_hash is distinct from p_request_hash then
+      return jsonb_build_object('session_id',p_session_id,'assistant_message_id',a.id,'reused',true,'conflict',true);
+    end if;
+    return jsonb_build_object('session_id',p_session_id,'assistant_message_id',a.id,'reused',true,'conflict',false);
+  end if;
   insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id,request_hash)
     values(p_session_id,p_video_id,p_user_id,'user',p_question,p_request_id,p_request_hash) returning * into u;
   insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id,not_in_video,
@@ -193,7 +202,7 @@ begin
       c->'source_segment_indexes',coalesce(c->'chunk_ids','[]'::jsonb));
   end loop;
   update public.video_chat_sessions set updated_at=now() where id=p_session_id;
-  return jsonb_build_object('session_id',p_session_id,'user_message_id',u.id,'assistant_message_id',a.id,'reused',false);
+  return jsonb_build_object('session_id',p_session_id,'user_message_id',u.id,'assistant_message_id',a.id,'reused',false,'conflict',false);
 end $$;
 
 revoke all on function public.persist_video_chat_index(uuid,text,text,text,text,text,integer,jsonb) from public,anon,authenticated;
