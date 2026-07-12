@@ -277,12 +277,20 @@ CONFLICT=$(q "select (public.persist_video_chat_exchange('$SID','$CHATVID','$U',
 eq "request id reuse with different payload is rejected structurally" "true" "$CONFLICT"
 eq "conflicting request creates no duplicate messages" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
 eq "conflicting request creates no duplicate citations" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
+FAILREQ=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+q "select public.persist_video_chat_failure('$SID','$CHATVID','$U','$FAILREQ','پرسش ناموفق','failure-hash','CHAT_PROVIDER_UNAVAILABLE');" >/dev/null
+eq "classified chat failure is persisted" "failed|CHAT_PROVIDER_UNAVAILABLE" "$(q "select status||'|'||error_code from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ' and role='user';")"
+q "select public.persist_video_chat_exchange('$SID','$CHATVID','$U','$FAILREQ','پرسش ناموفق','پاسخ بازیابی‌شده',false,'local','qwen','p1','s1','failure-hash','$CITS'::jsonb);" >/dev/null
+eq "retry recovers failed user message without duplication" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ';")"
+eq "recovered user message is complete" "complete|" "$(q "select status||'|'||coalesce(error_code,'') from public.video_chat_messages where session_id='$SID' and request_id='$FAILREQ' and role='user';")"
 DENYCHAT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id) values('$SID','$CHATVID','$U','assistant','forged',gen_random_uuid());" 2>&1 | tr -d '\n')
 eq "browser cannot forge assistant messages" "denied" "$(echo "$DENYCHAT" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$DENYCHAT")"
 DENYCIT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_message_citations(message_id,video_id,citation_index,start_ms,end_ms,source_segment_indexes) select id,'$CHATVID',9,0,10,'[0]' from public.video_chat_messages limit 1;" 2>&1 | tr -d '\n')
 eq "browser cannot forge chat citations" "denied" "$(echo "$DENYCIT" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$DENYCIT")"
 DENYIDX=$(psql -qtAX -c "set role authenticated; select public.persist_video_chat_index('$CHATVID','x','x','x','x','x',384,'[]'::jsonb);" 2>&1 | tr -d '\n')
 eq "authenticated denied chat index RPC" "denied" "$(echo "$DENYIDX" | grep -qi 'permission denied' && echo denied || echo "$DENYIDX")"
+DENYFAIL=$(psql -qtAX -c "set role authenticated; select public.persist_video_chat_failure('$SID','$CHATVID','$U',gen_random_uuid(),'x','h','CHAT_INVALID_OUTPUT');" 2>&1 | tr -d '\n')
+eq "authenticated denied chat failure RPC" "denied" "$(echo "$DENYFAIL" | grep -qi 'permission denied' && echo denied || echo "$DENYFAIL")"
 OWNCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','$U',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
 eq "owner reads own chat messages" "2" "$OWNCHAT"
 XCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','33333333-3333-3333-3333-333333333333',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
