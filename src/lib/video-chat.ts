@@ -3,7 +3,7 @@ import { fetchWithAuth, type AuthSession } from "./auth";
 import { getBrowserEnv } from "./env";
 
 export const VIDEO_CHAT_URL = (import.meta.env?.VITE_VIDEO_CHAT_URL as string | undefined)
-  || "https://sepehrrahimpour8--vidora-worker-chat-api.modal.run";
+  || "https://kvqrkphoyuoblfonjcvo.supabase.co/functions/v1/video-chat";
 
 export interface ChatCitation {
   citation_index: number;
