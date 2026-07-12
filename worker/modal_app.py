@@ -455,7 +455,7 @@ def inspect_chat_index(video_id: str):
     return inspect_index(video_id)
 
 
-@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288)
 @modal.asgi_app()
 def chat_api():
     """Authenticated scale-to-zero chat API for the GitHub Pages frontend."""
