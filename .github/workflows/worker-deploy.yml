@@ -7,16 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       step:
-        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect"
+        description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect | chat-index | chat-index-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect]
       video_id:
-        description: "video id for inspect / subtitles / insights"
+        description: "video id for inspect / subtitles / insights / chat"
         type: string
         default: ""
       force:
-        description: "force regeneration (subtitles / insights)"
+        description: "force regeneration (subtitles / insights / chat index)"
         type: boolean
         default: false
 
@@ -68,3 +68,9 @@ jobs:
       - name: Inspect insight state (structural facts only)
         if: ${{ inputs.step == 'insights-inspect' }}
         run: modal run worker/modal_app.py::insights_inspect --video-id "${{ inputs.video_id }}"
+      - name: Build chat index (transcript-only embeddings)
+        if: ${{ inputs.step == 'chat-index' }}
+        run: modal run worker/modal_app.py::chat_index --video-id "${{ inputs.video_id }}" ${{ inputs.force && '--force' || '' }}
+      - name: Inspect chat index (structural facts only)
+        if: ${{ inputs.step == 'chat-index-inspect' }}
+        run: modal run worker/modal_app.py::chat_index_inspect --video-id "${{ inputs.video_id }}"
