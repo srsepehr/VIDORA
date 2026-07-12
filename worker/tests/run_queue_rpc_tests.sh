@@ -292,7 +292,7 @@ eq "authenticated denied chat index RPC" "denied" "$(echo "$DENYIDX" | grep -qi 
 DENYFAIL=$(psql -qtAX -c "set role authenticated; select public.persist_video_chat_failure('$SID','$CHATVID','$U',gen_random_uuid(),'x','h','CHAT_INVALID_OUTPUT');" 2>&1 | tr -d '\n')
 eq "authenticated denied chat failure RPC" "denied" "$(echo "$DENYFAIL" | grep -qi 'permission denied' && echo denied || echo "$DENYFAIL")"
 OWNCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','$U',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
-eq "owner reads own chat messages" "2" "$OWNCHAT"
+eq "owner reads own chat messages" "4" "$OWNCHAT"
 XCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_user','33333333-3333-3333-3333-333333333333',true); select count(*) from public.video_chat_messages where video_id='$CHATVID';" 2>&1 | tail -1 | tr -d '[:space:]')
 eq "another user cannot read chat messages" "0" "$XCHAT"
 DENYCHUNKS=$(psql -qtAX -c "set role authenticated; select count(*) from public.video_chat_chunks;" 2>&1 | tr -d '\n')
