@@ -57,6 +57,7 @@ const ERROR_FA: Record<string, string> = {
   CHAT_STALE_INDEX: "جست‌وجوی هوشمند این ویدیو باید به‌روزرسانی شود.",
   CHAT_QUESTION_TOO_LONG: "پرسش بیش از حد طولانی است.",
   CHAT_RATE_LIMITED: "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
+  CHAT_REQUEST_CONFLICT: "این پرسش با شناسه تکراری نامعتبر است. دوباره ارسال کنید.",
   CHAT_PROVIDER_UNAVAILABLE: "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",
   CHAT_INVALID_OUTPUT: "پاسخ معتبر تولید نشد. دوباره تلاش کنید.",
   CHAT_GROUNDING_FAILED: "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
