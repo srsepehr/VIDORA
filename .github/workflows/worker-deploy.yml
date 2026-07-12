@@ -79,4 +79,4 @@ jobs:
         run: modal run worker/modal_app.py::chat_diagnose --video-id "${{ inputs.video_id }}"
       - name: Inspect recent chat endpoint logs (no request or response bodies)
         if: ${{ inputs.step == 'chat-logs' }}
-        run: modal app logs vidora-worker --function chat_api --since 30m --tail 100 --timestamps
+        run: modal app logs vidora-worker --since 30m --tail 100 --search chat_api_unhandled --timestamps
