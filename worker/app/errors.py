@@ -171,6 +171,8 @@ CHAT_QUESTION_TOO_LONG = _reg(
     "CHAT_QUESTION_TOO_LONG", "متن پرسش بیش از حد طولانی است.", False, STAGE_VIDEO_CHAT)
 CHAT_RATE_LIMITED = _reg(
     "CHAT_RATE_LIMITED", "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.", True, STAGE_VIDEO_CHAT)
+CHAT_REQUEST_CONFLICT = _reg(
+    "CHAT_REQUEST_CONFLICT", "شناسه این پرسش قبلاً برای درخواست دیگری استفاده شده است.", False, STAGE_VIDEO_CHAT)
 CHAT_TRANSCRIPT_MISSING = _reg(
     "CHAT_TRANSCRIPT_MISSING", "متن این ویدیو برای پاسخ‌گویی یافت نشد.", False, STAGE_VIDEO_CHAT)
 CHAT_TRANSLATION_INCOMPLETE = _reg(
