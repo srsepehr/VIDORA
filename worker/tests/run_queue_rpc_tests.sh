@@ -273,6 +273,10 @@ eq "chat exchange creates citation" "1" "$(q "select count(*) from public.video_
 q "select public.persist_video_chat_exchange('$SID','$CHATVID','$U','$REQ','پرسش','پاسخ فارسی',false,'local','qwen','p1','s1','rh','$CITS'::jsonb);" >/dev/null
 eq "request retry creates no duplicate messages" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
 eq "request retry creates no duplicate citations" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
+CONFLICT=$(q "select (public.persist_video_chat_exchange('$SID','$CHATVID','$U','$REQ','پرسش متفاوت','پاسخ دیگر',false,'local','qwen','p1','s1','different-hash','$CITS'::jsonb)->>'conflict');")
+eq "request id reuse with different payload is rejected structurally" "true" "$CONFLICT"
+eq "conflicting request creates no duplicate messages" "2" "$(q "select count(*) from public.video_chat_messages where session_id='$SID';")"
+eq "conflicting request creates no duplicate citations" "1" "$(q "select count(*) from public.video_chat_message_citations where video_id='$CHATVID';")"
 DENYCHAT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id) values('$SID','$CHATVID','$U','assistant','forged',gen_random_uuid());" 2>&1 | tr -d '\n')
 eq "browser cannot forge assistant messages" "denied" "$(echo "$DENYCHAT" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$DENYCHAT")"
 DENYCIT=$(psql -qtAX -c "set role authenticated; insert into public.video_chat_message_citations(message_id,video_id,citation_index,start_ms,end_ms,source_segment_indexes) select id,'$CHATVID',9,0,10,'[0]' from public.video_chat_messages limit 1;" 2>&1 | tr -d '\n')
