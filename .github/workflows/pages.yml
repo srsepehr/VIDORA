@@ -42,6 +42,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_APP_URL: ${{ vars.VITE_APP_URL }}
+          VITE_VIDEO_CHAT_URL: ${{ vars.VITE_VIDEO_CHAT_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
