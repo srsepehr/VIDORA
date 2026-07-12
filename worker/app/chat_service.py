@@ -90,6 +90,18 @@ def _safe_question(raw: object, max_chars: int) -> str:
     return question
 
 
+def _retrieval_query(question: str, history: list[dict]) -> str:
+    """Resolve short referential follow-ups without broadening the video scope."""
+    normalized = question.strip()
+    markers = ("این را", "این بخش", "آن را", "منظورش", "بیشتر توضیح", "ساده‌تر", "دوباره توضیح")
+    if len(normalized) <= 140 and any(marker in normalized for marker in markers):
+        previous = next((row.get("content", "").strip() for row in reversed(history)
+                         if row.get("role") == "user" and row.get("content", "").strip()), "")
+        if previous:
+            return previous + "\n" + normalized
+    return normalized
+
+
 def _rate_limit(client: SupabaseClient, user_id: str, video_id: str, config) -> None:
     cutoff = (datetime.now(timezone.utc) - timedelta(seconds=config.rate_window_seconds)).isoformat()
     rows = client.select_many("video_chat_messages",
@@ -148,8 +160,12 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
         raise WorkerError("CHAT_INDEX_MISSING", dev_detail="ready index missing")
     if index.get("content_hash") != index_hash:
         raise WorkerError("CHAT_STALE_INDEX", dev_detail="index hash mismatch")
+    history = client.select_many("video_chat_messages",
+        f"session_id=eq.{session['id']}&status=eq.complete&select=role,content&order=created_at.desc&limit={config.recent_messages}")
+    history.reverse()
+    retrieval_query = _retrieval_query(question, history)
     embedding = embedding or LocalE5EmbeddingProvider()
-    vector = embedding.embed_query(question)
+    vector = embedding.embed_query(retrieval_query)
     semantic = client.rpc("match_video_chat_chunks", {"p_video_id": video_id, "p_content_hash": index_hash,
         "p_query_embedding": "[" + ",".join(f"{v:.8f}" for v in vector) + "]",
         "p_top_k": config.top_k, "p_min_score": config.min_similarity}) or []
@@ -157,13 +173,10 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
         f"video_id=eq.{video_id}&select=id,chunk_index,start_ms,end_ms,source_segment_indexes,text_fa,source_text&order=chunk_index.asc")
     lexical = []
     for row in all_chunks:
-        score = lexical_score(question, row)
+        score = lexical_score(retrieval_query, row)
         if score >= 0.34:
             lexical.append({**row, "lexical_score": score, "score": score})
     evidence = merge_retrieval(semantic, lexical, config.top_k)
-    history = client.select_many("video_chat_messages",
-        f"session_id=eq.{session['id']}&status=eq.complete&select=role,content&order=created_at.desc&limit={config.recent_messages}")
-    history.reverse()
     if not evidence:
         result = {"answer": NOT_IN_VIDEO_FA, "not_in_video": True, "citations": [], "suggested_followups": []}
     else:
