@@ -475,6 +475,7 @@ def chat_api():
         "CHAT_QUESTION_EMPTY": "پرسش خود را بنویسید.",
         "CHAT_QUESTION_TOO_LONG": "پرسش بیش از حد طولانی است.",
         "CHAT_RATE_LIMITED": "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
+        "CHAT_REQUEST_CONFLICT": "این پرسش با شناسه تکراری نامعتبر است. دوباره ارسال کنید.",
         "CHAT_PROVIDER_UNAVAILABLE": "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",
         "CHAT_INVALID_OUTPUT": "پاسخ معتبر تولید نشد. دوباره تلاش کنید.",
         "CHAT_GROUNDING_FAILED": "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
@@ -492,7 +493,7 @@ def chat_api():
             result = ask_video(body, token)
             return JSONResponse(result)
         except WorkerError as err:
-            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
+            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 409 if err.code == "CHAT_REQUEST_CONFLICT" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
             return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
                 headers={"Retry-After": "3600"} if err.code == "CHAT_RATE_LIMITED" else None)
         except Exception:
