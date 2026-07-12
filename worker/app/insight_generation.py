@@ -79,11 +79,63 @@ def _attempt_with_repair(provider: VideoInsightProvider, system: str, user: str,
         return validate(provider.complete_json(system, user, correction))
 
 
+def _fill_missing_takeaway_refs(payload: dict, segments: list[InsightSegment]) -> dict:
+    """Coarsely ground otherwise valid takeaways when a small local model omits refs.
+
+    Only missing/empty takeaway references are repaired. Non-empty invalid refs
+    still fail strict validation. The fallback is deterministic and restricted
+    to real transcript indexes, preferring the union of valid chapter refs.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    takeaways = payload.get("key_takeaways")
+    if not isinstance(takeaways, list):
+        return payload
+    real = {segment.segment_index for segment in segments}
+    chapter_refs: set[int] = set()
+    chapters = payload.get("chapters")
+    if isinstance(chapters, list):
+        for chapter in chapters:
+            if not isinstance(chapter, dict):
+                continue
+            refs = chapter.get("segment_indexes")
+            if not isinstance(refs, list):
+                continue
+            for item in refs:
+                try:
+                    idx = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if idx in real:
+                    chapter_refs.add(idx)
+    fallback = sorted(chapter_refs or real)
+    if not fallback:
+        return payload
+
+    changed = False
+    repaired_takeaways: list = []
+    for takeaway in takeaways:
+        if isinstance(takeaway, dict):
+            refs = takeaway.get("segment_indexes")
+            if refs is None or refs == []:
+                takeaway = dict(takeaway)
+                takeaway["segment_indexes"] = fallback
+                changed = True
+        repaired_takeaways.append(takeaway)
+    if not changed:
+        return payload
+    repaired = dict(payload)
+    repaired["key_takeaways"] = repaired_takeaways
+    return repaired
+
+
 def _generate_direct(provider, segments, *, title, duration_ms, config) -> InsightResult:
     user = build_user_message(segments, title=title, duration_ms=duration_ms)
     return _attempt_with_repair(
         provider, INSIGHT_SYSTEM_PROMPT, user,
-        lambda payload: validate_insight_payload(payload, segments, duration_ms, config),
+        lambda payload: validate_insight_payload(
+            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config
+        ),
     )
 
 
@@ -100,7 +152,9 @@ def _generate_hierarchical(provider, segments, *, title, duration_ms, config) ->
     synthesis_user = build_synthesis_message(intermediates, title=title, duration_ms=duration_ms)
     return _attempt_with_repair(
         provider, INSIGHT_SYNTHESIS_PROMPT, synthesis_user,
-        lambda payload: validate_insight_payload(payload, segments, duration_ms, config),
+        lambda payload: validate_insight_payload(
+            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config
+        ),
     )
 
 
