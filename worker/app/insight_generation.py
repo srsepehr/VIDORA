@@ -133,7 +133,9 @@ def _generate_direct(provider, segments, *, title, duration_ms, config) -> Insig
     user = build_user_message(segments, title=title, duration_ms=duration_ms)
     return _attempt_with_repair(
         provider, INSIGHT_SYSTEM_PROMPT, user,
-        lambda payload: validate_insight_payload(\n            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config\n        ),
+        lambda payload: validate_insight_payload(
+            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config
+        ),
     )
 
 
@@ -150,7 +152,9 @@ def _generate_hierarchical(provider, segments, *, title, duration_ms, config) ->
     synthesis_user = build_synthesis_message(intermediates, title=title, duration_ms=duration_ms)
     return _attempt_with_repair(
         provider, INSIGHT_SYNTHESIS_PROMPT, synthesis_user,
-        lambda payload: validate_insight_payload(\n            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config\n        ),
+        lambda payload: validate_insight_payload(
+            _fill_missing_takeaway_refs(payload, segments), segments, duration_ms, config
+        ),
     )
 
 
