@@ -7,9 +7,11 @@ import {
   FileText,
   Languages,
   Loader2,
+  MessageCircle,
   Play,
   RefreshCw,
   Search,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -314,6 +316,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     loadSignedUrl();
     loadSubtitles();
     loadInsights();
+    loadChat();
     return () => {
       if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
       if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
