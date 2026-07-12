@@ -110,25 +110,25 @@ insight_image = (
 )
 
 # Dedicated chat/index image: local E5 embeddings + Qwen answer generation.
-+# It intentionally contains no whisper, NLLB, ffmpeg, subtitle, or media stack.
-+CHAT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
-+CHAT_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
-+
-+
-+def _bake_chat_models():
-+    from huggingface_hub import snapshot_download
-+    snapshot_download(CHAT_MODEL, cache_dir="/models")
-+    snapshot_download(CHAT_EMBEDDING_MODEL, cache_dir="/models")
-+
-+
-+chat_image = (
-+    modal.Image.debian_slim(python_version="3.11")
-+    .pip_install("numpy<2", "torch==2.2.2", "transformers==4.44.2", "fastapi[standard]")
-+    .env({"CHAT_MODEL": CHAT_MODEL, "CHAT_EMBEDDING_MODEL": CHAT_EMBEDDING_MODEL,
-+          "STT_DOWNLOAD_ROOT": "/models", "OMP_NUM_THREADS": "4"})
-+    .run_function(_bake_chat_models)
-+    .add_local_python_source("worker")
-+)
+# It intentionally contains no whisper, NLLB, ffmpeg, subtitle, or media stack.
+CHAT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+CHAT_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
+
+
+def _bake_chat_models():
+    from huggingface_hub import snapshot_download
+    snapshot_download(CHAT_MODEL, cache_dir="/models")
+    snapshot_download(CHAT_EMBEDDING_MODEL, cache_dir="/models")
+
+
+chat_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install("numpy<2", "torch==2.2.2", "transformers==4.44.2", "fastapi[standard]")
+    .env({"CHAT_MODEL": CHAT_MODEL, "CHAT_EMBEDDING_MODEL": CHAT_EMBEDDING_MODEL,
+          "STT_DOWNLOAD_ROOT": "/models", "OMP_NUM_THREADS": "4"})
+    .run_function(_bake_chat_models)
+    .add_local_python_source("worker")
+)
 
 app = modal.App("vidora-worker")
 
@@ -434,85 +434,85 @@ def inspect_insights(video_id: str = ""):
 
 @app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
 def build_chat_index(video_id: str, force: bool = False):
-+    """Internal transcript-only chat-index backfill. No media processing."""
-+    from worker.app.chat_service import backfill_chat_index
-+    from worker.app.errors import WorkerError
-+    try:
-+        return backfill_chat_index(video_id, force=force)
-+    except WorkerError as err:
-+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:240], "retryable": err.retryable}
-+
-+
-+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
-+def inspect_chat_index(video_id: str):
-+    from worker.app.chat_service import inspect_chat_index as inspect_index
-+    return inspect_index(video_id)
-+
-+
-+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
-+@modal.asgi_app()
-+def chat_api():
-+    """Authenticated scale-to-zero chat API for the GitHub Pages frontend."""
-+    from fastapi import FastAPI, Request
-+    from fastapi.middleware.cors import CORSMiddleware
-+    from fastapi.responses import JSONResponse
-+    from worker.app.chat_service import ask_video
-+    from worker.app.errors import WorkerError
-+
-+    api = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-+    api.add_middleware(CORSMiddleware,
-+        allow_origins=["https://srsepehr.github.io", "http://127.0.0.1:5173", "http://localhost:5173"],
-+        allow_credentials=False, allow_methods=["POST", "OPTIONS"],
-+        allow_headers=["Authorization", "Content-Type", "apikey", "X-Request-ID"], max_age=600)
-+    messages = {
-+        "CHAT_AUTH_REQUIRED": "برای پرسش از ویدیو ابتدا وارد حساب شوید.",
-+        "CHAT_ACCESS_DENIED": "اجازه دسترسی به گفت‌وگوی این ویدیو را ندارید.",
-+        "CHAT_VIDEO_NOT_FOUND": "ویدیوی موردنظر پیدا نشد.",
-+        "CHAT_TRANSCRIPT_MISSING": "متن این ویدیو هنوز آماده نیست.",
-+        "CHAT_TRANSLATION_INCOMPLETE": "ترجمه فارسی این ویدیو هنوز کامل نیست.",
-+        "CHAT_INDEX_MISSING": "جست‌وجوی هوشمند این ویدیو هنوز آماده نشده است.",
-+        "CHAT_STALE_INDEX": "متن ویدیو تغییر کرده و جست‌وجوی هوشمند باید به‌روزرسانی شود.",
-+        "CHAT_QUESTION_EMPTY": "پرسش خود را بنویسید.",
-+        "CHAT_QUESTION_TOO_LONG": "پرسش بیش از حد طولانی است.",
-+        "CHAT_RATE_LIMITED": "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
-+        "CHAT_PROVIDER_UNAVAILABLE": "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",
-+        "CHAT_INVALID_OUTPUT": "پاسخ معتبر تولید نشد. دوباره تلاش کنید.",
-+        "CHAT_GROUNDING_FAILED": "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
-+    }
-+
-+    @api.post("/")
-+    async def ask(request: Request):
-+        length = int(request.headers.get("content-length") or 0)
-+        if length > 12_000:
-+            return JSONResponse({"error": {"code": "CHAT_QUESTION_TOO_LONG", "message_fa": messages["CHAT_QUESTION_TOO_LONG"]}}, status_code=413)
-+        auth = request.headers.get("authorization", "")
-+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
-+        try:
-+            body = await request.json()
-+            result = ask_video(body, token)
-+            return JSONResponse(result)
-+        except WorkerError as err:
-+            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
-+            return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
-+                headers={"Retry-After": "3600"} if err.code == "CHAT_RATE_LIMITED" else None)
-+        except Exception:
-+            return JSONResponse({"error": {"code": "CHAT_PROVIDER_UNAVAILABLE", "message_fa": messages["CHAT_PROVIDER_UNAVAILABLE"]}}, status_code=500)
-+    return api
-+
-+
-+@app.local_entrypoint()
-+def chat_index(video_id: str = "", force: bool = False):
-+    import json
-+    result = build_chat_index.remote(video_id, force)
-+    print("chat_index:", json.dumps(result, ensure_ascii=False, indent=2))
-+    if result.get("status") == "error":
-+        raise SystemExit(1)
-+
-+
-+@app.local_entrypoint()
-+def chat_index_inspect(video_id: str = ""):
-+    import json
-+    print("inspect_chat_index:", json.dumps(inspect_chat_index.remote(video_id), ensure_ascii=False, indent=2))
+    """Internal transcript-only chat-index backfill. No media processing."""
+    from worker.app.chat_service import backfill_chat_index
+    from worker.app.errors import WorkerError
+    try:
+        return backfill_chat_index(video_id, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:240], "retryable": err.retryable}
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def inspect_chat_index(video_id: str):
+    from worker.app.chat_service import inspect_chat_index as inspect_index
+    return inspect_index(video_id)
+
+
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
+@modal.asgi_app()
+def chat_api():
+    """Authenticated scale-to-zero chat API for the GitHub Pages frontend."""
+    from fastapi import FastAPI, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
+    from worker.app.chat_service import ask_video
+    from worker.app.errors import WorkerError
+
+    api = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    api.add_middleware(CORSMiddleware,
+        allow_origins=["https://srsepehr.github.io", "http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_credentials=False, allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "apikey", "X-Request-ID"], max_age=600)
+    messages = {
+        "CHAT_AUTH_REQUIRED": "برای پرسش از ویدیو ابتدا وارد حساب شوید.",
+        "CHAT_ACCESS_DENIED": "اجازه دسترسی به گفت‌وگوی این ویدیو را ندارید.",
+        "CHAT_VIDEO_NOT_FOUND": "ویدیوی موردنظر پیدا نشد.",
+        "CHAT_TRANSCRIPT_MISSING": "متن این ویدیو هنوز آماده نیست.",
+        "CHAT_TRANSLATION_INCOMPLETE": "ترجمه فارسی این ویدیو هنوز کامل نیست.",
+        "CHAT_INDEX_MISSING": "جست‌وجوی هوشمند این ویدیو هنوز آماده نشده است.",
+        "CHAT_STALE_INDEX": "متن ویدیو تغییر کرده و جست‌وجوی هوشمند باید به‌روزرسانی شود.",
+        "CHAT_QUESTION_EMPTY": "پرسش خود را بنویسید.",
+        "CHAT_QUESTION_TOO_LONG": "پرسش بیش از حد طولانی است.",
+        "CHAT_RATE_LIMITED": "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
+        "CHAT_PROVIDER_UNAVAILABLE": "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",
+        "CHAT_INVALID_OUTPUT": "پاسخ معتبر تولید نشد. دوباره تلاش کنید.",
+        "CHAT_GROUNDING_FAILED": "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
+    }
+
+    @api.post("/")
+    async def ask(request: Request):
+        length = int(request.headers.get("content-length") or 0)
+        if length > 12_000:
+            return JSONResponse({"error": {"code": "CHAT_QUESTION_TOO_LONG", "message_fa": messages["CHAT_QUESTION_TOO_LONG"]}}, status_code=413)
+        auth = request.headers.get("authorization", "")
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        try:
+            body = await request.json()
+            result = ask_video(body, token)
+            return JSONResponse(result)
+        except WorkerError as err:
+            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
+            return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
+                headers={"Retry-After": "3600"} if err.code == "CHAT_RATE_LIMITED" else None)
+        except Exception:
+            return JSONResponse({"error": {"code": "CHAT_PROVIDER_UNAVAILABLE", "message_fa": messages["CHAT_PROVIDER_UNAVAILABLE"]}}, status_code=500)
+    return api
+
+
+@app.local_entrypoint()
+def chat_index(video_id: str = "", force: bool = False):
+    import json
+    result = build_chat_index.remote(video_id, force)
+    print("chat_index:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
+
+
+@app.local_entrypoint()
+def chat_index_inspect(video_id: str = ""):
+    import json
+    print("inspect_chat_index:", json.dumps(inspect_chat_index.remote(video_id), ensure_ascii=False, indent=2))
 
 
 @app.local_entrypoint()
