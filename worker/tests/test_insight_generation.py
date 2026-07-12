@@ -150,6 +150,18 @@ class TestOrchestration(unittest.TestCase):
         self.assertEqual(len(provider.calls), 2)
         self.assertTrue(provider.calls[1][1])  # second call carried a correction
 
+    def test_missing_takeaway_refs_are_grounded_to_real_chapter_segments(self):
+        client = FakeClient()
+        payload = good_payload()
+        payload["key_takeaways"][0].pop("segment_indexes")
+        provider = FakeProvider([payload])
+        out = G.generate_insights_for_video(CFG, client, "vid1", provider=provider)
+        self.assertEqual(out["status"], "generated")
+        self.assertEqual(len(provider.calls), 1)
+        persist = client.rpc_calls[-1][1]
+        self.assertEqual(persist["p_key_takeaways"][0]["segment_indexes"], [0, 1, 2])
+
+
     def test_repair_includes_rejected_payload_and_non_empty_schema(self):
         client = FakeClient()
         rejected = {
