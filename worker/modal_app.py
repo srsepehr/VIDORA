@@ -453,6 +453,7 @@ def inspect_chat_index(video_id: str):
 @modal.asgi_app()
 def chat_api():
     """Authenticated scale-to-zero chat API for the GitHub Pages frontend."""
+    import json
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
@@ -483,13 +484,21 @@ def chat_api():
 
     @api.post("/")
     async def ask(request: Request):
-        length = int(request.headers.get("content-length") or 0)
-        if length > 12_000:
+        try:
+            declared_length = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared_length = 12_001
+        if declared_length > 12_000:
+            return JSONResponse({"error": {"code": "CHAT_QUESTION_TOO_LONG", "message_fa": messages["CHAT_QUESTION_TOO_LONG"]}}, status_code=413)
+        raw_body = await request.body()
+        if len(raw_body) > 12_000:
             return JSONResponse({"error": {"code": "CHAT_QUESTION_TOO_LONG", "message_fa": messages["CHAT_QUESTION_TOO_LONG"]}}, status_code=413)
         auth = request.headers.get("authorization", "")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
         try:
-            body = await request.json()
+            body = json.loads(raw_body)
+            if not isinstance(body, dict):
+                raise ValueError("request body must be an object")
             result = ask_video(body, token)
             return JSONResponse(result)
         except WorkerError as err:
