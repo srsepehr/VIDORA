@@ -206,6 +206,8 @@ class ChatServiceTests(unittest.TestCase):
         self.assertIn('allow_origins=["https://srsepehr.github.io", "http://127.0.0.1:5173", "http://localhost:5173"]', source)
         self.assertIn("raw_body = await request.body()", source)
         self.assertIn("if len(raw_body) > 12_000", source)
+        web_decorator = source[source.rfind("@app.function", 0, source.index("def chat_api")):source.index("def chat_api")]
+        self.assertNotIn("retries=", web_decorator)
 
     def test_chat_image_excludes_video_processing_stack(self):
         source = (Path(__file__).parents[1] / "modal_app.py").read_text()
