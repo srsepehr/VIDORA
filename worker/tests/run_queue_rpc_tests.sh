@@ -50,7 +50,9 @@ psql -qX -v ON_ERROR_STOP=1 -f "$MIGRATION" >/dev/null || { echo "migration load
 psql -qX -v ON_ERROR_STOP=1 -f "$SUBTITLE_MIGRATION" >/dev/null || { echo "subtitle migration load failed"; exit 1; }
 psql -qX -v ON_ERROR_STOP=1 -f "$INSIGHT_MIGRATION" >/dev/null || { echo "insight migration load failed"; exit 1; }
 CHAT_MIGRATION="$REPO/supabase/migrations/202607120002_video_chat.sql"
+CHAT_HARDENING_MIGRATION="$REPO/supabase/migrations/202607120003_video_chat_privilege_hardening.sql"
 psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_MIGRATION" >/dev/null || { echo "chat migration load failed"; exit 1; }
+psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_HARDENING_MIGRATION" >/dev/null || { echo "chat hardening migration load failed"; exit 1; }
 ok "migrations + prereqs load cleanly into Postgres"
 
 U=11111111-1111-1111-1111-111111111111
@@ -297,6 +299,8 @@ XCHAT=$(psql -qtAX -c "set role authenticated; select set_config('app.current_us
 eq "another user cannot read chat messages" "0" "$XCHAT"
 DENYCHUNKS=$(psql -qtAX -c "set role authenticated; select count(*) from public.video_chat_chunks;" 2>&1 | tr -d '\n')
 eq "browser cannot read private embeddings/chunks" "denied" "$(echo "$DENYCHUNKS" | grep -qi 'permission denied' && echo denied || echo "$DENYCHUNKS")"
+eq "authenticated has no chunk SELECT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_chat_chunks','select');")"
+eq "authenticated has no message INSERT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_chat_messages','insert');")"
 
 echo "---------------------------------------------"
 echo "queue RPC tests: $pass passed, $fail failed"
