@@ -96,11 +96,14 @@ def _rate_limit(client: SupabaseClient, user_id: str, video_id: str, config) -> 
         raise WorkerError("CHAT_RATE_LIMITED", dev_detail="configured window exceeded", retryable=True)
 
 
-def _existing_exchange(client: SupabaseClient, session_id: str, request_id: str) -> dict | None:
+def _existing_exchange(client: SupabaseClient, session_id: str, request_id: str,
+                       request_hash: str) -> dict | None:
     assistant = client.select_one("video_chat_messages",
-        f"session_id=eq.{session_id}&request_id=eq.{request_id}&role=eq.assistant&select=id,content,not_in_video")
+        f"session_id=eq.{session_id}&request_id=eq.{request_id}&role=eq.assistant&select=id,content,not_in_video,request_hash")
     if not assistant:
         return None
+    if assistant.get("request_hash") != request_hash:
+        raise WorkerError("CHAT_REQUEST_CONFLICT", dev_detail="request id reused with different payload")
     citations = client.select_many("video_chat_message_citations",
         f"message_id=eq.{assistant['id']}&select=citation_index,start_ms,end_ms,source_segment_indexes&order=citation_index.asc")
     return {"status": "ok", "reused": True, "session_id": session_id, "assistant_message_id": assistant["id"],
@@ -124,8 +127,10 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
     video = client.select_one("videos", f"id=eq.{video_id}&user_id=eq.{user['id']}&select=id,user_id")
     if not video:
         raise WorkerError("CHAT_ACCESS_DENIED", dev_detail="video not owned")
+    request_hash = hashlib.sha256(json.dumps({"video": video_id, "user": user["id"], "question": question},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     session = client.rpc("get_or_create_video_chat_session", {"p_video_id": video_id, "p_user_id": user["id"]})
-    existing = _existing_exchange(client, session["id"], request_id)
+    existing = _existing_exchange(client, session["id"], request_id, request_hash)
     if existing:
         return existing
     _rate_limit(client, user["id"], video_id, config)
@@ -163,14 +168,14 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
         except WorkerError as first:
             repaired = provider.repair(question, evidence, history, raw, first.dev_detail)
             result = validate_chat_payload(repaired, evidence, rows)
-    request_hash = hashlib.sha256(json.dumps({"video": video_id, "question": question,
-        "index": index_hash, "history": history[-config.recent_messages:]}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     persisted = client.rpc("persist_video_chat_exchange", {"p_session_id": session["id"], "p_video_id": video_id,
         "p_user_id": user["id"], "p_request_id": request_id, "p_question": question,
         "p_answer": result["answer"], "p_not_in_video": result["not_in_video"],
         "p_provider": CHAT_PROVIDER, "p_model": CHAT_MODEL, "p_prompt_version": CHAT_PROMPT_VERSION,
         "p_schema_version": CHAT_SCHEMA_VERSION, "p_request_hash": request_hash,
         "p_citations": result["citations"]})
+    if persisted.get("conflict"):
+        raise WorkerError("CHAT_REQUEST_CONFLICT", dev_detail="request id conflict detected during persist")
     return {"status": "ok", "reused": bool(persisted.get("reused")), "session_id": session["id"],
         "assistant_message_id": persisted["assistant_message_id"], "answer": result["answer"],
         "not_in_video": result["not_in_video"], "citations": result["citations"],
