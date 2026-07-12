@@ -98,6 +98,11 @@ def _rate_limit(client: SupabaseClient, user_id: str, video_id: str, config) -> 
         raise WorkerError("CHAT_RATE_LIMITED", dev_detail="configured window exceeded", retryable=True)
 
 
+def _request_fingerprint(video_id: str, user_id: str, question: str) -> str:
+    return hashlib.sha256(json.dumps({"video": video_id, "user": user_id, "question": question},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _existing_exchange(client: SupabaseClient, session_id: str, request_id: str,
                        request_hash: str) -> dict | None:
     assistant = client.select_one("video_chat_messages",
@@ -129,8 +134,7 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
     video = client.select_one("videos", f"id=eq.{video_id}&user_id=eq.{user['id']}&select=id,user_id")
     if not video:
         raise WorkerError("CHAT_ACCESS_DENIED", dev_detail="video not owned")
-    request_hash = hashlib.sha256(json.dumps({"video": video_id, "user": user["id"], "question": question},
-        ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    request_hash = _request_fingerprint(video_id, user["id"], question)
     session = client.rpc("get_or_create_video_chat_session", {"p_video_id": video_id, "p_user_id": user["id"]})
     existing = _existing_exchange(client, session["id"], request_id, request_hash)
     if existing:
@@ -183,6 +187,30 @@ def ask_video(body: dict, access_token: str, *, embedding: VideoEmbeddingProvide
         "not_in_video": result["not_in_video"], "citations": result["citations"],
         "suggested_followups": result.get("suggested_followups") or [],
         "runtime_ms": int((time.monotonic() - started) * 1000)}
+
+
+def persist_chat_failure(body: dict, access_token: str, error_code: str) -> None:
+    """Persist only a stable failure code after revalidating token and ownership.
+
+    This deliberately stores no provider detail, retrieved evidence, prompt, or
+    token. Authentication/validation failures that cannot establish an owned
+    session are not persisted.
+    """
+    config = load_chat_config()
+    cfg = load_config(require_translation=False)
+    client = SupabaseClient(cfg.supabase_url, cfg.service_role_key)
+    user = _authenticate(client, access_token)
+    video_id = str(uuid.UUID(str(body.get("video_id") or "")))
+    request_id = str(uuid.UUID(str(body.get("request_id") or "")))
+    question = _safe_question(body.get("question"), config.max_question_chars)
+    video = client.select_one("videos", f"id=eq.{video_id}&user_id=eq.{user['id']}&select=id")
+    if not video:
+        return
+    request_hash = _request_fingerprint(video_id, user["id"], question)
+    session = client.rpc("get_or_create_video_chat_session", {"p_video_id": video_id, "p_user_id": user["id"]})
+    client.rpc("persist_video_chat_failure", {"p_session_id": session["id"], "p_video_id": video_id,
+        "p_user_id": user["id"], "p_request_id": request_id, "p_question": question,
+        "p_request_hash": request_hash, "p_error_code": error_code})
 
 
 def inspect_chat_index(video_id: str) -> dict:
