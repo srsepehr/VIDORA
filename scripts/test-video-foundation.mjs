@@ -37,6 +37,7 @@ compileTs("src/lib/video-service.ts", "video-service.mjs");
 compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
 compileTs("src/lib/insight-review.ts", "insight-review.mjs");
+compileTs("src/lib/video-chat.ts", "video-chat.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
@@ -47,6 +48,7 @@ const accessPolicy = await load("access-policy.mjs");
 const transcriptReview = await load("transcript-review.mjs");
 const subtitleReview = await load("subtitle-review.mjs");
 const insightReview = await load("insight-review.mjs");
+const videoChat = await load("video-chat.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -501,6 +503,35 @@ test("frontend insight schema version matches the worker (no drift)", () => {
   const match = py.match(/SCHEMA_VERSION\s*=\s*"([^"]+)"/);
   assert.ok(match, "worker SCHEMA_VERSION not found");
   assert.equal(insightReview.INSIGHT_SCHEMA_VERSION, match[1]);
+});
+
+test("video chat citation labels are deterministic", () => {
+  assert.equal(videoChat.formatCitation({ start_ms: 12000, end_ms: 24000 }), "00:12–00:24");
+  assert.equal(videoChat.formatCitation({ start_ms: 0, end_ms: 900 }), "00:00");
+});
+
+test("review page adds grounded video chat without replacing existing review tools", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  assert.match(source, /\["chat", "پرسش از ویدیو"\]/);
+  assert.match(source, /fetchVideoChatHistory/);
+  assert.match(source, /askVideoQuestion/);
+  assert.match(source, /formatCitation\(citation\)/);
+  assert.match(source, /seekToCitation\(citation\)/);
+  assert.match(source, /crypto\.randomUUID\(\)/);
+  assert.match(source, /role="tabpanel" aria-label="پرسش از ویدیو"/);
+  assert.match(source, /متن و ترجمه/);
+  assert.match(source, /"summary", "خلاصه"/);
+  assert.match(source, /"chapters", "فصل‌ها"/);
+  assert.doesNotMatch(source, /Save to Note|Living Note|ذخیره در یادداشت/);
+});
+
+test("video chat client uses authenticated endpoint and owner-scoped history", () => {
+  const source = fs.readFileSync(path.join(root, "src/lib/video-chat.ts"), "utf8");
+  assert.match(source, /fetchWithAuth/);
+  assert.match(source, /video_chat_sessions\?video_id=eq/);
+  assert.match(source, /video_chat_messages\?session_id=eq/);
+  assert.match(source, /video_chat_message_citations\?video_id=eq/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role/);
 });
 
 test("review page adds insight tabs with seek actions and keeps transcript usable", () => {
