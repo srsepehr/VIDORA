@@ -47,6 +47,8 @@ def index_video(client: SupabaseClient, video_id: str, *, force: bool = False,
     chunks = build_chat_chunks(segments, config.chunk_target_chars)
     provider = provider or LocalE5EmbeddingProvider()
     vectors = provider.embed_documents([c.text_fa + ("\n" + c.source_text if c.source_text else "") for c in chunks])
+    if len(vectors) != len(chunks) or any(len(vector) != EMBEDDING_DIMENSIONS for vector in vectors):
+        raise WorkerError("CHAT_PROVIDER_UNAVAILABLE", dev_detail="embedding batch shape mismatch")
     payload = []
     for chunk, vector in zip(chunks, vectors):
         payload.append({"chunk_index": chunk.chunk_index, "start_ms": chunk.start_ms, "end_ms": chunk.end_ms,
