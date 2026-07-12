@@ -190,8 +190,15 @@ begin
     end if;
     return jsonb_build_object('session_id',p_session_id,'assistant_message_id',a.id,'reused',true,'conflict',false);
   end if;
-  insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id,request_hash)
-    values(p_session_id,p_video_id,p_user_id,'user',p_question,p_request_id,p_request_hash) returning * into u;
+  insert into public.video_chat_messages(session_id,video_id,user_id,role,content,status,request_id,request_hash,error_code)
+    values(p_session_id,p_video_id,p_user_id,'user',p_question,'complete',p_request_id,p_request_hash,null)
+  on conflict(session_id,request_id,role) do update set
+    content=excluded.content,status='complete',request_hash=excluded.request_hash,error_code=null
+  where public.video_chat_messages.request_hash=excluded.request_hash
+  returning * into u;
+  if not found then
+    return jsonb_build_object('session_id',p_session_id,'reused',true,'conflict',true);
+  end if;
   insert into public.video_chat_messages(session_id,video_id,user_id,role,content,request_id,not_in_video,
     provider,model,prompt_version,schema_version,request_hash)
     values(p_session_id,p_video_id,p_user_id,'assistant',p_answer,p_request_id,p_not_in_video,
@@ -205,11 +212,41 @@ begin
   return jsonb_build_object('session_id',p_session_id,'user_message_id',u.id,'assistant_message_id',a.id,'reused',false,'conflict',false);
 end $$;
 
+create or replace function public.persist_video_chat_failure(
+  p_session_id uuid,p_video_id uuid,p_user_id uuid,p_request_id uuid,
+  p_question text,p_request_hash text,p_error_code text
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare u public.video_chat_messages; a public.video_chat_messages;
+begin
+  if not exists(select 1 from public.video_chat_sessions s where s.id=p_session_id and s.video_id=p_video_id and s.user_id=p_user_id)
+    then raise exception 'session access denied'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_session_id::text || ':' || p_request_id::text, 0));
+  select * into a from public.video_chat_messages
+    where session_id=p_session_id and request_id=p_request_id and role='assistant';
+  if found then
+    return jsonb_build_object('session_id',p_session_id,'reused',true,'completed',true,
+      'conflict',a.request_hash is distinct from p_request_hash);
+  end if;
+  insert into public.video_chat_messages
+    (session_id,video_id,user_id,role,content,status,request_id,request_hash,error_code)
+  values(p_session_id,p_video_id,p_user_id,'user',p_question,'failed',p_request_id,p_request_hash,p_error_code)
+  on conflict(session_id,request_id,role) do update set
+    status='failed',error_code=excluded.error_code
+  where public.video_chat_messages.request_hash=excluded.request_hash
+  returning * into u;
+  if not found then
+    return jsonb_build_object('session_id',p_session_id,'reused',true,'completed',false,'conflict',true);
+  end if;
+  return jsonb_build_object('session_id',p_session_id,'user_message_id',u.id,'reused',false,'completed',false,'conflict',false);
+end $$;
+
 revoke all on function public.persist_video_chat_index(uuid,text,text,text,text,text,integer,jsonb) from public,anon,authenticated;
 revoke all on function public.match_video_chat_chunks(uuid,text,extensions.vector,integer,real) from public,anon,authenticated;
 revoke all on function public.get_or_create_video_chat_session(uuid,uuid) from public,anon,authenticated;
 revoke all on function public.persist_video_chat_exchange(uuid,uuid,uuid,uuid,text,text,boolean,text,text,text,text,text,jsonb) from public,anon,authenticated;
+revoke all on function public.persist_video_chat_failure(uuid,uuid,uuid,uuid,text,text,text) from public,anon,authenticated;
 grant execute on function public.persist_video_chat_index(uuid,text,text,text,text,text,integer,jsonb) to service_role;
 grant execute on function public.match_video_chat_chunks(uuid,text,extensions.vector,integer,real) to service_role;
 grant execute on function public.get_or_create_video_chat_session(uuid,uuid) to service_role;
 grant execute on function public.persist_video_chat_exchange(uuid,uuid,uuid,uuid,text,text,boolean,text,text,text,text,text,jsonb) to service_role;
+grant execute on function public.persist_video_chat_failure(uuid,uuid,uuid,uuid,text,text,text) to service_role;
