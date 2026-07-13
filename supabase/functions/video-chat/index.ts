@@ -68,16 +68,41 @@ export default {
         body,
       });
 
-      return new Response(await upstream.text(), {
+      const upstreamBody = await upstream.text();
+      if (!upstream.ok) {
+        let code = "CHAT_UPSTREAM_ERROR";
+        try {
+          const parsed = JSON.parse(upstreamBody);
+          if (typeof parsed?.error?.code === "string") code = parsed.error.code;
+        } catch {
+          // Upstream response was not JSON. Log only the structural fallback.
+        }
+        console.error(JSON.stringify({
+          event: "video_chat_upstream_rejected",
+          status: upstream.status,
+          code,
+        }));
+      }
+
+      return new Response(upstreamBody, {
         status: upstream.status,
         headers: {
           ...cors,
           "Content-Type": upstream.headers.get("content-type") || "application/json",
         },
       });
-    } catch {
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "video_chat_upstream_unreachable",
+        error_type: error instanceof Error ? error.name : "UnknownError",
+      }));
       return Response.json(
-        { error: { code: "CHAT_PROVIDER_UNAVAILABLE", message_fa: "پاسخ‌گویی هوشمند موقتاً در دسترس نیست." } },
+        {
+          error: {
+            code: "CHAT_GATEWAY_UPSTREAM_UNAVAILABLE",
+            message_fa: "ارتباط با سرویس پاسخ‌گویی برقرار نشد. کمی بعد دوباره تلاش کنید.",
+          },
+        },
         { status: 503, headers: cors },
       );
     }
