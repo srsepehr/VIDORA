@@ -58,7 +58,7 @@ const ERROR_FA: Record<string, string> = {
   CHAT_QUESTION_TOO_LONG: "پرسش بیش از حد طولانی است.",
   CHAT_RATE_LIMITED: "تعداد پرسش‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
   CHAT_REQUEST_CONFLICT: "این پرسش با شناسه تکراری نامعتبر است. دوباره ارسال کنید.",
-  CHAT_PROVIDER_UNAVAILABLE: "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",
+  CHAT_PROVIDER_UNAVAILABLE: "پاسخ‌گویی هوشمند موقتاً در دسترس نیست.",\n  CHAT_GATEWAY_UPSTREAM_UNAVAILABLE: "ارتباط با سرویس پاسخ‌گویی برقرار نشد. کمی بعد دوباره تلاش کنید.",
   CHAT_INVALID_OUTPUT: "پاسخ معتبر تولید نشد. دوباره تلاش کنید.",
   CHAT_GROUNDING_FAILED: "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
 };
@@ -72,6 +72,7 @@ export async function askVideoQuestion(session: AuthSession, videoId: string, qu
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const code = payload?.error?.code || "CHAT_PROVIDER_UNAVAILABLE";
+    console.error(`[Vidora] videoChatFailure status=${response.status} code=${code}`);
     throw new AppError({ code, httpStatus: response.status,
       messageFa: payload?.error?.message_fa || ERROR_FA[code] || "در پاسخ‌گویی خطایی رخ داد.",
       retryable: response.status >= 500 || response.status === 429,
