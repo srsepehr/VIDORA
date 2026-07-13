@@ -518,13 +518,18 @@ def chat_api():
         except (json.JSONDecodeError, ValueError):
             return JSONResponse({"error": {"code": "CHAT_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=400)
         except WorkerError as err:
+            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 409 if err.code == "CHAT_REQUEST_CONFLICT" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
+            # Stable structural diagnostics only. Never log tokens, request
+            # bodies, questions, transcript evidence, prompts, or answers.
+            print(json.dumps({"event": "chat_api_worker_error", "code": err.code,
+                              "status": status, "retryable": bool(err.retryable)},
+                             sort_keys=True), flush=True)
             try:
                 persist_chat_failure(body if isinstance(body, dict) else {}, token, err.code)
             except Exception:
                 # Failure recording is best-effort and must never replace the
                 # original classified response or leak internal diagnostics.
                 pass
-            status = 401 if err.code == "CHAT_AUTH_REQUIRED" else 403 if err.code == "CHAT_ACCESS_DENIED" else 409 if err.code == "CHAT_REQUEST_CONFLICT" else 429 if err.code == "CHAT_RATE_LIMITED" else 400
             return JSONResponse({"error": {"code": err.code, "message_fa": messages.get(err.code, "در پاسخ‌گویی خطایی رخ داد.")}}, status_code=status,
                 headers={"Retry-After": "3600"} if err.code == "CHAT_RATE_LIMITED" else None)
         except Exception as exc:

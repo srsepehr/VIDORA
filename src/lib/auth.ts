@@ -177,10 +177,10 @@ export async function fetchWithAuth(
 
   let active = await getValidAuthSession(session);
   let response = await run(active);
-  if (response.status !== 401 && response.status !== 403) return response;
+  if (response.status !== 401) return response;
 
-  // The server can reject a token before its local expiry (rotation, clock
-  // skew, or revocation). Force one refresh and retry exactly once.
+  // Only authentication failures can indicate an expired/revoked token.
+  // A 403 is an authorization decision and must not rotate a valid session.
   active = await refreshAuthSession(active, { force: true }) as AuthSession;
   if (!active) throw sessionExpiredError();
   response = await run(active);
