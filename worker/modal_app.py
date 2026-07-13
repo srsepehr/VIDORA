@@ -495,8 +495,7 @@ def chat_api():
         "CHAT_GROUNDING_FAILED": "پاسخ قابل استناد تولید نشد. دوباره تلاش کنید.",
     }
 
-    @api.post("/")
-    async def ask(request: Request):
+    async def ask(request):
         try:
             declared_length = int(request.headers.get("content-length") or 0)
         except ValueError:
@@ -542,6 +541,12 @@ def chat_api():
             except Exception:
                 pass
             return JSONResponse({"error": {"code": "CHAT_PROVIDER_UNAVAILABLE", "message_fa": messages["CHAT_PROVIDER_UNAVAILABLE"]}}, status_code=500)
+
+    # Postponed annotations cannot resolve a type imported only inside this
+    # factory from the route function globals. Attach the concrete class before
+    # registration so FastAPI injects Request instead of requiring a query field.
+    ask.__annotations__["request"] = Request
+    api.add_api_route("/", ask, methods=["POST"])
     return api
 
 
