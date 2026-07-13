@@ -120,7 +120,7 @@ def _retrieval_query(question: str, history: list[dict]) -> str:
 
 
 def _rate_limit(client: SupabaseClient, user_id: str, video_id: str, config) -> None:
-    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=config.rate_window_seconds)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=config.rate_window_seconds)).isoformat().replace("+00:00", "Z")
     rows = client.select_many("video_chat_messages",
         f"user_id=eq.{user_id}&role=eq.user&status=eq.complete&created_at=gte.{cutoff}&select=id,video_id&limit=100")
     if len(rows) >= config.user_window_questions or sum(1 for row in rows if row.get("video_id") == video_id) >= config.video_window_questions:

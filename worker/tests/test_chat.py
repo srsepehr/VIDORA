@@ -186,6 +186,8 @@ class ChatServiceTests(unittest.TestCase):
             S._rate_limit(client, "u1", "v1", config)
         self.assertEqual(ctx.exception.code, "CHAT_RATE_LIMITED")
         self.assertIn("status=eq.complete", client.query)
+        self.assertNotIn("+00:00", client.query)
+        self.assertRegex(client.query, r"created_at=gte\.[^&]+Z")
 
     def test_referential_followup_reuses_only_recent_user_topic(self):
         history = [{"role": "assistant", "content": "پاسخ قبلی"},
