@@ -550,6 +550,108 @@ def chat_api():
     return api
 
 
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
+def build_video_note(video_id: str, user_id: str, force: bool = False):
+    """Internal AI-note backfill for one owner. Reads persisted insights + saved
+    answers + transcript only; no media, STT, translation, or insight rebuild."""
+    from worker.app.note_service import backfill_note
+    from worker.app.errors import WorkerError
+    try:
+        return backfill_note(video_id, user_id, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:240], "retryable": err.retryable}
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def inspect_video_note(video_id: str, user_id: str):
+    from worker.app.note_service import inspect_note
+    return inspect_note(video_id, user_id)
+
+
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288)
+@modal.asgi_app()
+def note_api():
+    """Authenticated scale-to-zero AI Living-Note generation API for the frontend.
+
+    Reached ONLY through the Supabase Edge gateway (Browser -> Edge -> here);
+    the browser never calls this URL directly. Authenticates the caller's token,
+    resolves the user server-side, verifies ownership, synthesizes the note from
+    already-persisted material, and persists it via service_role RPCs."""
+    import json
+    from fastapi import FastAPI, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
+    from worker.app.note_service import generate_note
+    from worker.app.errors import WorkerError, spec_for
+
+    api = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    api.add_middleware(CORSMiddleware,
+        allow_origins=["https://srsepehr.github.io", "http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_credentials=False, allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "apikey", "X-Request-ID"], max_age=600)
+
+    status_for = {
+        "NOTE_AUTH_REQUIRED": 401, "NOTE_ACCESS_DENIED": 403, "NOTE_VIDEO_NOT_FOUND": 404,
+        "NOTE_RATE_LIMITED": 429, "NOTE_PROVIDER_UNAVAILABLE": 503,
+        "NOTE_INSIGHT_MISSING": 409, "NOTE_TRANSCRIPT_MISSING": 409, "NOTE_NO_SOURCE_MATERIAL": 409,
+        "NOTE_INVALID_OUTPUT": 502, "NOTE_GROUNDING_FAILED": 502,
+    }
+
+    async def make(request):
+        try:
+            declared_length = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared_length = 4001
+        if declared_length > 4000:
+            return JSONResponse({"error": {"code": "NOTE_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=413)
+        raw_body = await request.body()
+        if len(raw_body) > 4000:
+            return JSONResponse({"error": {"code": "NOTE_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=413)
+        auth = request.headers.get("authorization", "")
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        try:
+            body = json.loads(raw_body)
+            if not isinstance(body, dict):
+                raise ValueError("request body must be an object")
+            return JSONResponse(generate_note(body, token))
+        except (json.JSONDecodeError, ValueError):
+            return JSONResponse({"error": {"code": "NOTE_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=400)
+        except WorkerError as err:
+            status = status_for.get(err.code, 400)
+            # Structural diagnostics only — never log tokens, bodies, or note text.
+            print(json.dumps({"event": "note_api_worker_error", "code": err.code,
+                              "status": status, "retryable": bool(err.retryable)}, sort_keys=True), flush=True)
+            try:
+                message_fa = spec_for(err.code).message_fa
+            except KeyError:
+                message_fa = "در ساخت یادداشت خطایی رخ داد."
+            return JSONResponse({"error": {"code": err.code, "message_fa": message_fa}}, status_code=status,
+                headers={"Retry-After": "3600"} if err.code == "NOTE_RATE_LIMITED" else None)
+        except Exception as exc:
+            print(json.dumps({"event": "note_api_unhandled", "error_type": type(exc).__name__}, sort_keys=True), flush=True)
+            return JSONResponse({"error": {"code": "NOTE_PROVIDER_UNAVAILABLE",
+                "message_fa": "سرویس ساخت یادداشت در دسترس نیست. دوباره تلاش کنید."}}, status_code=500)
+
+    make.__annotations__["request"] = Request
+    api.add_api_route("/", make, methods=["POST"])
+    return api
+
+
+@app.local_entrypoint()
+def note_build(video_id: str = "", user_id: str = "", force: bool = False):
+    import json
+    result = build_video_note.remote(video_id, user_id, force)
+    print("build_video_note:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
+
+
+@app.local_entrypoint()
+def note_inspect(video_id: str = "", user_id: str = ""):
+    import json
+    print("inspect_video_note:", json.dumps(inspect_video_note.remote(video_id, user_id), ensure_ascii=False, indent=2))
+
+
 @app.local_entrypoint()
 def chat_diagnose(video_id: str = ""):
     import json

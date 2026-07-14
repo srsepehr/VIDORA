@@ -53,6 +53,8 @@ CHAT_MIGRATION="$REPO/supabase/migrations/202607120002_video_chat.sql"
 CHAT_HARDENING_MIGRATION="$REPO/supabase/migrations/202607120003_video_chat_privilege_hardening.sql"
 psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_MIGRATION" >/dev/null || { echo "chat migration load failed"; exit 1; }
 psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_HARDENING_MIGRATION" >/dev/null || { echo "chat hardening migration load failed"; exit 1; }
+NOTE_MIGRATION="$REPO/supabase/migrations/202607120004_video_notes.sql"
+psql -qX -v ON_ERROR_STOP=1 -f "$NOTE_MIGRATION" >/dev/null || { echo "note migration load failed"; exit 1; }
 ok "migrations + prereqs load cleanly into Postgres"
 
 U=11111111-1111-1111-1111-111111111111
@@ -301,6 +303,99 @@ DENYCHUNKS=$(psql -qtAX -c "set role authenticated; select count(*) from public.
 eq "browser cannot read private embeddings/chunks" "denied" "$(echo "$DENYCHUNKS" | grep -qi 'permission denied' && echo denied || echo "$DENYCHUNKS")"
 eq "authenticated has no chunk SELECT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_chat_chunks','select');")"
 eq "authenticated has no message INSERT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_chat_messages','insert');")"
+
+# ---- 16. video notes: personal autosave, saved answers, AI persist, RLS -----
+IDS=$(seed_job translating completed 1 3 NULL true); NOTEVID=${IDS%|*}
+q "insert into auth.users(id) values('$U') on conflict do nothing;" >/dev/null
+q "insert into public.transcript_segments(video_id,segment_index,start_ms,end_ms,source_text,translated_text_fa) values ('$NOTEVID',0,0,10000,'a','سلام'),('$NOTEVID',1,10000,20000,'b','دنیا');" >/dev/null
+NTAKE='[{"text":"نکته","segment_indexes":[0]}]'
+NCHAP='[{"chapter_index":0,"title":"فصل","description":"","start_ms":0,"end_ms":20000,"source_segment_indexes":[0,1]}]'
+q "select public.persist_video_insight('$NOTEVID','fa','خلاصه‌کوتاه','خلاصه‌کامل','$NTAKE'::jsonb,'insh','local','qwen','ins-p3','ins-s1',2,'$NCHAP'::jsonb);" >/dev/null
+NSID=$(q "select id from public.get_or_create_video_chat_session('$NOTEVID','$U');")
+NREQ=cccccccc-cccc-4ccc-8ccc-cccccccccccc
+NCITS='[{"citation_index":0,"start_ms":0,"end_ms":10000,"source_segment_indexes":[0],"chunk_ids":[]}]'
+AMID=$(q "select (public.persist_video_chat_exchange('$NSID','$NOTEVID','$U','$NREQ','پرسش‌من','پاسخ‌فارسی',false,'local','qwen','p1','s1','rh','$NCITS'::jsonb))->>'assistant_message_id';")
+
+# Helper: run a statement as the authenticated role impersonating a user.
+auth_run() { psql -qtAX -c "set role authenticated; select set_config('app.current_user','$1',true); $2" 2>&1; }
+
+# personal-text autosave (authenticated SECURITY DEFINER, resolves auth.uid())
+auth_run "$U" "select 1 from public.upsert_video_note_personal('$NOTEVID','یادداشت-شخصی-من');" >/dev/null
+eq "personal note upsert creates one row" "1" "$(q "select count(*) from public.video_notes where video_id='$NOTEVID';")"
+eq "personal note text stored" "یادداشت-شخصی-من" "$(q "select personal_text from public.video_notes where video_id='$NOTEVID';")"
+auth_run "$U" "select 1 from public.upsert_video_note_personal('$NOTEVID','متن-به‌روزشده');" >/dev/null
+eq "personal note update keeps one row" "1" "$(q "select count(*) from public.video_notes where video_id='$NOTEVID';")"
+eq "personal note text updated" "متن-به‌روزشده" "$(q "select personal_text from public.video_notes where video_id='$NOTEVID';")"
+# over-length rejected
+LONG=$(python3 -c "print('a'*20001)")
+badlen=$(auth_run "$U" "select public.upsert_video_note_personal('$NOTEVID','$LONG');" | tr -d '\n')
+eq "over-length personal note rejected" "rejected" "$(echo "$badlen" | grep -qi 'note too long' && echo rejected || echo toolongok)"
+# non-owner cannot write personal note
+denypers=$(auth_run 33333333-3333-3333-3333-333333333333 "select public.upsert_video_note_personal('$NOTEVID','hack');" | tr -d '\n')
+eq "non-owner denied personal note write" "denied" "$(echo "$denypers" | grep -qi 'access denied' && echo denied || echo "$denypers")"
+
+# save chat answer to note (snapshots question/answer/citations; duplicate-safe)
+auth_run "$U" "select 1 from public.save_video_note_answer('$NOTEVID','$AMID');" >/dev/null
+eq "save answer creates one saved row" "1" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+eq "saved answer snapshots question" "پرسش‌من" "$(q "select question from public.video_note_saved_answers where video_id='$NOTEVID';")"
+eq "saved answer snapshots answer" "پاسخ‌فارسی" "$(q "select answer from public.video_note_saved_answers where video_id='$NOTEVID';")"
+eq "saved answer snapshots citations" "1" "$(q "select jsonb_array_length(citations) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+# duplicate save -> still one row (idempotent, duplicate-prevented)
+auth_run "$U" "select 1 from public.save_video_note_answer('$NOTEVID','$AMID');" >/dev/null
+eq "duplicate save keeps one saved row" "1" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+# non-owner cannot save
+denysave=$(auth_run 33333333-3333-3333-3333-333333333333 "select public.save_video_note_answer('$NOTEVID','$AMID');" | tr -d '\n')
+eq "non-owner denied save answer" "denied" "$(echo "$denysave" | grep -qi 'access denied' && echo denied || echo "$denysave")"
+SAVEDID=$(q "select id from public.video_note_saved_answers where video_id='$NOTEVID';")
+# another user cannot remove someone else's saved answer
+eq "non-owner remove returns false" "f" "$(auth_run 33333333-3333-3333-3333-333333333333 "select public.remove_video_note_answer('$SAVEDID');" | tail -1 | tr -d '[:space:]')"
+eq "saved answer still present after foreign remove attempt" "1" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+# owner removes; chat message is NOT deleted
+auth_run "$U" "select public.remove_video_note_answer('$SAVEDID');" >/dev/null
+eq "owner removed saved answer" "0" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+eq "removing saved answer does not delete chat message" "1" "$(q "select count(*) from public.video_chat_messages where id='$AMID';")"
+
+# AI persist (service_role) sets ai fields WITHOUT touching personal_text
+KP='[{"text":"نکته کلیدی","citations":[{"start_ms":0,"end_ms":10000,"source_segment_indexes":[0]}]}]'
+q "select public.persist_video_note_ai('$NOTEVID','$U','نمای کلی فارسی','$KP'::jsonb,'[]'::jsonb,'notehashA','insh',0,'local_transformers','qwen','note-p1','note-s1');" >/dev/null
+eq "AI persist sets ready status" "ready" "$(q "select ai_status from public.video_notes where video_id='$NOTEVID';")"
+eq "AI persist sets overview" "نمای کلی فارسی" "$(q "select ai_overview from public.video_notes where video_id='$NOTEVID';")"
+eq "AI persist preserves personal text" "متن-به‌روزشده" "$(q "select personal_text from public.video_notes where video_id='$NOTEVID';")"
+eq "AI persist stores key points" "1" "$(q "select jsonb_array_length(ai_key_points) from public.video_notes where video_id='$NOTEVID';")"
+# failed status preserves prior AI content + personal text
+q "select public.set_video_note_ai_status('$NOTEVID','$U','failed','notehashB','NOTE_INVALID_OUTPUT');" >/dev/null
+eq "failed AI status recorded" "failed" "$(q "select ai_status from public.video_notes where video_id='$NOTEVID';")"
+eq "failed AI status preserves overview" "نمای کلی فارسی" "$(q "select ai_overview from public.video_notes where video_id='$NOTEVID';")"
+eq "failed AI status preserves personal text" "متن-به‌روزشده" "$(q "select personal_text from public.video_notes where video_id='$NOTEVID';")"
+# stale marking when hash differs; keeps matching hash
+q "update public.video_notes set ai_status='ready' where video_id='$NOTEVID';" >/dev/null
+q "select public.mark_video_note_ai_stale('$NOTEVID','$U','otherhash');" >/dev/null
+eq "AI note marked stale when hash differs" "stale" "$(q "select ai_status from public.video_notes where video_id='$NOTEVID';")"
+q "update public.video_notes set ai_status='ready' where video_id='$NOTEVID';" >/dev/null
+q "select public.mark_video_note_ai_stale('$NOTEVID','$U','notehashB');" >/dev/null
+eq "AI note stays ready for matching hash" "ready" "$(q "select ai_status from public.video_notes where video_id='$NOTEVID';")"
+
+# privileges: clients cannot call service_role RPCs or write tables directly
+denyai=$(auth_run "$U" "select public.persist_video_note_ai('$NOTEVID','$U','x','[]'::jsonb,'[]'::jsonb,'h','i',0,'p','m','v','s');" | tr -d '\n')
+eq "authenticated denied AI persist RPC" "denied" "$(echo "$denyai" | grep -qi 'permission denied' && echo denied || echo "$denyai")"
+denystat=$(auth_run "$U" "select public.set_video_note_ai_status('$NOTEVID','$U','ready','h',null);" | tr -d '\n')
+eq "authenticated denied AI status RPC" "denied" "$(echo "$denystat" | grep -qi 'permission denied' && echo denied || echo "$denystat")"
+denyins=$(auth_run "$U" "insert into public.video_notes(video_id,user_id) values('$NOTEVID','$U');" | tr -d '\n')
+eq "authenticated denied direct note insert" "denied" "$(echo "$denyins" | grep -qi 'permission denied\|row-level security' && echo denied || echo "$denyins")"
+denyupd=$(auth_run "$U" "update public.video_notes set ai_overview='hack' where video_id='$NOTEVID';" | tr -d '\n')
+eq "authenticated denied direct note update" "denied" "$(echo "$denyupd" | grep -qi 'permission denied' && echo denied || echo "$denyupd")"
+eq "authenticated has no note INSERT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_notes','insert');")"
+
+# RLS: owner reads own note; another user reads none
+auth_run "$U" "select 1 from public.save_video_note_answer('$NOTEVID','$AMID');" >/dev/null
+eq "owner reads own note via RLS" "1" "$(auth_run "$U" "select count(*) from public.video_notes where video_id='$NOTEVID';" | tail -1 | tr -d '[:space:]')"
+eq "owner reads own saved answers via RLS" "1" "$(auth_run "$U" "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read note" "0" "$(auth_run 33333333-3333-3333-3333-333333333333 "select count(*) from public.video_notes where video_id='$NOTEVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read saved answers" "0" "$(auth_run 33333333-3333-3333-3333-333333333333 "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';" | tail -1 | tr -d '[:space:]')"
+# cascade cleanup
+q "delete from public.videos where id='$NOTEVID';" >/dev/null
+eq "video delete cascades notes" "0" "$(q "select count(*) from public.video_notes where video_id='$NOTEVID';")"
+eq "video delete cascades saved answers" "0" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
 
 echo "---------------------------------------------"
 echo "queue RPC tests: $pass passed, $fail failed"

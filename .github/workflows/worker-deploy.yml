@@ -10,13 +10,17 @@ on:
         description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect | chat-index | chat-index-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect, chat-diagnose, chat-logs]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect, chat-diagnose, chat-logs, note-build, note-inspect]
       video_id:
-        description: "video id for inspect / subtitles / insights / chat"
+        description: "video id for inspect / subtitles / insights / chat / note"
+        type: string
+        default: ""
+      user_id:
+        description: "owner user id (for note-build / note-inspect)"
         type: string
         default: ""
       force:
-        description: "force regeneration (subtitles / insights / chat index)"
+        description: "force regeneration (subtitles / insights / chat index / note)"
         type: boolean
         default: false
 
@@ -80,3 +84,9 @@ jobs:
       - name: Inspect recent chat endpoint logs (no request or response bodies)
         if: ${{ inputs.step == 'chat-logs' }}
         run: modal app logs vidora-worker --since 30m --tail 100 --timestamps
+      - name: Build AI note (synthesize from persisted insights + saved answers — structural output only)
+        if: ${{ inputs.step == 'note-build' }}
+        run: modal run worker/modal_app.py::note_build --video-id "${{ inputs.video_id }}" --user-id "${{ inputs.user_id }}" ${{ inputs.force && '--force' || '' }}
+      - name: Inspect AI note state (structural facts only)
+        if: ${{ inputs.step == 'note-inspect' }}
+        run: modal run worker/modal_app.py::note_inspect --video-id "${{ inputs.video_id }}" --user-id "${{ inputs.user_id }}"

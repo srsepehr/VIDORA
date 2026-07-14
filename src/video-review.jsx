@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  BookmarkPlus,
   CheckCircle2,
   Clipboard,
   Copy,
@@ -8,10 +9,13 @@ import {
   Languages,
   Loader2,
   MessageCircle,
+  NotebookPen,
   Play,
   RefreshCw,
+  Save,
   Search,
   Send,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -47,7 +51,21 @@ import {
   takeawaySeekMs,
 } from "./lib/insight-review";
 import { askVideoQuestion, fetchVideoChatHistory, formatCitation } from "./lib/video-chat";
+import {
+  NOTE_AI_STATE_FA,
+  deriveNoteAiState,
+  fetchSavedAnswers,
+  fetchVideoNote,
+  generateVideoNote,
+  noteItemSeekMs,
+  removeSavedAnswer,
+  saveChatAnswerToNote,
+  saveNotePersonalText,
+} from "./lib/note-review";
 import "./video-review.css";
+
+const PERSONAL_NOTE_MAX = 20000;
+const PERSONAL_NOTE_AUTOSAVE_MS = 1200;
 
 const SIGNED_URL_TTL_SECONDS = 300;
 const MODE_KEY_PREFIX = "vidora.transcript-mode.";
@@ -166,7 +184,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [tab, setTab] = React.useState(() => {
     try {
       const stored = window.sessionStorage.getItem(`vidora.review-tab.${video.id}`);
-      return ["transcript", "summary", "chapters", "chat"].includes(stored) ? stored : "transcript";
+      return ["transcript", "summary", "chapters", "chat", "notes"].includes(stored) ? stored : "transcript";
     } catch {
       return "transcript";
     }
@@ -176,6 +194,12 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [selectedChapter, setSelectedChapter] = React.useState(-1);
   const [chatState, setChatState] = React.useState({ loading: true, messages: [], error: "", sending: false });
   const [chatInput, setChatInput] = React.useState("");
+  const [noteState, setNoteState] = React.useState({ loading: true, note: null, saved: [], error: "" });
+  const [personalText, setPersonalText] = React.useState("");
+  const [personalStatus, setPersonalStatus] = React.useState("idle"); // idle | dirty | saving | saved | error
+  const [noteGenerating, setNoteGenerating] = React.useState(false);
+  const [noteActionError, setNoteActionError] = React.useState("");
+  const [savingAnswerId, setSavingAnswerId] = React.useState("");
   const videoRef = React.useRef(null);
   const listRef = React.useRef(null);
   const rowRefs = React.useRef(new Map());
@@ -185,6 +209,8 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const resumePlaybackRef = React.useRef(null);
   const noticeTimerRef = React.useRef(null);
   const chatEndRef = React.useRef(null);
+  const personalSaveTimerRef = React.useRef(null);
+  const personalTextRef = React.useRef("");
 
   const loadTranscript = React.useCallback(async () => {
     setTranscriptState({ loading: true, error: "", report: null });
@@ -275,6 +301,29 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     }
   }, [session, video.id]);
 
+  const loadNote = React.useCallback(async () => {
+    setNoteState((previous) => ({ ...previous, loading: true, error: "" }));
+    try {
+      const [note, saved] = await Promise.all([
+        fetchVideoNote(session, video.id),
+        fetchSavedAnswers(session, video.id),
+      ]);
+      setNoteState({ loading: false, note, saved, error: "" });
+      // Only adopt the server's personal text when the field is not being edited.
+      setPersonalStatus((status) => {
+        if (status === "idle" || status === "saved") {
+          setPersonalText(note?.personal_text || "");
+        }
+        return status;
+      });
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadNote");
+      // Note availability must never block transcript review.
+      setNoteState({ loading: false, note: null, saved: [], error: appError.messageFa });
+    }
+  }, [session, video.id]);
+
   const applySubtitleMode = React.useCallback((show) => {
     const player = videoRef.current;
     if (!player || !player.textTracks) return;
@@ -317,11 +366,13 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     loadSubtitles();
     loadInsights();
     loadChat();
+    loadNote();
     return () => {
       if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+      if (personalSaveTimerRef.current) window.clearTimeout(personalSaveTimerRef.current);
       if (subtitleBlobRef.current) { URL.revokeObjectURL(subtitleBlobRef.current); subtitleBlobRef.current = ""; }
     };
-  }, [loadTranscript, loadSignedUrl, loadSubtitles, loadInsights, loadChat]);
+  }, [loadTranscript, loadSignedUrl, loadSubtitles, loadInsights, loadChat, loadNote]);
 
   React.useEffect(() => {
     try {
@@ -455,6 +506,98 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   React.useEffect(() => {
     if (tab === "chat" && !chatState.loading) chatEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [tab, chatState.messages.length, chatState.sending, chatState.loading]);
+
+  const seekToNoteItem = React.useCallback((item) => {
+    const ms = noteItemSeekMs(item);
+    if (ms === null) return;
+    seekToMs(ms);
+    const firstRef = (item.citations?.[0]?.source_segment_indexes || [])[0];
+    const segment = segments.find((s) => s.segment_index === firstRef);
+    if (segment) {
+      setSelectedId(segment.id);
+      setActiveIndex(findActiveSegmentIndex(segments, segment.start_ms));
+    }
+  }, [seekToMs, segments]);
+
+  const persistPersonalText = React.useCallback(async (text) => {
+    setPersonalStatus("saving");
+    try {
+      await saveNotePersonalText(session, video.id, text);
+      // Only settle to "saved" when no newer edit arrived while saving.
+      setPersonalStatus((status) => (personalTextRef.current === text ? "saved" : status));
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.persistPersonalText");
+      setPersonalStatus("error");
+    }
+  }, [session, video.id]);
+
+  const handlePersonalChange = React.useCallback((value) => {
+    const next = value.slice(0, PERSONAL_NOTE_MAX);
+    personalTextRef.current = next;
+    setPersonalText(next);
+    setPersonalStatus("dirty");
+    if (personalSaveTimerRef.current) window.clearTimeout(personalSaveTimerRef.current);
+    personalSaveTimerRef.current = window.setTimeout(() => persistPersonalText(next), PERSONAL_NOTE_AUTOSAVE_MS);
+  }, [persistPersonalText]);
+
+  const flushPersonalSave = React.useCallback(() => {
+    if (personalSaveTimerRef.current) window.clearTimeout(personalSaveTimerRef.current);
+    if (personalStatus === "dirty") persistPersonalText(personalTextRef.current);
+  }, [personalStatus, persistPersonalText]);
+
+  const handleGenerateNote = React.useCallback(async (force) => {
+    if (noteGenerating) return;
+    setNoteGenerating(true);
+    setNoteActionError("");
+    try {
+      await generateVideoNote(session, video.id, force);
+      await loadNote();
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleGenerateNote");
+      setNoteActionError(appError.messageFa);
+    } finally {
+      setNoteGenerating(false);
+    }
+  }, [noteGenerating, session, video.id, loadNote]);
+
+  const savedMessageIds = React.useMemo(
+    () => new Set(noteState.saved.map((answer) => answer.message_id)),
+    [noteState.saved],
+  );
+
+  const handleSaveAnswer = React.useCallback(async (messageId) => {
+    if (!messageId || savingAnswerId) return;
+    setSavingAnswerId(messageId);
+    setNoteActionError("");
+    try {
+      await saveChatAnswerToNote(session, video.id, messageId);
+      const saved = await fetchSavedAnswers(session, video.id);
+      setNoteState((previous) => ({ ...previous, saved }));
+      announceCopy("پاسخ به یادداشت‌ها افزوده شد.");
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleSaveAnswer");
+      setNoteActionError(appError.messageFa);
+    } finally {
+      setSavingAnswerId("");
+    }
+  }, [savingAnswerId, session, video.id, announceCopy]);
+
+  const handleRemoveAnswer = React.useCallback(async (savedId) => {
+    setNoteActionError("");
+    // Optimistic removal; reload on failure to restore truth.
+    setNoteState((previous) => ({ ...previous, saved: previous.saved.filter((answer) => answer.id !== savedId) }));
+    try {
+      await removeSavedAnswer(session, savedId);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleRemoveAnswer");
+      setNoteActionError(appError.messageFa);
+      loadNote();
+    }
+  }, [session, loadNote]);
 
   const handleMediaError = React.useCallback(() => {
     const player = videoRef.current;
@@ -673,6 +816,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
               ["summary", "خلاصه"],
               ["chapters", "فصل‌ها"],
               ["chat", "پرسش از ویدیو"],
+              ["notes", "یادداشت‌ها"],
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -794,7 +938,19 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                         ))}
                       </div>
                     ) : null}
-                    {message.role === "assistant" ? <button className="vdr-chat-copy" type="button" onClick={() => copyText(message.content, "پاسخ کپی شد.")}><Copy size={13} /> کپی پاسخ</button> : null}
+                    {message.role === "assistant" && !message.id.startsWith("pending-") ? (
+                      <div className="vdr-chat-actions">
+                        <button className="vdr-chat-copy" type="button" onClick={() => copyText(message.content, "پاسخ کپی شد.")}><Copy size={13} /> کپی پاسخ</button>
+                        {savedMessageIds.has(message.id) ? (
+                          <span className="vdr-chat-saved"><CheckCircle2 size={13} /> در یادداشت‌ها</span>
+                        ) : (
+                          <button className="vdr-chat-copy" type="button" disabled={savingAnswerId === message.id}
+                            onClick={() => handleSaveAnswer(message.id)}>
+                            {savingAnswerId === message.id ? <Loader2 size={13} className="vd-spin" /> : <BookmarkPlus size={13} />} افزودن به یادداشت
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
                 {chatState.sending ? <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال بررسی متن ویدیو...</p> : null}
@@ -808,6 +964,124 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                   onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitChatQuestion(chatInput); } }} />
                 <button type="submit" disabled={chatState.sending || !chatInput.trim()} aria-label="ارسال پرسش"><Send size={17} /></button>
               </form>
+            </div>
+          ) : null}
+
+          {tab === "notes" ? (
+            <div className="vdr-note-panel" role="tabpanel" aria-label="یادداشت‌های این ویدیو">
+              {noteState.loading ? (
+                <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال دریافت یادداشت‌ها...</p>
+              ) : (() => {
+                const aiState = deriveNoteAiState(noteState.note);
+                const note = noteState.note;
+                const hasAi = (aiState === "ready" || aiState === "stale") && note?.ai_overview;
+                return (
+                  <>
+                    <section className="vdr-note-block vdr-note-ai">
+                      <header className="vdr-note-head">
+                        <span><Sparkles size={16} /> <b>یادداشت هوشمند</b></span>
+                        <button type="button" className="vd-secondary vdr-note-generate"
+                          onClick={() => handleGenerateNote(hasAi)} disabled={noteGenerating}>
+                          {noteGenerating ? <Loader2 size={14} className="vd-spin" /> : <RefreshCw size={14} />}
+                          {hasAi ? "ساخت دوباره" : "ساخت یادداشت هوشمند"}
+                        </button>
+                      </header>
+                      <p className="vdr-note-hint">این یادداشت از خلاصه و نکات همین ویدیو و پاسخ‌های ذخیره‌شده ساخته می‌شود؛ محتوای ویدیو دوباره پردازش نمی‌شود.</p>
+                      {aiState === "stale" ? <p className="vdr-insight-status is-warning" role="status">{NOTE_AI_STATE_FA.stale} نسخه قبلی در ادامه نمایش داده می‌شود.</p> : null}
+                      {noteGenerating ? <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> ساخت یادداشت هوشمند ممکن است چند لحظه طول بکشد...</p> : null}
+                      {noteActionError ? <p className="vdr-chat-error" role="alert">{noteActionError}</p> : null}
+                      {hasAi ? (
+                        <>
+                          <div className="vdr-note-sub">
+                            <h4>نمای کلی</h4>
+                            <p dir="rtl">{note.ai_overview}</p>
+                          </div>
+                          {(note.ai_key_points || []).length ? (
+                            <div className="vdr-note-sub">
+                              <h4>نکات کلیدی</h4>
+                              <ul className="vdr-takeaways">
+                                {(note.ai_key_points || []).map((item, position) => (
+                                  <li key={position}>
+                                    <span dir="rtl">{item.text}</span>
+                                    {noteItemSeekMs(item) !== null ? (
+                                      <button type="button" onClick={() => seekToNoteItem(item)}><Play size={13} /> رفتن به بخش مرتبط</button>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {(note.ai_action_items || []).length ? (
+                            <div className="vdr-note-sub">
+                              <h4>اقدام‌های پیشنهادی</h4>
+                              <ul className="vdr-takeaways">
+                                {(note.ai_action_items || []).map((item, position) => (
+                                  <li key={position}>
+                                    <span dir="rtl">{item.text}</span>
+                                    {noteItemSeekMs(item) !== null ? (
+                                      <button type="button" onClick={() => seekToNoteItem(item)}><Play size={13} /> رفتن به بخش مرتبط</button>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {note.ai_generated_at ? <p className="vdr-insight-meta">تاریخ ساخت: {new Date(note.ai_generated_at).toLocaleString("fa-IR")}</p> : null}
+                        </>
+                      ) : (
+                        <p className="vdr-insight-status" role="status">{NOTE_AI_STATE_FA[aiState]}</p>
+                      )}
+                    </section>
+
+                    <section className="vdr-note-block">
+                      <header className="vdr-note-head"><span><BookmarkPlus size={16} /> <b>پاسخ‌های ذخیره‌شده</b></span></header>
+                      {noteState.saved.length ? (
+                        <ul className="vdr-note-saved">
+                          {noteState.saved.map((answer) => (
+                            <li key={answer.id}>
+                              <div className="vdr-note-saved-copy">
+                                {answer.question ? <b dir="rtl">{answer.question}</b> : null}
+                                <p dir="rtl">{answer.answer}</p>
+                                {answer.citations?.length ? (
+                                  <div className="vdr-chat-citations">
+                                    {answer.citations.map((citation, index) => (
+                                      <button key={index} type="button" onClick={() => seekToCitation(citation)}>
+                                        <Play size={12} /> <span dir="ltr">{formatCitation(citation)}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <button type="button" className="vdr-note-remove" aria-label="حذف از یادداشت‌ها" onClick={() => handleRemoveAnswer(answer.id)}><Trash2 size={14} /></button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="vdr-note-hint">هنوز پاسخی ذخیره نکرده‌اید. از تب «پرسش از ویدیو» می‌توانید پاسخ‌ها را با «افزودن به یادداشت» اینجا نگه دارید.</p>
+                      )}
+                    </section>
+
+                    <section className="vdr-note-block">
+                      <header className="vdr-note-head">
+                        <span><NotebookPen size={16} /> <b>یادداشت شخصی</b></span>
+                        <span className="vdr-note-status" role="status" aria-live="polite">
+                          {personalStatus === "saving" ? (<><Loader2 size={13} className="vd-spin" /> در حال ذخیره...</>)
+                            : personalStatus === "saved" ? (<><CheckCircle2 size={13} /> ذخیره شد</>)
+                            : personalStatus === "dirty" ? (<><Save size={13} /> تغییرات ذخیره‌نشده</>)
+                            : personalStatus === "error" ? (<span className="vdr-note-status-error">ذخیره نشد؛ دوباره تلاش کنید.</span>)
+                            : null}
+                        </span>
+                      </header>
+                      <label className="vdr-sr-only" htmlFor={"personal-note-" + video.id}>یادداشت شخصی</label>
+                      <textarea id={"personal-note-" + video.id} className="vdr-note-textarea" dir="rtl"
+                        value={personalText} maxLength={PERSONAL_NOTE_MAX} rows={8}
+                        placeholder="یادداشت‌های خودتان درباره این ویدیو را اینجا بنویسید. تغییرات به‌صورت خودکار ذخیره می‌شود."
+                        onChange={(event) => handlePersonalChange(event.target.value)} onBlur={flushPersonalSave} />
+                      <p className="vdr-note-count">{personalText.length.toLocaleString("fa-IR")} / {PERSONAL_NOTE_MAX.toLocaleString("fa-IR")}</p>
+                    </section>
+                  </>
+                );
+              })()}
             </div>
           ) : null}
 

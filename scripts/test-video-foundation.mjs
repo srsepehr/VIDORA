@@ -38,6 +38,7 @@ compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
 compileTs("src/lib/insight-review.ts", "insight-review.mjs");
 compileTs("src/lib/video-chat.ts", "video-chat.mjs");
+compileTs("src/lib/note-review.ts", "note-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
@@ -49,6 +50,7 @@ const transcriptReview = await load("transcript-review.mjs");
 const subtitleReview = await load("subtitle-review.mjs");
 const insightReview = await load("insight-review.mjs");
 const videoChat = await load("video-chat.mjs");
+const noteReview = await load("note-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -532,6 +534,72 @@ test("video chat client uses authenticated endpoint and owner-scoped history", (
   assert.match(source, /video_chat_messages\?session_id=eq/);
   assert.match(source, /video_chat_message_citations\?video_id=eq/);
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role/);
+});
+
+test("living-note AI state derives from status + schema version", () => {
+  const note = (over = {}) => ({
+    personal_text: "", personal_updated_at: null, ai_status: "ready",
+    ai_overview: "x", ai_key_points: [], ai_action_items: [],
+    ai_schema_version: noteReview.NOTE_SCHEMA_VERSION, ai_generated_at: "2026-07-14", ai_error_code: null, ...over });
+  assert.equal(noteReview.deriveNoteAiState(note({})), "ready");
+  assert.equal(noteReview.deriveNoteAiState(note({ ai_status: "generating" })), "generating");
+  assert.equal(noteReview.deriveNoteAiState(note({ ai_status: "failed" })), "failed");
+  assert.equal(noteReview.deriveNoteAiState(note({ ai_status: "stale" })), "stale");
+  // A ready row with a drifted schema version is treated as stale.
+  assert.equal(noteReview.deriveNoteAiState(note({ ai_schema_version: "note-s0" })), "stale");
+  assert.equal(noteReview.deriveNoteAiState(null), "none");
+});
+
+test("living-note state messages are meaningful Persian", () => {
+  for (const state of ["none", "generating", "ready", "failed", "stale"]) {
+    assert.ok(noteReview.NOTE_AI_STATE_FA[state].length > 5, state);
+  }
+  assert.match(noteReview.NOTE_AI_STATE_FA.failed, /یادداشت شخصی و پاسخ‌های ذخیره‌شده/);
+  assert.match(noteReview.NOTE_AI_STATE_FA.stale, /تغییر کرده/);
+});
+
+test("note item seek uses the first citation start or null", () => {
+  assert.equal(noteReview.noteItemSeekMs({ text: "x", citations: [{ start_ms: 9500, end_ms: 12000, source_segment_indexes: [1] }] }), 9500);
+  assert.equal(noteReview.noteItemSeekMs({ text: "x", citations: [] }), null);
+  assert.equal(noteReview.noteItemSeekMs({ text: "x" }), null);
+});
+
+test("frontend note schema version matches the worker (no drift)", () => {
+  const py = fs.readFileSync(path.join(root, "worker/app/note_config.py"), "utf8");
+  const match = py.match(/NOTE_SCHEMA_VERSION\s*=\s*"([^"]+)"/);
+  assert.ok(match, "worker NOTE_SCHEMA_VERSION not found");
+  assert.equal(noteReview.NOTE_SCHEMA_VERSION, match[1]);
+});
+
+test("note client uses the Supabase Edge gateway, authenticated RPCs, and no secrets", () => {
+  const source = fs.readFileSync(path.join(root, "src/lib/note-review.ts"), "utf8");
+  // AI generation goes through the Edge gateway function, never directly to Modal.
+  assert.match(source, /functions\/v1\/video-note/);
+  assert.doesNotMatch(source, /modal\.run/);
+  // User-authored writes go through owner-checked RPCs (auth.uid()), not direct writes.
+  assert.match(source, /rest\/v1\/rpc\/\$\{fn\}/);
+  assert.match(source, /"upsert_video_note_personal"/);
+  assert.match(source, /"save_video_note_answer"/);
+  assert.match(source, /"remove_video_note_answer"/);
+  // Owner-scoped reads only.
+  assert.match(source, /video_notes\?video_id=eq/);
+  assert.match(source, /video_note_saved_answers\?video_id=eq/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role/);
+});
+
+test("review page adds the یادداشت‌ها tab with AI note, saved answers, and autosave", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  assert.match(source, /\["notes", "یادداشت‌ها"\]/);
+  assert.match(source, /fetchVideoNote/);
+  assert.match(source, /generateVideoNote/);
+  assert.match(source, /saveNotePersonalText/);
+  assert.match(source, /saveChatAnswerToNote/);
+  assert.match(source, /removeSavedAnswer/);
+  assert.match(source, /افزودن به یادداشت/);
+  assert.match(source, /role="tabpanel" aria-label="یادداشت‌های این ویدیو"/);
+  // Existing review tools remain.
+  assert.match(source, /"chat", "پرسش از ویدیو"/);
+  assert.match(source, /متن و ترجمه/);
 });
 
 test("review page adds insight tabs with seek actions and keeps transcript usable", () => {
