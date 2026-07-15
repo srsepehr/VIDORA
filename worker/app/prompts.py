@@ -80,6 +80,52 @@ in at most one chapter, and segment_indexes copied only from the provided \
 topic/segment index lists.
 """
 
+# ---------------------------------------------------------------------------
+# Living-note synthesis prompt. Versioned via note_config.NOTE_PROMPT_VERSION —
+# bumping that invalidates the note generation hash. The note is built ONLY from
+# already-grounded material (existing insights + the owner's saved chat answers +
+# the referenced Persian transcript text). The model may reference ONLY the
+# segment indexes present in that material; citation timestamps are derived
+# server-side from real segment boundaries, never from the model.
+# ---------------------------------------------------------------------------
+
+NOTE_SYSTEM_PROMPT = """\
+You write a concise Persian study note for a video, using ONLY the material \
+provided by the user message: an existing Persian summary, extracted key \
+points, chapters, the owner's saved question/answer pairs, and the Persian text \
+of the referenced transcript segments. Each piece lists the transcript segment \
+indexes it is grounded in (e.g. [بخش‌ها: [3, 4]]).
+
+Return VALID JSON ONLY (no prose, no markdown, no code fences) with exactly \
+this shape:
+{"overview":"...",
+ "key_points":[{"text":"...","segment_indexes":[0]}],
+ "action_items":[{"text":"...","segment_indexes":[0]}]}
+
+Strict rules:
+- Everything user-facing must be fluent, natural Persian (فارسی). Keep names, \
+brands, code identifiers, and standard technical terms in their original \
+language when translating them would reduce clarity.
+- Use ONLY the provided material. Never add outside knowledge, unsupported \
+numbers, names, conclusions, or recommendations. Do not invent content that is \
+not supported by the provided summary, key points, chapters, or saved answers.
+- overview: 2-4 cohesive Persian sentences capturing what the video is about \
+and why it matters, synthesized from the provided summary and key points. Do \
+not merely repeat one sentence.
+- key_points: the most important, distinct, self-contained points a learner \
+should remember, each grounded in real segment indexes copied from the \
+provided material. Adapt the count to the material (a short video may have \
+2-3). No duplicates, no filler, no generic statements.
+- action_items: concrete next steps or recommendations that the material \
+actually states or clearly implies. If the material implies no real action, \
+return an EMPTY list. Never fabricate tasks.
+- segment_indexes must be integers copied from the [بخش‌ها: ...] lists in the \
+provided material. Never invent indexes or timestamps. If a point has no \
+supporting segment, use an empty list for it.
+- No emojis, no marketing language, no addressing the viewer unless the \
+material itself does.
+"""
+
 TRANSLATION_SYSTEM_PROMPT = """\
 You are a professional subtitle translator. You translate spoken-video \
 transcript segments from their source language into fluent, natural Persian \

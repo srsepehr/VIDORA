@@ -188,6 +188,33 @@ CHAT_INVALID_OUTPUT = _reg(
 CHAT_GROUNDING_FAILED = _reg(
     "CHAT_GROUNDING_FAILED", "پاسخ ساخته‌شده به بخش معتبری از ویدیو متصل نبود.", True, STAGE_VIDEO_CHAT)
 
+# --- living notes (AI overview / key points / action items) ----------------
+# Note state is independent from the video processing lifecycle. This stage is
+# used only for safe error classification and is never written to videos.status.
+STAGE_VIDEO_NOTE = "video_note"
+NOTE_AUTH_REQUIRED = _reg(
+    "NOTE_AUTH_REQUIRED", "برای ساخت یادداشت هوشمند ابتدا وارد حساب شوید.", False, STAGE_VIDEO_NOTE)
+NOTE_ACCESS_DENIED = _reg(
+    "NOTE_ACCESS_DENIED", "شما به یادداشت این ویدیو دسترسی ندارید.", False, STAGE_VIDEO_NOTE)
+NOTE_VIDEO_NOT_FOUND = _reg(
+    "NOTE_VIDEO_NOT_FOUND", "ویدیوی موردنظر یافت نشد.", False, STAGE_VIDEO_NOTE)
+NOTE_INSIGHT_MISSING = _reg(
+    "NOTE_INSIGHT_MISSING", "برای ساخت یادداشت هوشمند ابتدا باید خلاصه ویدیو آماده شود.", False, STAGE_VIDEO_NOTE)
+NOTE_TRANSCRIPT_MISSING = _reg(
+    "NOTE_TRANSCRIPT_MISSING", "متن این ویدیو برای ساخت یادداشت یافت نشد.", False, STAGE_VIDEO_NOTE)
+NOTE_NO_SOURCE_MATERIAL = _reg(
+    "NOTE_NO_SOURCE_MATERIAL", "هنوز محتوایی برای ساخت یادداشت هوشمند وجود ندارد.", False, STAGE_VIDEO_NOTE)
+NOTE_RATE_LIMITED = _reg(
+    "NOTE_RATE_LIMITED", "تعداد درخواست ساخت یادداشت بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.", True, STAGE_VIDEO_NOTE)
+NOTE_PROVIDER_UNAVAILABLE = _reg(
+    "NOTE_PROVIDER_UNAVAILABLE", "سرویس ساخت یادداشت در دسترس نیست. دوباره تلاش کنید.", True, STAGE_VIDEO_NOTE)
+NOTE_INVALID_OUTPUT = _reg(
+    "NOTE_INVALID_OUTPUT", "خروجی یادداشت هوشمند نامعتبر بود.", True, STAGE_VIDEO_NOTE)
+NOTE_GROUNDING_FAILED = _reg(
+    "NOTE_GROUNDING_FAILED", "یادداشت ساخته‌شده به بخش معتبری از ویدیو متصل نبود.", True, STAGE_VIDEO_NOTE)
+NOTE_PERSIST_FAILED = _reg(
+    "NOTE_PERSIST_FAILED", "ثبت یادداشت هوشمند ناموفق بود.", True, STAGE_VIDEO_NOTE)
+
 # --- lifecycle -------------------------------------------------------------
 JOB_TIMEOUT = _reg("JOB_TIMEOUT", "زمان پردازش این ویدیو به پایان رسید.", True, STAGE_ACQUIRING)
 JOB_CANCELLED = _reg("JOB_CANCELLED", "پردازش این ویدیو لغو شد.", False, STAGE_ACQUIRING)
