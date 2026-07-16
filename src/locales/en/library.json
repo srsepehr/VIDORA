@@ -129,6 +129,7 @@
   },
   "allVideos": {
     "title": "All Videos",
+    "backToLibrary": "Back to library",
     "loadMore": "Load More",
     "emptyCategory": "No videos in this category yet.",
     "error": "We couldn't load the videos.",

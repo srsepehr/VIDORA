@@ -1,7 +1,7 @@
 // Vidora Library — public monochrome content-discovery page (#/library), the
 // dedicated watch route (#/watch/:slug), and the search route (#/search?q=).
-// Page flow: Hero → Continue Watching (logged-in only) → Trending → Browse by
-// Category → New on Vidora → Editor's Pick → All Videos → Footer.
+// Main page flow: Hero → Browse by Category → Trending → New on Vidora →
+// Continue Watching → Footer. All Videos is a dedicated #/library/all view.
 // Search lives only in the header (expanding input + live results overlay).
 // Strictly black / white / neutral gray. All copy lives in
 // src/locales/{en,fa}/library.json; language follows the site-wide selector.
@@ -186,10 +186,10 @@ const bySlug = (slug) => VIDEOS.find((v) => v.slug === slug);
 const toneOf = (video) => TONES[VIDEOS.indexOf(video) % TONES.length];
 
 const BASE = () => import.meta.env.BASE_URL;
-const HERO_IMAGES = {
-  "future-of-ai": "uploads/vidora_learning_woman_photo.jpg",
-  "sam-altman-talk": "uploads/vidora_hero_man_photo.png",
-  "building-giants": "uploads/1.png",
+const HERO_MEDIA = {
+  "future-of-ai": { src: "uploads/vidora_learning_woman_photo.jpg", position: "center 44%", flip: true },
+  "sam-altman-talk": { src: "uploads/vidora_hero_walking_man_background_1600x850.png", position: "center", flip: true },
+  "building-giants": { src: "uploads/vidora_hero_man_photo.png", position: "center top", flip: true },
 };
 const BANNER_IMAGE = "uploads/IMG_0766.JPG";
 
@@ -341,6 +341,7 @@ const CSS = `
 .lib-arrow:hover{background:var(--s3)}
 .lib-arrow.is-prev{inset-inline-start:-19px}
 .lib-arrow.is-next{inset-inline-end:-19px}
+.lib-arrow.is-only{left:-19px;right:auto}
 
 /* standard card */
 .lib-card{display:grid;gap:10px;min-width:0;text-align:start}
@@ -504,8 +505,10 @@ const CSS = `
 
 .is-library .lib-hero-shell{padding-inline:46px;max-width:1320px;margin:0 auto}
 .is-library .lib-hero{height:430px;border:0;border-radius:14px;background:#111}
-.is-library .lib-hero-media{filter:grayscale(1) brightness(.52);background-position:center;transform:scale(1.01)}
-.is-library .lib-hero-shade{background:rgba(0,0,0,.34)}
+.is-library .lib-hero-media{display:block;width:100%;height:100%;object-fit:cover;object-position:center;filter:grayscale(1);transform:none}
+.is-library .lib-hero-media.is-flipped{transform:scaleX(-1)}
+.lib-root.is-library[dir="rtl"] .lib-hero-shade{background:linear-gradient(90deg,transparent 14%,rgba(0,0,0,.12) 42%,rgba(0,0,0,.62) 72%,rgba(0,0,0,.84) 100%)}
+.lib-root.is-library[dir="ltr"] .lib-hero-shade{background:linear-gradient(270deg,transparent 14%,rgba(0,0,0,.12) 42%,rgba(0,0,0,.62) 72%,rgba(0,0,0,.84) 100%)}
 .is-library .lib-hero-shade::after{display:none}
 .is-library .lib-hero-in{height:100%;min-height:0;padding:52px 96px;align-items:center;justify-content:flex-start}
 .is-library .lib-hero-box{max-width:46%;gap:14px;color:#fff}
@@ -542,6 +545,7 @@ const CSS = `
 .is-library .lib-sec-title svg{display:none}
 .is-library .lib-view-all{color:#111;font-size:12px;font-weight:700;white-space:nowrap}
 .is-library .lib-view-all:hover{text-decoration:underline;text-underline-offset:4px}
+.is-library .lib-view-all:focus-visible{outline:2px solid #111;outline-offset:5px;border-radius:2px}
 .is-library .lib-cats{grid-template-columns:repeat(4,minmax(0,1fr));gap:26px;margin-top:24px}
 .is-library .lib-cat-card{padding:0;display:block;border:1px solid #ddd;border-radius:10px;background:#fff;text-align:start;overflow:hidden}
 .is-library .lib-cat-card:hover{background:#fff;border-color:#aaa}
@@ -575,8 +579,7 @@ const CSS = `
 .is-library .lib-play-circle{width:40px;height:40px}
 .is-library .lib-arrow{top:44%;width:40px;height:40px;background:#fff;color:#111;border-color:#ddd}
 .is-library .lib-arrow:hover{background:#f4f4f4}
-.is-library .lib-arrow.is-prev{inset-inline-start:-20px}
-.is-library .lib-arrow.is-next{inset-inline-end:-20px}
+.is-library .lib-arrow.is-only{left:-20px;right:auto}
 
 .is-library .lib-cw-card{background:#fff;border-color:#ddd;color:#111}
 .is-library .lib-cw-card:hover{background:#f7f7f7;border-color:#aaa}
@@ -585,6 +588,14 @@ const CSS = `
 .is-library .lib-controls-row .lib-select{background:#fff;color:#111}
 .is-library .lib-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 18px}
 .is-library .lib-btn.is-ghost{background:#fff;border-color:#ccc;color:#111}
+.is-library .lib-all-page{padding-top:34px;padding-bottom:32px}
+.is-library .lib-all-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:4px}
+.is-library .lib-all-page-title{font-size:32px;line-height:1.35;letter-spacing:0;color:#111}
+.is-library .lib-all-back{display:inline-flex;align-items:center;gap:7px;color:#555;font-size:12px;font-weight:700}
+.is-library .lib-all-back:hover{color:#111}
+.is-library .lib-all-back:focus-visible{outline:2px solid #111;outline-offset:5px;border-radius:2px}
+.is-library .lib-all-content{margin-top:46px}
+.is-library .lib-all-content.lib-section{margin-top:46px}
 
 .is-library .lib-trust{margin-top:72px;background:#0d0d0f;color:#fff}
 .is-library .lib-trust-in{min-height:158px;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;padding-block:28px}
@@ -614,7 +625,7 @@ const CSS = `
   .is-library .lib-ref-nav,.is-library .lib-login{display:none}
   .is-library .lib-burger{display:grid}.is-library .lib-head-actions{gap:5px}
   .is-library .lib-hero{height:470px;border-radius:10px}
-  .is-library .lib-hero-media{background-position:center}
+  .is-library .lib-hero-shade{background:linear-gradient(0deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.34) 58%,rgba(0,0,0,.08) 100%)}
   .is-library .lib-hero-in{align-items:flex-end;padding:32px 24px 72px}
   .is-library .lib-hero-box{max-width:100%;gap:11px}
   .is-library .lib-hero-title{font-size:26px}.is-library .lib-hero-desc{font-size:13px;line-height:1.8}
@@ -630,6 +641,8 @@ const CSS = `
   .is-library .lib-trust-in{grid-template-columns:1fr;padding-block:12px}
   .is-library .lib-trust-item{padding:24px 10px}.is-library .lib-trust-item+ .lib-trust-item{border-inline-start:0;border-top:1px solid #303030}
   .is-library .lib-footer-in{grid-template-columns:1fr;justify-items:start}.is-library .lib-footer-links{justify-content:flex-start;gap:18px;flex-wrap:wrap}.is-library .lib-footer-rights{text-align:start}
+  .is-library .lib-all-page{padding-top:26px}.is-library .lib-all-page-head{align-items:flex-start;flex-direction:column-reverse;gap:12px}.is-library .lib-all-page-title{font-size:27px}
+  .is-library .lib-all-content,.is-library .lib-all-content.lib-section{margin-top:34px}
 }
 `;
 
@@ -830,10 +843,14 @@ function HeaderSearch({ onClose }) {
 }
 
 function LibraryHeader({ reference = false }) {
-  const { t, viewer } = useLib();
+  const { t, lang, rtl, viewer, catName, title } = useLib();
   const [drawer, setDrawer] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [logoBroken, setLogoBroken] = React.useState(false);
+  const [headerQuery, setHeaderQuery] = React.useState("");
+  const [headerActive, setHeaderActive] = React.useState(-1);
+  const [headerRecent, setHeaderRecent] = React.useState(readRecentSearches);
+  const headerInputRef = React.useRef(null);
   const goMyList = () => {
     window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/saved") : "#/dashboard/saved";
   };
@@ -843,44 +860,99 @@ function LibraryHeader({ reference = false }) {
     { key: "mylist", label: t("nav.myList"), go: goMyList },
   ];
   const closeSearch = React.useCallback(() => setSearchOpen(false), []);
-  if (reference) {
-    const referenceItems = [
-      { key: "library", label: t("libraryPage.header.library"), go: () => (window.location.hash = "#/library") },
-      { key: "subscription", label: t("libraryPage.header.subscription"), go: () => (window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/subscription") : "#/dashboard/subscription") },
-    ];
+  const headerResults = React.useMemo(() => searchVideos(headerQuery).slice(0, 6), [headerQuery]);
+  const headerSuggestions = React.useMemo(() => [...VIDEOS].sort((a, b) => b.viewsK - a.viewsK).slice(0, 4), []);
+
+  React.useEffect(() => {
+    if (searchOpen) headerInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const openHeaderVideo = (video) => {
+    pushRecentSearch(headerQuery || title(video));
+    setSearchOpen(false);
+    window.location.hash = `#/watch/${video.slug}`;
+  };
+  const submitHeaderSearch = () => {
+    if (headerActive >= 0 && headerResults[headerActive]) return openHeaderVideo(headerResults[headerActive]);
+    if (!headerQuery.trim()) return;
+    setHeaderRecent(pushRecentSearch(headerQuery));
+    setSearchOpen(false);
+    window.location.hash = `#/search?q=${encodeURIComponent(headerQuery.trim())}`;
+  };
+  const onHeaderSearchKey = (event) => {
+    if (event.key === "Escape") closeSearch();
+    else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHeaderActive((index) => Math.min(headerResults.length - 1, index + 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHeaderActive((index) => Math.max(-1, index - 1));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      submitHeaderSearch();
+    }
+  };
+  const headerResultRow = (video, index) => {
+    const Icon = CAT_ICONS[video.category] || Sparkles;
     return (
-      <header className="lib-head">
-        <div className="lib-wrap lib-head-in" dir="ltr">
-          <a className="lib-logo" href="#/" aria-label="Vidora"><span>VIDORA</span></a>
-          {searchOpen ? (
-            <HeaderSearch onClose={closeSearch} />
-          ) : (
-            <>
-              <nav className="lib-ref-nav" aria-label={t("nav.menu")} dir="rtl">
-                {referenceItems.map((item) => (
-                  <button key={item.key} className={item.key === "library" ? "is-active" : ""} onClick={item.go}>{item.label}</button>
-                ))}
-              </nav>
-              <div className="lib-head-actions">
-                <button className="lib-iconbtn" aria-label={t("nav.search")} onClick={() => setSearchOpen(true)}><Search size={20} /></button>
-                {viewer === "guest" ? (
-                  <a className="lib-login" href={loginHashFor("/library")}>{t("libraryPage.header.login")}</a>
-                ) : (
-                  <a className="lib-avatarbtn" href="#/dashboard" aria-label={t("nav.profile")}><User size={16} /></a>
-                )}
-                <button className="lib-iconbtn lib-burger" aria-label={t("nav.menu")} onClick={() => setDrawer(true)}><MenuIcon size={20} /></button>
-              </div>
-            </>
-          )}
-        </div>
-        {drawer ? <div className="lib-drawer-veil" onClick={() => setDrawer(false)} /> : null}
-        <div className={`lib-drawer${drawer ? " is-open" : ""}`}>
-          <button onClick={() => setDrawer(false)} aria-label={t("nav.close")} style={{ justifyContent: "flex-end" }}><X size={18} /></button>
-          {referenceItems.map((item) => <button key={item.key} onClick={() => { setDrawer(false); item.go(); }}>{item.label}</button>)}
-          <button onClick={() => { setDrawer(false); setSearchOpen(true); }}><Search size={17} />{t("nav.search")}</button>
-          {viewer === "guest" ? <button onClick={() => (window.location.hash = loginHashFor("/library"))}>{t("libraryPage.header.login")}</button> : <button onClick={() => (window.location.hash = "#/dashboard")}>{t("nav.profile")}</button>}
-        </div>
-      </header>
+      <button key={video.slug} className={`lib-sr${index === headerActive ? " is-active" : ""}`} onClick={() => openHeaderVideo(video)}>
+        <span className="lib-sr-thumb" style={{ background: toneOf(video) }}><Icon size={22} strokeWidth={1.4} /></span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span className="lib-sr-title" style={{ display: "block" }}>{title(video)}</span>
+          <span className="lib-sr-meta"><span>{catName(video.category)}</span><span>·</span><span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span></span>
+        </span>
+        <span className="lib-sr-badge">{t(`access.${video.access}`)}</span>
+      </button>
+    );
+  };
+
+  if (reference && window.EditorialHeader) {
+    const referenceItems = [
+      { label: t("libraryPage.header.library"), active: true, onClick: () => (window.location.hash = "#/library") },
+      { label: t("libraryPage.header.subscription"), onClick: () => (window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/subscription") : "#/dashboard/subscription") },
+    ];
+    const Header = window.EditorialHeader;
+    const panelItems = headerQuery.trim() ? headerResults : headerSuggestions;
+    const headerPanel = (
+      <div className="lib-search-panel" role="listbox" aria-label={t("search.placeholder")}>
+        {headerQuery.trim() && panelItems.length === 0 ? <p className="lib-sp-empty">{t("search.empty")}</p> : null}
+        {!headerQuery.trim() && headerRecent.length ? (
+          <>
+            <p className="lib-sp-label">
+              {t("search.recent")}
+              <button onClick={() => { try { window.localStorage.removeItem("vidora-recent-searches"); } catch (e) {/* ignore */} setHeaderRecent([]); }}>{t("search.clear")}</button>
+            </p>
+            {headerRecent.map((term) => <button key={term} className="lib-sr" onClick={() => setHeaderQuery(term)}><span className="lib-sr-thumb" style={{ background: "var(--s2)" }}><Clock3 size={16} /></span><span className="lib-sr-title">{term}</span></button>)}
+            <p className="lib-sp-label">{t("search.suggestions")}</p>
+          </>
+        ) : !headerQuery.trim() ? <p className="lib-sp-label">{t("search.suggestions")}</p> : null}
+        {panelItems.map(headerResultRow)}
+      </div>
+    );
+    return (
+      <Header
+        mode="library"
+        layoutDirection="ltr"
+        navItems={referenceItems}
+        search={{
+          open: searchOpen,
+          query: headerQuery,
+          onChange: (event) => { setHeaderQuery(event.target.value); setHeaderActive(-1); },
+          onKeyDown: onHeaderSearchKey,
+          onOpen: () => setSearchOpen(true),
+          onClose: closeSearch,
+          inputRef: headerInputRef,
+          placeholder: t("search.placeholder"),
+          closeLabel: t("search.close"),
+          searchLabel: t("nav.search"),
+          rtl,
+          panel: headerPanel,
+        }}
+        auth={{
+          label: viewer === "guest" ? t("libraryPage.header.login") : t("nav.profile"),
+          onClick: () => { window.location.hash = viewer === "guest" ? loginHashFor("/library") : "#/dashboard"; },
+        }}
+      />
     );
   }
   return (
@@ -1021,19 +1093,19 @@ function VideoCarousel({ videos, loading, ariaLabel, flagFor, landscape = false 
     const amount = row.clientWidth * 0.9 * (fwd ? 1 : -1) * (rtl ? -1 : 1);
     row.scrollBy({ left: amount, behavior: "smooth" });
   };
+  const showArrow = !loading && videos.length > 4;
   return (
     <div className="lib-carousel">
-      <button className="lib-arrow is-prev" aria-label={t("trending.prev")} onClick={() => scroll(false)}>
-        {rtl ? <ChevronRight size={19} /> : <ChevronLeft size={19} />}
-      </button>
       <div className="lib-row" ref={rowRef} tabIndex={0} role="list" aria-label={ariaLabel}>
         {loading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : videos.map((video) => <VideoCard key={video.slug} video={video} landscape={landscape} flag={flagFor ? flagFor(video) : undefined} />)}
       </div>
-      <button className="lib-arrow is-next" aria-label={t("trending.next")} onClick={() => scroll(true)}>
-        {rtl ? <ChevronLeft size={19} /> : <ChevronRight size={19} />}
-      </button>
+      {showArrow ? (
+        <button className="lib-arrow is-only" aria-label={rtl ? t("trending.next") : t("trending.prev")} onClick={() => scroll(rtl)}>
+          <ChevronLeft size={19} />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1071,6 +1143,7 @@ function FeaturedHero({ loading }) {
   const [paused, setPaused] = React.useState(false);
   const items = HERO_SLUGS.map(bySlug);
   const video = items[slide];
+  const media = HERO_MEDIA[video.slug];
   const move = React.useCallback((delta) => setSlide((current) => (current + delta + items.length) % items.length), [items.length]);
   React.useEffect(() => {
     if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
@@ -1102,7 +1175,12 @@ function FeaturedHero({ loading }) {
         onFocusCapture={() => setPaused(true)}
         onBlurCapture={() => setPaused(false)}
       >
-        <div className="lib-hero-media" style={{ backgroundImage: `url(${BASE()}${HERO_IMAGES[video.slug]})` }} />
+        <img
+          className={`lib-hero-media${media.flip ? " is-flipped" : ""}`}
+          src={`${BASE()}${media.src}`}
+          alt={title(video)}
+          style={{ objectPosition: media.position }}
+        />
         <div className="lib-hero-shade" />
         <div className="lib-hero-in">
           <div className="lib-hero-box">
@@ -1182,30 +1260,23 @@ function LibrarySearchAndFilter({ topic, setTopic }) {
   );
 }
 
-function TrendingSection({ loading, topic, setTopic, onViewAll }) {
+function TrendingSection({ loading, topic, setTopic }) {
   const { t } = useLib();
-  const [sort, setSort] = React.useState("popular");
   const trending = React.useMemo(() => {
     let list = [...VIDEOS];
     if (topic !== "all") list = list.filter((video) => matchesTopic(video, topic));
-    if (sort === "newest") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    else if (sort === "shortest") list.sort((a, b) => a.durationMin - b.durationMin);
-    else if (sort === "longest") list.sort((a, b) => b.durationMin - a.durationMin);
-    else list.sort((a, b) => b.viewsK - a.viewsK);
+    list.sort((a, b) => b.viewsK - a.viewsK);
     return list.slice(0, 10);
-  }, [sort, topic]);
+  }, [topic]);
   return (
     <section className="lib-section lib-wrap" id="lib-popular" aria-label={t("trending.title")}>
       <div className="lib-sec-head">
         <h2 className="lib-sec-title">{t("trending.title")}</h2>
         <span className="lib-sec-spacer" />
-        <button className="lib-view-all" onClick={onViewAll}>{t("libraryPage.viewAll")}</button>
+        <a className="lib-view-all" href="#/library/all?sort=popular">{t("libraryPage.viewAll")}</a>
       </div>
       <div className="lib-media-tools">
         <CategoryChips active={topic} onChange={setTopic} keys={BROWSE_TOPICS} max={4} />
-        <select className="lib-select" value={sort} onChange={(event) => setSort(event.target.value)} aria-label={t("libraryPage.sort.label")}>
-          {["popular", "newest", "shortest", "longest"].map((key) => <option key={key} value={key}>{t(`libraryPage.sort.${key}`)}</option>)}
-        </select>
       </div>
       {trending.length === 0 && !loading ? (
         <div className="lib-empty">
@@ -1226,7 +1297,7 @@ function BrowseByCategory({ onPick }) {
       <div className="lib-sec-head">
         <h2 className="lib-sec-title">{t("libraryPage.categoriesTitle")}</h2>
         <span className="lib-sec-spacer" />
-        <button className="lib-view-all" onClick={() => onPick("all")}>{t("libraryPage.viewAll")}</button>
+        <a className="lib-view-all" href="#/library/all">{t("libraryPage.viewAll")}</a>
       </div>
       <div className="lib-cats">
         {LIBRARY_GROUPS.map((group) => {
@@ -1251,14 +1322,14 @@ function BrowseByCategory({ onPick }) {
   );
 }
 
-function NewOnVidora({ loading, onViewAll }) {
+function NewOnVidora({ loading }) {
   const { t } = useLib();
   return (
     <section className="lib-section lib-wrap" id="lib-new" aria-label={t("newOn.title")}>
       <div className="lib-sec-head">
         <h2 className="lib-sec-title">{t("newOn.title")}</h2>
         <span className="lib-sec-spacer" />
-        <button className="lib-view-all" onClick={onViewAll}>{t("libraryPage.viewAll")}</button>
+        <a className="lib-view-all" href="#/library/all?sort=newest">{t("libraryPage.viewAll")}</a>
       </div>
       <VideoCarousel videos={NEWEST.concat(VIDEOS.filter((video) => !NEWEST.includes(video)).slice(0, 4))} loading={loading} landscape ariaLabel={t("newOn.title")} />
     </section>
@@ -1297,11 +1368,11 @@ function EditorsPick() {
 
 const GRID_STEP = 10;
 
-function AllVideos({ loading, topic, setTopic }) {
+function AllVideos({ loading, topic, setTopic, initialSort = "newest", initialType = "all", initialDuration = "all", onFiltersChange = null }) {
   const { t, lang } = useLib();
-  const [type, setType] = React.useState("all");
-  const [sort, setSort] = React.useState("newest");
-  const [duration, setDuration] = React.useState("all");
+  const [type, setType] = React.useState(initialType);
+  const [sort, setSort] = React.useState(initialSort);
+  const [duration, setDuration] = React.useState(initialDuration);
   const [limit, setLimit] = React.useState(GRID_STEP);
 
   const filtered = React.useMemo(() => {
@@ -1321,13 +1392,12 @@ function AllVideos({ loading, topic, setTopic }) {
 
   React.useEffect(() => setLimit(GRID_STEP), [type, topic, sort, duration]);
 
+  React.useEffect(() => {
+    onFiltersChange?.({ topic, type, sort, duration });
+  }, [duration, onFiltersChange, sort, topic, type]);
+
   return (
-    <section className="lib-section lib-wrap" id="lib-all" aria-label={t("allVideos.title")}>
-      <div className="lib-sec-head">
-        <h2 className="lib-sec-title">
-          <ListVideo size={20} /> {t("allVideos.title")}
-        </h2>
-      </div>
+    <section className="lib-all-content" id="lib-all" aria-label={t("allVideos.title")}>
       <div className="lib-chips" role="tablist" style={{ marginTop: 20 }}>
         {["all", ...TYPES].map((key) => (
           <button key={key} className={`lib-chip${type === key ? " is-active" : ""}`} role="tab" aria-selected={type === key} onClick={() => setType(key)}>
@@ -1440,10 +1510,80 @@ function readTopicFromHash() {
   return topic && (TOPICS.includes(topic) || BROWSE_TOPICS.includes(topic)) ? topic : "all";
 }
 
+const ALL_VIDEO_SORTS = ["newest", "popular", "views"];
+const ALL_VIDEO_DURATIONS = ["all", "under15", "d15to30", "d30to60", "over60"];
+
+function readAllVideoParams() {
+  const query = window.location.hash.split("?")[1] || "";
+  const params = new URLSearchParams(query);
+  const category = params.get("category");
+  const sort = params.get("sort");
+  const type = params.get("type");
+  const duration = params.get("duration");
+  return {
+    topic: category && (TOPICS.includes(category) || BROWSE_TOPICS.includes(category)) ? category : "all",
+    sort: sort && ALL_VIDEO_SORTS.includes(sort) ? sort : "newest",
+    type: type && TYPES.includes(type) ? type : "all",
+    duration: duration && ALL_VIDEO_DURATIONS.includes(duration) ? duration : "all",
+  };
+}
+
+function AllVideosPageInner() {
+  const { t, rtl } = useLib();
+  const initial = React.useMemo(readAllVideoParams, []);
+  const [topic, setTopic] = React.useState(initial.topic);
+
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, []);
+
+  const syncUrl = React.useCallback(({ topic: nextTopic, type, sort, duration }) => {
+    const params = new URLSearchParams();
+    params.set("sort", sort);
+    if (nextTopic !== "all") params.set("category", nextTopic);
+    if (type !== "all") params.set("type", type);
+    if (duration !== "all") params.set("duration", duration);
+    const query = params.toString();
+    try {
+      window.history.replaceState(null, "", `#/library/all${query ? `?${query}` : ""}`);
+    } catch (error) {/* ignore */}
+  }, []);
+
+  return (
+    <>
+      <LibraryHeader reference />
+      <main className="lib-all-page">
+        <div className="lib-wrap">
+          <div className="lib-all-page-head">
+            <h1 className="lib-all-page-title">{t("allVideos.title")}</h1>
+            <a className="lib-all-back" href="#/library">
+              {rtl ? <ArrowRight size={15} /> : <ArrowLeft size={15} />}
+              {t("allVideos.backToLibrary")}
+            </a>
+          </div>
+        </div>
+        <LibrarySearchAndFilter topic={topic} setTopic={setTopic} />
+        <div className="lib-wrap">
+          <AllVideos
+            loading={false}
+            topic={topic}
+            setTopic={setTopic}
+            initialSort={initial.sort}
+            initialType={initial.type}
+            initialDuration={initial.duration}
+            onFiltersChange={syncUrl}
+          />
+        </div>
+      </main>
+      <TrustStrip />
+      <LibraryFooter />
+    </>
+  );
+}
+
 function LibraryPageInner() {
   const loading = false;
   const [topic, setTopic] = React.useState(readTopicFromHash);
-  const [showAll, setShowAll] = React.useState(false);
 
   const updateTopic = (key) => {
     setTopic(key);
@@ -1455,21 +1595,15 @@ function LibraryPageInner() {
     updateTopic(key);
     document.getElementById("lib-popular")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  const revealAll = () => {
-    setShowAll(true);
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById("lib-all")?.scrollIntoView({ behavior: "smooth", block: "start" })));
-  };
-
   return (
     <>
       <LibraryHeader reference />
       <FeaturedHero loading={loading} />
       <LibrarySearchAndFilter topic={topic} setTopic={updateTopic} />
       <BrowseByCategory onPick={pickTopic} />
-      <TrendingSection loading={loading} topic={topic} setTopic={updateTopic} onViewAll={revealAll} />
-      <NewOnVidora loading={loading} onViewAll={revealAll} />
+      <TrendingSection loading={loading} topic={topic} setTopic={updateTopic} />
+      <NewOnVidora loading={loading} />
       <ContinueWatching />
-      {showAll ? <AllVideos loading={loading} topic={topic} setTopic={updateTopic} /> : null}
       <TrustStrip />
       <LibraryFooter />
     </>
@@ -1651,7 +1785,7 @@ function WatchPageInner() {
 export function LibraryPage() {
   return (
     <LibraryProvider surface="library">
-      <LibraryPageInner />
+      {window.location.hash.startsWith("#/library/all") ? <AllVideosPageInner /> : <LibraryPageInner />}
     </LibraryProvider>
   );
 }
