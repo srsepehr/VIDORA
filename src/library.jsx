@@ -314,19 +314,9 @@ const CSS = `
 .lib-hero-desc{color:#cfcfd6;font-size:15px;line-height:1.85;max-width:52ch}
 .lib-hero-meta{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px;font-weight:600;flex-wrap:wrap}
 .lib-hero-cta{display:flex;gap:11px;margin-top:6px}
-.lib-hero-counter{position:absolute;z-index:5;top:20px;left:22px;direction:ltr;display:flex;align-items:baseline;gap:6px;padding:7px 9px;border:1px solid rgba(255,255,255,.24);border-radius:8px;background:rgba(0,0,0,.28);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.08em;text-shadow:0 1px 12px rgba(0,0,0,.45)}
-.lib-hero-counter strong{font-size:17px;font-weight:650}.lib-hero-counter span{color:rgba(255,255,255,.58)}
-.lib-hero-nav{position:absolute;z-index:5;bottom:17px;left:50%;width:min(520px,calc(100% - 190px));transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
-.lib-hero-nav-item{min-width:0;display:grid;gap:6px;color:rgba(255,255,255,.58);text-align:start}
-.lib-hero-nav-item:hover,.lib-hero-nav-item.is-active{color:#fff}
-.lib-hero-nav-track{display:block;height:2px;background:rgba(255,255,255,.24);overflow:hidden}
-.lib-hero-nav-fill{display:block;width:0;height:100%;background:#d4af37}
-.lib-hero-nav-item.is-active .lib-hero-nav-fill{animation:lib-hero-progress 6s linear forwards}
-.lib-hero-nav-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:650;letter-spacing:0}
 @keyframes lib-hero-reveal{0%{clip-path:circle(0 at 50% 50%);filter:grayscale(1) blur(8px)}100%{clip-path:circle(145% at 50% 50%);filter:grayscale(1) blur(0)}}
 @keyframes lib-glass-wave{0%{transform:translate(-50%,-50%) scale(.08);opacity:0}18%{opacity:.9}100%{transform:translate(-50%,-50%) scale(7);opacity:0}}
 @keyframes lib-hero-content-in{0%{opacity:0;transform:translateY(18px);filter:blur(7px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
-@keyframes lib-hero-progress{from{width:0}to{width:100%}}
 
 /* sections */
 .lib-section{margin-top:96px}
@@ -356,7 +346,9 @@ const CSS = `
 .lib-arrow:hover{background:var(--s3)}
 .lib-arrow.is-prev{inset-inline-start:-19px}
 .lib-arrow.is-next{inset-inline-end:-19px}
-.lib-arrow.is-only{left:-19px;right:auto}
+.lib-arrow.is-left{left:-19px;right:auto}
+.lib-arrow.is-right{right:-19px;left:auto}
+.lib-arrow:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 
 /* standard card */
 .lib-card{display:grid;gap:10px;min-width:0;text-align:start}
@@ -447,16 +439,12 @@ const CSS = `
 .lib-gate{display:grid;place-items:center;text-align:center;gap:12px;padding:26px;background:rgba(8,8,10,.78);backdrop-filter:blur(6px);position:absolute;inset:0}
 .lib-gate p{font-size:15px;font-weight:650;max-width:400px;line-height:1.8}
 .lib-gate svg{color:var(--mut)}
-.lib-watch-head{display:flex;align-items:flex-start;gap:16px;margin-top:26px;flex-wrap:wrap}
 .lib-watch-title{font-size:clamp(22px,2.4vw,32px);font-weight:800;letter-spacing:-.01em;line-height:1.25}
 .lib-watch-meta{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px;font-weight:600;margin-top:10px;flex-wrap:wrap}
 .lib-watch-cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:34px;margin-top:26px;align-items:start}
 .lib-watch-desc{color:#cfcfd6;font-size:14.5px;line-height:1.95}
-.lib-side-card{border:1px solid var(--line);border-radius:14px;background:var(--s1);padding:18px;display:grid;gap:12px}
-.lib-side-card h3{font-size:14px;font-weight:750}
 .lib-inc{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px}
 .lib-inc svg{color:#d6d6dd}
-.lib-note{border:1px solid var(--line2);border-radius:11px;background:var(--s1);color:var(--mut);font-size:13px;padding:11px 14px;margin-top:12px;line-height:1.7}
 .lib-pillbadge{height:24px;padding-inline:10px;border-radius:999px;border:1px solid rgba(255,255,255,.3);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;color:#fff}
 .lib-ts{color:#fff;font-weight:750;font-size:11.5px;font-variant-numeric:tabular-nums}
 
@@ -494,8 +482,7 @@ const CSS = `
   .lib-footer-links{margin-inline:0}
 }
 
-/* Library redesign: scoped white editorial surface. Watch and search keep the
-   original dark theme above. */
+/* Library redesign: scoped white editorial surface. */
 .lib-root.is-library{--bg:#fff;--s1:#fff;--s2:#f5f5f5;--s3:#ededed;--ink:#111;--mut:#666;--mut2:#8c8c8c;--line:#e4e4e4;--line2:#d5d5d5;background:#fff;color:#111}
 .is-library .lib-wrap{max-width:1320px;padding-inline:46px}
 .is-library .lib-head{position:relative;background:#fff;border:0;backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -552,15 +539,15 @@ const CSS = `
 .is-library .lib-btn.is-primary{height:50px;border-radius:11px;background:#fff;color:#111;padding-inline:23px}
 .is-library .lib-btn.is-primary:hover{background:#eee}
 
-.is-library .lib-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start;margin-top:32px;position:relative}
-.is-library .lib-page-search{height:58px;border:1px solid #d9d9d9;border-radius:12px;display:flex;align-items:center;gap:12px;padding-inline:20px;background:#fff}
+.is-library .lib-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;margin-top:26px;position:relative}
+.is-library .lib-page-search{height:46px;border:1px solid #dedede;border-radius:9px;display:flex;align-items:center;gap:8px;padding-inline:12px;background:#fff}
 .is-library .lib-page-search input{border:0;outline:0;background:transparent;color:#111;min-width:0;flex:1;font-size:14px}
-.is-library .lib-page-search>button{width:30px;height:30px;display:grid;place-items:center;border-radius:6px;flex:none}
+.is-library .lib-page-search>button{width:28px;height:28px;display:grid;place-items:center;border-radius:5px;flex:none}
 .is-library .lib-page-search>button:hover{background:#f2f2f2}
 .is-library .lib-page-search svg{color:#777;flex:none}
-.is-library .lib-filter-btn{height:58px;min-width:132px;border:1px solid #d9d9d9;border-radius:12px;background:#fff;display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:700}
+.is-library .lib-filter-btn{height:46px;min-width:112px;padding-inline:14px;border:1px solid #dedede;border-radius:9px;background:#fff;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:12.5px;font-weight:700}
 .is-library .lib-filter-btn:hover{border-color:#111}
-.is-library .lib-filter-popover{position:absolute;top:68px;inset-inline-end:0;z-index:20;width:min(390px,100%);padding:16px;border:1px solid #ddd;border-radius:10px;background:#fff;box-shadow:0 18px 48px rgba(0,0,0,.12);display:grid;gap:12px}
+.is-library .lib-filter-popover{position:absolute;top:56px;inset-inline-end:0;z-index:20;width:min(390px,100%);padding:16px;border:1px solid #ddd;border-radius:10px;background:#fff;box-shadow:0 18px 48px rgba(0,0,0,.12);display:grid;gap:12px}
 .is-library .lib-filter-popover p{font-size:13px;font-weight:750}
 .is-library .lib-filter-options{display:flex;gap:8px;flex-wrap:wrap}
 .is-library .lib-filter-options button{height:34px;border:1px solid #ddd;border-radius:999px;padding-inline:13px;color:#555;font-size:12px}
@@ -578,8 +565,8 @@ const CSS = `
 .is-library .lib-cat-card:hover{background:#fff;border-color:#aaa}
 .is-library .lib-cat-media{display:block;height:182px;position:relative;background:#eee}
 .is-library .lib-cat-media img{width:100%;height:100%;display:block;object-fit:cover;filter:grayscale(1)}
-.is-library .lib-cat-icon{position:absolute;inset-inline-start:18px;bottom:-24px;width:52px;height:52px;border-radius:10px;background:#fff;border:1px solid #ddd;color:#111}
-.is-library .lib-cat-body{display:grid;gap:9px;padding:38px 20px 19px}
+.is-library .lib-cat-icon{position:absolute;inset-inline-start:16px;bottom:-18px;width:42px;height:42px;border-radius:8px;background:#111;border:1px solid #111;color:#fff}
+.is-library .lib-cat-body{display:grid;gap:9px;padding:31px 20px 19px}
 .is-library .lib-cat-name{font-size:15px;color:#111}
 .is-library .lib-cat-desc{font-size:12.5px;color:#555;line-height:1.75;min-height:44px}
 .is-library .lib-cat-count{display:flex;align-items:center;gap:7px;color:#555;font-size:11.5px;margin-top:4px}
@@ -606,7 +593,34 @@ const CSS = `
 .is-library .lib-play-circle{width:40px;height:40px}
 .is-library .lib-arrow{top:44%;width:40px;height:40px;background:#fff;color:#111;border-color:#ddd}
 .is-library .lib-arrow:hover{background:#f4f4f4}
-.is-library .lib-arrow.is-only{left:-20px;right:auto}
+.is-library .lib-arrow.is-left{left:-20px;right:auto}
+.is-library .lib-arrow.is-right{right:-20px;left:auto}
+
+.is-library .lib-watch{padding-block:28px 72px}
+.is-library .lib-watch .lib-back{color:#666;margin-bottom:22px}
+.is-library .lib-watch .lib-back:hover{color:#111}
+.is-library .lib-watch-intro{display:grid;gap:10px;margin-bottom:24px;max-width:900px}
+.is-library .lib-watch-title{font-size:clamp(27px,3vw,40px);line-height:1.3;letter-spacing:0;color:#111}
+.is-library .lib-watch-meta{margin-top:0;color:#666;font-size:12.5px}
+.is-library .lib-watch-meta .lib-pillbadge{height:25px;border-color:#d4d4d4;background:#f5f5f5;color:#222}
+.is-library .lib-player{max-height:none;border:0;border-radius:14px;background:#0b0b0d}
+.is-library .lib-player-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1);opacity:.58}
+.is-library .lib-player::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.24);pointer-events:none}
+.is-library .lib-player-center,.is-library .lib-gate{z-index:2}
+.is-library .lib-playbtn{width:62px;height:62px;box-shadow:none}
+.is-library .lib-gate{color:#fff;background:rgba(8,8,10,.76)}
+.is-library .lib-watch-note{margin-top:12px;border:1px solid #ddd;border-radius:9px;background:#f7f7f7;color:#555;font-size:12.5px;padding:11px 13px;line-height:1.75}
+.is-library .lib-watch-note a{color:#111;font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.is-library .lib-watch-cols{grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:42px;margin-top:38px;padding-top:34px;border-top:1px solid #e3e3e3}
+.is-library .lib-watch-copy h2,.is-library .lib-watch-aside h2{font-size:18px;line-height:1.5;color:#111;margin-bottom:12px}
+.is-library .lib-watch-desc{color:#4f4f4f;font-size:14px;line-height:2}
+.is-library .lib-watch-aside{display:grid;gap:28px}
+.is-library .lib-watch-section{display:grid;gap:10px}
+.is-library .lib-watch-section+.lib-watch-section{padding-top:24px;border-top:1px solid #e5e5e5}
+.is-library .lib-inc{color:#666;font-size:12.5px}
+.is-library .lib-inc svg{color:#333}
+.is-library .lib-ts{color:#111;min-width:42px}
+.is-library .lib-watch-related{margin-top:72px;padding-top:48px;border-top:1px solid #e3e3e3}
 
 .is-library .lib-cw-card{background:#fff;border-color:#ddd;color:#111}
 .is-library .lib-cw-card:hover{background:#f7f7f7;border-color:#aaa}
@@ -657,16 +671,17 @@ const CSS = `
   .is-library .lib-hero-box{max-width:100%;gap:11px}
   .is-library .lib-hero-title{font-size:26px}.is-library .lib-hero-desc{font-size:13px;line-height:1.8}
   .is-library .lib-hero-arrow{width:38px;height:38px;top:34%}
-  .is-library .lib-hero-counter{top:16px;left:16px}.is-library .lib-hero-nav{bottom:16px;width:calc(100% - 32px);gap:8px}.is-library .lib-hero-nav-label{display:none}
   .is-library .lib-profile-menu{top:66px;left:16px;right:16px;width:auto}
   .is-library .lib-search-row{grid-template-columns:1fr auto;gap:10px;margin-top:20px}
-  .is-library .lib-page-search{height:52px;padding-inline:14px}.is-library .lib-filter-btn{height:52px;min-width:52px;font-size:0}
+  .is-library .lib-page-search{height:48px;padding-inline:10px}.is-library .lib-filter-btn{height:48px;min-width:48px;width:48px;padding:0;font-size:0}
   .is-library .lib-section{margin-top:48px}.is-library .lib-sec-title{font-size:21px}
   .is-library .lib-cats{grid-template-columns:1fr;gap:16px}.is-library .lib-cat-media{height:168px}
   .is-library .lib-media-tools{align-items:stretch;flex-direction:column-reverse}
   .is-library .lib-chips{width:100%;justify-content:flex-start}.is-library .lib-select{width:100%}
   .is-library .lib-row{grid-auto-columns:84%;gap:13px}
   .is-library .lib-arrow{display:none}
+  .is-library .lib-watch{padding-block:20px 52px}.is-library .lib-watch-intro{margin-bottom:18px}.is-library .lib-watch-title{font-size:25px}.is-library .lib-player{border-radius:10px}
+  .is-library .lib-watch-cols{grid-template-columns:1fr;gap:30px;margin-top:28px;padding-top:27px}.is-library .lib-watch-related{margin-top:52px;padding-top:36px}
   .is-library .lib-trust-in{grid-template-columns:1fr;padding-block:12px}
   .is-library .lib-trust-item{padding:24px 10px}.is-library .lib-trust-item+ .lib-trust-item{border-inline-start:0;border-top:1px solid #303030}
   .is-library .lib-footer-in{grid-template-columns:1fr;justify-items:start}.is-library .lib-footer-links{justify-content:flex-start;gap:18px;flex-wrap:wrap}.is-library .lib-footer-rights{text-align:start}
@@ -1185,13 +1200,49 @@ function SkeletonCard() {
 function VideoCarousel({ videos, loading, ariaLabel, flagFor, landscape = false }) {
   const { t, rtl } = useLib();
   const rowRef = React.useRef(null);
-  const scroll = (fwd) => {
+  const itemKey = videos.map((video) => video.slug).join("|");
+  const [edges, setEdges] = React.useState({ left: false, right: false });
+
+  const updateEdges = React.useCallback(() => {
     const row = rowRef.current;
     if (!row) return;
-    const amount = row.clientWidth * 0.9 * (fwd ? 1 : -1) * (rtl ? -1 : 1);
-    row.scrollBy({ left: amount, behavior: "smooth" });
+    const rowRect = row.getBoundingClientRect();
+    const cardRects = Array.from(row.children, (child) => child.getBoundingClientRect());
+    const hasOverflow = row.scrollWidth > row.clientWidth + 2 && cardRects.length > 0;
+    const next = hasOverflow ? {
+      left: Math.min(...cardRects.map((rect) => rect.left)) < rowRect.left - 2,
+      right: Math.max(...cardRects.map((rect) => rect.right)) > rowRect.right + 2,
+    } : { left: false, right: false };
+    setEdges((current) => current.left === next.left && current.right === next.right ? current : next);
+  }, [itemKey, loading]);
+
+  React.useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+    const frame = window.requestAnimationFrame(updateEdges);
+    const onScroll = () => updateEdges();
+    row.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateEdges);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateEdges);
+    observer?.observe(row);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      row.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateEdges);
+      observer?.disconnect();
+    };
+  }, [updateEdges]);
+
+  const scroll = (direction) => {
+    const row = rowRef.current;
+    if (!row) return;
+    row.scrollBy({
+      left: (direction === "left" ? -1 : 1) * row.clientWidth * 0.88,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+    window.requestAnimationFrame(updateEdges);
   };
-  const showArrow = !loading && videos.length > 4;
+
   return (
     <div className="lib-carousel">
       <div className="lib-row" ref={rowRef} tabIndex={0} role="list" aria-label={ariaLabel}>
@@ -1199,9 +1250,14 @@ function VideoCarousel({ videos, loading, ariaLabel, flagFor, landscape = false 
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : videos.map((video) => <VideoCard key={video.slug} video={video} landscape={landscape} flag={flagFor ? flagFor(video) : undefined} />)}
       </div>
-      {showArrow ? (
-        <button className="lib-arrow is-only" aria-label={rtl ? t("trending.next") : t("trending.prev")} onClick={() => scroll(rtl)}>
+      {!loading && edges.left ? (
+        <button className="lib-arrow is-left" aria-label={rtl ? t("trending.next") : t("trending.prev")} onClick={() => scroll("left")}>
           <ChevronLeft size={19} />
+        </button>
+      ) : null}
+      {!loading && edges.right ? (
+        <button className="lib-arrow is-right" aria-label={rtl ? t("trending.prev") : t("trending.next")} onClick={() => scroll("right")}>
+          <ChevronRight size={19} />
         </button>
       ) : null}
     </div>
@@ -1282,8 +1338,6 @@ function FeaturedHero({ loading }) {
         aria-roledescription="carousel"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
-        onFocusCapture={() => setPaused(true)}
-        onBlurCapture={() => setPaused(false)}
       >
         {previousSlide !== null ? (
           <img
@@ -1324,18 +1378,6 @@ function FeaturedHero({ loading }) {
         </div>
         <button className="lib-hero-arrow is-prev" aria-label={t("trending.prev")} onClick={() => move(-1)}>{rtl ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}</button>
         <button className="lib-hero-arrow is-next" aria-label={t("trending.next")} onClick={() => move(1)}>{rtl ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}</button>
-        <div className="lib-hero-counter" aria-hidden="true">
-          <strong>{String(slide + 1).padStart(2, "0")}</strong>
-          <span>/ {String(items.length).padStart(2, "0")}</span>
-        </div>
-        <nav className="lib-hero-nav" aria-label={t("hero.label")}>
-          {items.map((item, i) => (
-            <button key={`${item.slug}-${i === slide ? transitionId : "idle"}`} className={`lib-hero-nav-item${i === slide ? " is-active" : ""}`} aria-label={t("hero.slide", { n: fmtNum(lang, i + 1) })} aria-current={i === slide ? "true" : undefined} onClick={() => selectSlide(i)}>
-              <span className="lib-hero-nav-track"><span className="lib-hero-nav-fill" /></span>
-              <span className="lib-hero-nav-label" dir="auto">{title(item)}</span>
-            </button>
-          ))}
-        </nav>
       </section>
     </div>
   );
@@ -1366,7 +1408,7 @@ function LibrarySearchAndFilter({ topic, setTopic }) {
   return (
     <div className="lib-wrap lib-search-row">
       <form className="lib-page-search" role="search" onSubmit={submit}>
-        <button type="submit" aria-label={t("nav.search")}><Search size={19} /></button>
+        <button type="submit" aria-label={t("nav.search")}><Search size={18} /></button>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("libraryPage.search.placeholder")} aria-label={t("libraryPage.search.placeholder")} />
       </form>
       <button className="lib-filter-btn" aria-expanded={open} aria-controls="library-filter-panel" onClick={() => setOpen((value) => !value)}>
@@ -1435,7 +1477,7 @@ function BrowseByCategory({ onPick }) {
             <button key={group.key} className="lib-cat-card" onClick={() => onPick(group.key)}>
               <span className="lib-cat-media">
                 <img src={`${BASE()}${group.image}`} alt="" />
-                <span className="lib-cat-icon"><Icon size={23} strokeWidth={1.7} /></span>
+                <span className="lib-cat-icon"><Icon size={20} strokeWidth={1.7} /></span>
               </span>
               <span className="lib-cat-body">
                 <span className="lib-cat-name">{t(`libraryPage.groups.${group.key}.title`)}</span>
@@ -1804,20 +1846,28 @@ function WatchPageInner() {
     .slice(0, 8);
   const gateCta = viewer === "guest" ? { label: t("watch.guestCta"), href: loginHashFor(`/watch/${video.slug}`) } : { label: t("watch.memberCta"), href: "#/dashboard/subscription" };
   const gateMsg = viewer === "guest" ? t("watch.guestGate") : t("watch.memberGate");
-  const Icon = CAT_ICONS[video.category] || Sparkles;
 
   return (
     <>
-      <LibraryHeader />
-      <div className="lib-wrap lib-watch">
+      <LibraryHeader reference />
+      <main className="lib-wrap lib-watch" aria-labelledby="watch-title">
         <a className="lib-back" href="#/library">
           {rtl ? <ArrowRight size={14} /> : <ArrowLeft size={14} />} {t("watch.back")}
         </a>
 
-        <div className="lib-player">
-          <div className="lib-player-center" style={{ opacity: 0.14 }}>
-            <Icon size={140} strokeWidth={0.9} color="#fff" />
+        <header className="lib-watch-intro">
+          <h1 className="lib-watch-title" id="watch-title">{title(video)}</h1>
+          <div className="lib-watch-meta">
+            <span>{catName(video.category)}</span>
+            <span>·</span>
+            <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
+            <span>·</span>
+            <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
           </div>
+        </header>
+
+        <div className="lib-player">
+          <img className="lib-player-poster" src={`${BASE()}${imageOf(video)}`} alt="" />
           {playing ? (
             <div className="lib-player-center">
               <span className="lib-pillbadge">{t("watch.playing")}</span>
@@ -1840,35 +1890,20 @@ function WatchPageInner() {
           ) : null}
         </div>
         {canPreview && !canWatchFull ? (
-          <div className="lib-note">
+          <div className="lib-watch-note">
             {t("watch.previewNote")}{" "}
-            <a href={gateCta.href} style={{ color: "#fff", textDecoration: "underline", textUnderlineOffset: 3 }}>
-              {gateCta.label}
-            </a>
+            <a href={gateCta.href}>{gateCta.label}</a>
           </div>
         ) : null}
 
-        <div className="lib-watch-head">
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <h1 className="lib-watch-title">{title(video)}</h1>
-            <div className="lib-watch-meta">
-              <span>{catName(video.category)}</span>
-              <span>·</span>
-              <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-              <span>·</span>
-              <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
-            </div>
-          </div>
-        </div>
-
         <div className="lib-watch-cols">
-          <div>
-            <h3 style={{ fontSize: 15, fontWeight: 750, marginBottom: 10 }}>{t("watch.about")}</h3>
+          <section className="lib-watch-copy" aria-labelledby="watch-about-title">
+            <h2 id="watch-about-title">{t("watch.about")}</h2>
             <p className="lib-watch-desc">{desc(video)}</p>
-          </div>
-          <div style={{ display: "grid", gap: 14 }}>
-            <div className="lib-side-card">
-              <h3>{t("watch.chapters")}</h3>
+          </section>
+          <aside className="lib-watch-aside">
+            <section className="lib-watch-section" aria-labelledby="watch-chapters-title">
+              <h2 id="watch-chapters-title">{t("watch.chapters")}</h2>
               {CHAPTERS.map((ch) => (
                 <div className="lib-inc" key={ch.en}>
                   <span className="lib-ts" dir="ltr">
@@ -1877,9 +1912,9 @@ function WatchPageInner() {
                   <span>{lang === "fa" ? ch.fa : ch.en}</span>
                 </div>
               ))}
-            </div>
-            <div className="lib-side-card">
-              <h3>{t("watch.includes")}</h3>
+            </section>
+            <section className="lib-watch-section" aria-labelledby="watch-includes-title">
+              <h2 id="watch-includes-title">{t("watch.includes")}</h2>
               <div className="lib-inc">
                 <FileText size={15} /> {t("watch.subtitles")}
               </div>
@@ -1889,19 +1924,18 @@ function WatchPageInner() {
               <div className="lib-inc">
                 <Sparkles size={15} /> {t("watch.summary")}
               </div>
-            </div>
-          </div>
+            </section>
+          </aside>
         </div>
 
-        <section className="lib-section" style={{ marginTop: 72 }} aria-label={t("watch.similar")}>
+        <section className="lib-watch-related" aria-label={t("watch.similar")}>
           <div className="lib-sec-head">
-            <h2 className="lib-sec-title">
-              <Sparkles size={19} /> {t("watch.similar")}
-            </h2>
+            <h2 className="lib-sec-title">{t("watch.similar")}</h2>
           </div>
-          <VideoCarousel videos={similar} loading={false} ariaLabel={t("watch.similar")} />
+          <VideoCarousel videos={similar} loading={false} landscape ariaLabel={t("watch.similar")} />
         </section>
-      </div>
+      </main>
+      <LibraryFooter />
     </>
   );
 }
@@ -1920,7 +1954,7 @@ export function LibraryPage() {
 
 export function WatchPage() {
   return (
-    <LibraryProvider surface="watch">
+    <LibraryProvider surface="library">
       <WatchPageInner />
     </LibraryProvider>
   );
