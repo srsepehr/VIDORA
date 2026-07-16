@@ -10,8 +10,10 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bookmark,
   BrainCircuit,
   Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -24,13 +26,16 @@ import {
   Headphones,
   Languages,
   LayoutGrid,
+  LayoutDashboard,
   ListVideo,
   Lock,
+  LogOut,
   Menu as MenuIcon,
   Package,
   Play,
   Rocket,
   Search,
+  Settings,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -40,7 +45,7 @@ import {
 } from "lucide-react";
 import enDict from "./locales/en/library.json";
 import faDict from "./locales/fa/library.json";
-import { getCachedSession, restoreAuthSession, subscribeAuthState } from "./lib/auth";
+import { getCachedSession, getDisplayName, getUserEmail, restoreAuthSession, signOut as signOutUser, subscribeAuthState } from "./lib/auth";
 import { loginHashFor } from "./lib/return-to";
 
 const DICTS = { en: enDict, fa: faDict };
@@ -69,10 +74,6 @@ const fmtNum = (lang, n) => Number(n).toLocaleString(lang === "fa" ? "fa-IR" : "
 // must remain server-side in the payment phase; the public library stays
 // browsable for guests, but premium playback is gated after open.
 // ---------------------------------------------------------------------------
-
-function readViewer() {
-  return getCachedSession() ? "member" : "guest";
-}
 
 function readRecentSearches() {
   try {
@@ -298,20 +299,34 @@ const CSS = `
 
 /* hero */
 .lib-hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
-.lib-hero-media{position:absolute;inset:0;background-size:cover;background-position:center;filter:grayscale(1);transition:opacity .5s ease}
-.lib-hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.94) 0%,rgba(8,8,10,.72) 34%,rgba(8,8,10,.28) 62%,rgba(8,8,10,.55) 100%)}
+.lib-hero-media{position:absolute;inset:0;background-size:cover;background-position:center;filter:grayscale(1);transition:opacity .5s ease;z-index:0}
+.lib-hero-media.is-current{z-index:1}
+.lib-hero-media.is-revealing{animation:lib-hero-reveal 1.15s cubic-bezier(.22,.8,.24,1) both}
+.lib-hero-glass-wave{position:absolute;z-index:2;top:50%;left:50%;width:22%;aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.42);box-shadow:inset 0 0 28px rgba(255,255,255,.16),0 0 40px rgba(255,255,255,.12);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);pointer-events:none;animation:lib-glass-wave 1.15s cubic-bezier(.22,.8,.24,1) both}
+.lib-hero-shade{position:absolute;inset:0;z-index:3;background:linear-gradient(90deg,rgba(8,8,10,.94) 0%,rgba(8,8,10,.72) 34%,rgba(8,8,10,.28) 62%,rgba(8,8,10,.55) 100%)}
 [dir="rtl"] .lib-hero-shade{background:linear-gradient(270deg,rgba(8,8,10,.94) 0%,rgba(8,8,10,.72) 34%,rgba(8,8,10,.28) 62%,rgba(8,8,10,.55) 100%)}
 .lib-hero-shade::after{content:"";position:absolute;inset-inline:0;bottom:0;height:34%;background:linear-gradient(180deg,transparent,rgba(8,8,10,.9))}
-.lib-hero-in{position:relative;min-height:clamp(420px,56vh,600px);display:flex;align-items:center;padding-block:64px}
+.lib-hero-in{position:relative;z-index:4;min-height:clamp(420px,56vh,600px);display:flex;align-items:center;padding-block:64px}
 .lib-hero-box{max-width:41%;display:grid;gap:16px}
+.lib-hero-box.is-revealing{animation:lib-hero-content-in .8s cubic-bezier(.22,.8,.24,1) both}
 .lib-hero-label{font-size:12px;font-weight:750;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
 .lib-hero-title{font-size:clamp(30px,3.4vw,50px);font-weight:800;line-height:1.16;letter-spacing:-.01em}
 .lib-hero-desc{color:#cfcfd6;font-size:15px;line-height:1.85;max-width:52ch}
 .lib-hero-meta{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px;font-weight:600;flex-wrap:wrap}
 .lib-hero-cta{display:flex;gap:11px;margin-top:6px}
-.lib-hero-dots{position:absolute;bottom:22px;inset-inline:0;display:flex;justify-content:center;gap:7px}
-.lib-hero-dots button{width:22px;height:4px;border-radius:999px;background:rgba(255,255,255,.22)}
-.lib-hero-dots button.is-active{background:#fff}
+.lib-hero-counter{position:absolute;z-index:5;top:20px;left:22px;direction:ltr;display:flex;align-items:baseline;gap:6px;padding:7px 9px;border:1px solid rgba(255,255,255,.24);border-radius:8px;background:rgba(0,0,0,.28);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.08em;text-shadow:0 1px 12px rgba(0,0,0,.45)}
+.lib-hero-counter strong{font-size:17px;font-weight:650}.lib-hero-counter span{color:rgba(255,255,255,.58)}
+.lib-hero-nav{position:absolute;z-index:5;bottom:17px;left:50%;width:min(520px,calc(100% - 190px));transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.lib-hero-nav-item{min-width:0;display:grid;gap:6px;color:rgba(255,255,255,.58);text-align:start}
+.lib-hero-nav-item:hover,.lib-hero-nav-item.is-active{color:#fff}
+.lib-hero-nav-track{display:block;height:2px;background:rgba(255,255,255,.24);overflow:hidden}
+.lib-hero-nav-fill{display:block;width:0;height:100%;background:#d4af37}
+.lib-hero-nav-item.is-active .lib-hero-nav-fill{animation:lib-hero-progress 6s linear forwards}
+.lib-hero-nav-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:650;letter-spacing:0}
+@keyframes lib-hero-reveal{0%{clip-path:circle(0 at 50% 50%);filter:grayscale(1) blur(8px)}100%{clip-path:circle(145% at 50% 50%);filter:grayscale(1) blur(0)}}
+@keyframes lib-glass-wave{0%{transform:translate(-50%,-50%) scale(.08);opacity:0}18%{opacity:.9}100%{transform:translate(-50%,-50%) scale(7);opacity:0}}
+@keyframes lib-hero-content-in{0%{opacity:0;transform:translateY(18px);filter:blur(7px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes lib-hero-progress{from{width:0}to{width:100%}}
 
 /* sections */
 .lib-section{margin-top:96px}
@@ -502,6 +517,21 @@ const CSS = `
 .is-library .lib-search-panel{background:#fff;border-color:#ddd;box-shadow:0 18px 50px rgba(0,0,0,.12)}
 .is-library .lib-sr:hover,.is-library .lib-sr.is-active{background:#f5f5f5}
 .is-library .lib-sr-badge{border-color:#ddd;color:#555}
+.is-library .lib-profile-trigger{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:190px}
+.is-library .lib-profile-avatar{position:relative;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;overflow:hidden;flex:none;background:#111;color:#fff;border:1px solid rgba(0,0,0,.12);font-size:11px;font-weight:800}
+.is-library .lib-profile-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.is-library .lib-profile-name{max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750}
+.is-library .lib-profile-trigger svg{flex:none;color:#666}
+.lib-profile-scrim{position:fixed;inset:0;z-index:74;background:transparent}
+.is-library .lib-profile-menu{position:fixed;z-index:75;top:68px;right:max(16px,calc((100vw - 1024px)/2 + 16px));width:286px;padding:9px;border:1px solid rgba(255,255,255,.74);border-radius:14px;background:rgba(250,250,250,.84);box-shadow:0 22px 60px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:#111}
+.is-library .lib-profile-menu-head{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:11px;padding:9px 9px 13px;border-bottom:1px solid rgba(0,0,0,.09)}
+.is-library .lib-profile-menu-head .lib-profile-avatar{width:42px;height:42px;font-size:14px}
+.is-library .lib-profile-menu-head strong,.is-library .lib-profile-menu-head span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-library .lib-profile-menu-head strong{font-size:13px}.is-library .lib-profile-menu-head span{margin-top:3px;color:#717171;font-size:11px;direction:ltr;text-align:left}
+.is-library .lib-profile-menu-actions{display:grid;gap:2px;padding-top:7px}
+.is-library .lib-profile-menu-actions button{width:100%;height:39px;padding-inline:10px;border-radius:8px;display:flex;align-items:center;gap:10px;color:#292929;font-size:12px;font-weight:700}
+.is-library .lib-profile-menu-actions button:hover,.is-library .lib-profile-menu-actions button:focus-visible{background:rgba(255,255,255,.78);outline:none}
+.is-library .lib-profile-menu-actions button.is-danger{margin-top:5px;border-top:1px solid rgba(0,0,0,.08);border-radius:0 0 8px 8px;color:#6d2020}
 
 .is-library .lib-hero-shell{padding-inline:46px;max-width:1320px;margin:0 auto}
 .is-library .lib-hero{height:430px;border:0;border-radius:14px;background:#111}
@@ -516,10 +546,7 @@ const CSS = `
 .is-library .lib-hero-title{font-size:34px;letter-spacing:0;line-height:1.35}
 .is-library .lib-hero-desc{font-size:14px;line-height:1.95;color:#f2f2f2}
 .is-library .lib-hero-meta{color:#e5e5e5;font-size:12px}
-.is-library .lib-hero-dots{bottom:22px;gap:9px}
-.is-library .lib-hero-dots button{width:19px;height:5px;background:#777}
-.is-library .lib-hero-dots button.is-active{width:25px;background:#fff}
-.is-library .lib-hero-arrow{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:rgba(0,0,0,.42);color:#fff;display:grid;place-items:center;z-index:3}
+.is-library .lib-hero-arrow{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:rgba(0,0,0,.42);color:#fff;display:grid;place-items:center;z-index:6}
 .is-library .lib-hero-arrow.is-prev{inset-inline-start:16px}
 .is-library .lib-hero-arrow.is-next{inset-inline-end:16px}
 .is-library .lib-btn.is-primary{height:50px;border-radius:11px;background:#fff;color:#111;padding-inline:23px}
@@ -630,6 +657,8 @@ const CSS = `
   .is-library .lib-hero-box{max-width:100%;gap:11px}
   .is-library .lib-hero-title{font-size:26px}.is-library .lib-hero-desc{font-size:13px;line-height:1.8}
   .is-library .lib-hero-arrow{width:38px;height:38px;top:34%}
+  .is-library .lib-hero-counter{top:16px;left:16px}.is-library .lib-hero-nav{bottom:16px;width:calc(100% - 32px);gap:8px}.is-library .lib-hero-nav-label{display:none}
+  .is-library .lib-profile-menu{top:66px;left:16px;right:16px;width:auto}
   .is-library .lib-search-row{grid-template-columns:1fr auto;gap:10px;margin-top:20px}
   .is-library .lib-page-search{height:52px;padding-inline:14px}.is-library .lib-filter-btn{height:52px;min-width:52px;font-size:0}
   .is-library .lib-section{margin-top:48px}.is-library .lib-sec-title{font-size:21px}
@@ -657,15 +686,15 @@ function LibraryProvider({ children, surface = "default" }) {
   const { lang } = window.useLang();
   const rtl = lang === "fa";
   const t = React.useMemo(() => makeT(lang), [lang]);
-  const [viewer, setViewer] = React.useState(readViewer);
+  const [session, setSession] = React.useState(getCachedSession);
   const [toasts, setToasts] = React.useState([]);
 
   React.useEffect(() => {
     let alive = true;
-    restoreAuthSession().then((session) => {
-      if (alive) setViewer(session ? "member" : "guest");
+    restoreAuthSession().then((activeSession) => {
+      if (alive) setSession(activeSession);
     });
-    const unsubscribe = subscribeAuthState((session) => setViewer(session ? "member" : "guest"));
+    const unsubscribe = subscribeAuthState(setSession);
     return () => {
       alive = false;
       unsubscribe();
@@ -682,7 +711,8 @@ function LibraryProvider({ children, surface = "default" }) {
   const title = (video) => video.title[lang] || video.title.en;
   const desc = (video) => (video.desc ? video.desc[lang] || video.desc.en : GENERIC_DESC[lang] || GENERIC_DESC.en);
 
-  const ctx = { t, lang, rtl, viewer, showToast, catName, title, desc };
+  const viewer = session ? "member" : "guest";
+  const ctx = { t, lang, rtl, viewer, session, showToast, catName, title, desc };
   return (
     <Ctx.Provider value={ctx}>
       <div className={`lib-root is-${surface}`} dir={rtl ? "rtl" : "ltr"} lang={lang}>
@@ -843,14 +873,20 @@ function HeaderSearch({ onClose }) {
 }
 
 function LibraryHeader({ reference = false }) {
-  const { t, lang, rtl, viewer, catName, title } = useLib();
+  const { t, lang, rtl, viewer, session, catName, title } = useLib();
   const [drawer, setDrawer] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const [profileOpen, setProfileOpen] = React.useState(false);
   const [logoBroken, setLogoBroken] = React.useState(false);
   const [headerQuery, setHeaderQuery] = React.useState("");
   const [headerActive, setHeaderActive] = React.useState(-1);
   const [headerRecent, setHeaderRecent] = React.useState(readRecentSearches);
   const headerInputRef = React.useRef(null);
+  const profileMenuRef = React.useRef(null);
+  const profileName = getDisplayName(session);
+  const profileEmail = getUserEmail(session);
+  const profileInitial = (profileName || profileEmail || "V").trim().charAt(0).toUpperCase();
+  const profileAvatarUrl = session?.user.user_metadata?.avatar_url;
   const goMyList = () => {
     window.location.hash = viewer === "guest" ? loginHashFor("/dashboard/saved") : "#/dashboard/saved";
   };
@@ -866,6 +902,38 @@ function LibraryHeader({ reference = false }) {
   React.useEffect(() => {
     if (searchOpen) headerInputRef.current?.focus();
   }, [searchOpen]);
+
+  React.useEffect(() => {
+    if (!profileOpen) return undefined;
+    profileMenuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [profileOpen]);
+
+  React.useEffect(() => {
+    if (viewer === "guest") setProfileOpen(false);
+  }, [viewer]);
+
+  const renderProfileAvatar = (large = false) => (
+    <span className="lib-profile-avatar" style={large ? { width: 42, height: 42, fontSize: 14 } : undefined} aria-hidden="true">
+      {profileInitial}
+      {profileAvatarUrl ? <img src={String(profileAvatarUrl)} alt="" onError={(event) => event.currentTarget.remove()} /> : null}
+    </span>
+  );
+
+  const openProfileRoute = (hash) => {
+    setProfileOpen(false);
+    window.location.hash = hash;
+  };
+
+  const logout = async () => {
+    setProfileOpen(false);
+    await signOutUser();
+    window.location.hash = "#/";
+  };
 
   const openHeaderVideo = (video) => {
     pushRecentSearch(headerQuery || title(video));
@@ -929,30 +997,60 @@ function LibraryHeader({ reference = false }) {
         {panelItems.map(headerResultRow)}
       </div>
     );
+    const authLabel = viewer === "guest" ? t("libraryPage.header.login") : (
+      <span className="lib-profile-trigger" aria-haspopup="menu" aria-expanded={profileOpen}>
+        {renderProfileAvatar()}
+        <span className="lib-profile-name">{profileName}</span>
+        <ChevronDown size={14} />
+      </span>
+    );
     return (
-      <Header
-        mode="library"
-        layoutDirection="ltr"
-        navItems={referenceItems}
-        search={{
-          open: searchOpen,
-          query: headerQuery,
-          onChange: (event) => { setHeaderQuery(event.target.value); setHeaderActive(-1); },
-          onKeyDown: onHeaderSearchKey,
-          onOpen: () => setSearchOpen(true),
-          onClose: closeSearch,
-          inputRef: headerInputRef,
-          placeholder: t("search.placeholder"),
-          closeLabel: t("search.close"),
-          searchLabel: t("nav.search"),
-          rtl,
-          panel: headerPanel,
-        }}
-        auth={{
-          label: viewer === "guest" ? t("libraryPage.header.login") : t("nav.profile"),
-          onClick: () => { window.location.hash = viewer === "guest" ? loginHashFor("/library") : "#/dashboard"; },
-        }}
-      />
+      <>
+        <Header
+          mode="library"
+          layoutDirection="ltr"
+          navItems={referenceItems}
+          search={{
+            open: searchOpen,
+            query: headerQuery,
+            onChange: (event) => { setHeaderQuery(event.target.value); setHeaderActive(-1); },
+            onKeyDown: onHeaderSearchKey,
+            onOpen: () => setSearchOpen(true),
+            onClose: closeSearch,
+            inputRef: headerInputRef,
+            placeholder: t("search.placeholder"),
+            closeLabel: t("search.close"),
+            searchLabel: t("nav.search"),
+            rtl,
+            panel: headerPanel,
+          }}
+          auth={{
+            label: authLabel,
+            onClick: () => {
+              if (viewer === "guest") window.location.hash = loginHashFor("/library");
+              else setProfileOpen((value) => !value);
+            },
+          }}
+        />
+        {profileOpen && session ? (
+          <>
+            <div className="lib-profile-scrim" aria-hidden="true" onClick={() => setProfileOpen(false)} />
+            <div className="lib-profile-menu" role="menu" ref={profileMenuRef} aria-label={t("libraryPage.profile.menuLabel")} dir={rtl ? "rtl" : "ltr"}>
+              <div className="lib-profile-menu-head">
+                {renderProfileAvatar(true)}
+                <div><strong>{profileName}</strong><span>{profileEmail}</span></div>
+              </div>
+              <div className="lib-profile-menu-actions">
+                <button role="menuitem" onClick={() => openProfileRoute("#/dashboard")}><LayoutDashboard size={16} />{t("libraryPage.profile.dashboard")}</button>
+                <button role="menuitem" onClick={() => openProfileRoute("#/dashboard/saved")}><Bookmark size={16} />{t("libraryPage.profile.saved")}</button>
+                <button role="menuitem" onClick={() => openProfileRoute("#/dashboard/profile")}><User size={16} />{t("libraryPage.profile.account")}</button>
+                <button role="menuitem" onClick={() => openProfileRoute("#/dashboard/settings")}><Settings size={16} />{t("libraryPage.profile.settings")}</button>
+                <button role="menuitem" className="is-danger" onClick={logout}><LogOut size={16} />{t("libraryPage.profile.logout")}</button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </>
     );
   }
   return (
@@ -1140,16 +1238,28 @@ function CategoryChips({ active, onChange, keys, max = 6 }) {
 function FeaturedHero({ loading }) {
   const { t, lang, rtl, title, desc, catName } = useLib();
   const [slide, setSlide] = React.useState(0);
+  const [previousSlide, setPreviousSlide] = React.useState(null);
+  const [transitionId, setTransitionId] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
+  const transitionTimerRef = React.useRef(null);
   const items = HERO_SLUGS.map(bySlug);
   const video = items[slide];
   const media = HERO_MEDIA[video.slug];
-  const move = React.useCallback((delta) => setSlide((current) => (current + delta + items.length) % items.length), [items.length]);
+  const selectSlide = React.useCallback((target) => {
+    if (target === slide) return;
+    window.clearTimeout(transitionTimerRef.current);
+    setPreviousSlide(slide);
+    setSlide(target);
+    setTransitionId((value) => value + 1);
+    transitionTimerRef.current = window.setTimeout(() => setPreviousSlide(null), 1200);
+  }, [slide]);
+  const move = React.useCallback((delta) => selectSlide((slide + delta + items.length) % items.length), [items.length, selectSlide, slide]);
   React.useEffect(() => {
     if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
     const timer = window.setInterval(() => move(1), 6000);
     return () => window.clearInterval(timer);
   }, [move, paused]);
+  React.useEffect(() => () => window.clearTimeout(transitionTimerRef.current), []);
   if (loading) {
     return (
       <div className="lib-hero-shell"><div className="lib-hero">
@@ -1175,15 +1285,26 @@ function FeaturedHero({ loading }) {
         onFocusCapture={() => setPaused(true)}
         onBlurCapture={() => setPaused(false)}
       >
+        {previousSlide !== null ? (
+          <img
+            className={`lib-hero-media is-previous${HERO_MEDIA[items[previousSlide].slug].flip ? " is-flipped" : ""}`}
+            src={`${BASE()}${HERO_MEDIA[items[previousSlide].slug].src}`}
+            alt=""
+            aria-hidden="true"
+            style={{ objectPosition: HERO_MEDIA[items[previousSlide].slug].position }}
+          />
+        ) : null}
         <img
-          className={`lib-hero-media${media.flip ? " is-flipped" : ""}`}
+          key={`${video.slug}-${transitionId}`}
+          className={`lib-hero-media is-current${previousSlide !== null ? " is-revealing" : ""}${media.flip ? " is-flipped" : ""}`}
           src={`${BASE()}${media.src}`}
           alt={title(video)}
           style={{ objectPosition: media.position }}
         />
+        {previousSlide !== null ? <span key={transitionId} className="lib-hero-glass-wave" aria-hidden="true" /> : null}
         <div className="lib-hero-shade" />
         <div className="lib-hero-in">
-          <div className="lib-hero-box">
+          <div key={video.slug} className={`lib-hero-box${previousSlide !== null ? " is-revealing" : ""}`}>
             <p className="lib-hero-label">{t("libraryPage.hero.eyebrow")}</p>
             <h1 className="lib-hero-title">{title(video)}</h1>
             <p className="lib-hero-desc">{desc(video)}</p>
@@ -1203,11 +1324,18 @@ function FeaturedHero({ loading }) {
         </div>
         <button className="lib-hero-arrow is-prev" aria-label={t("trending.prev")} onClick={() => move(-1)}>{rtl ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}</button>
         <button className="lib-hero-arrow is-next" aria-label={t("trending.next")} onClick={() => move(1)}>{rtl ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}</button>
-        <div className="lib-hero-dots">
-          {items.map((item, i) => (
-            <button key={item.slug} className={i === slide ? "is-active" : ""} aria-label={t("hero.slide", { n: fmtNum(lang, i + 1) })} aria-current={i === slide ? "true" : undefined} onClick={() => setSlide(i)} />
-          ))}
+        <div className="lib-hero-counter" aria-hidden="true">
+          <strong>{String(slide + 1).padStart(2, "0")}</strong>
+          <span>/ {String(items.length).padStart(2, "0")}</span>
         </div>
+        <nav className="lib-hero-nav" aria-label={t("hero.label")}>
+          {items.map((item, i) => (
+            <button key={`${item.slug}-${i === slide ? transitionId : "idle"}`} className={`lib-hero-nav-item${i === slide ? " is-active" : ""}`} aria-label={t("hero.slide", { n: fmtNum(lang, i + 1) })} aria-current={i === slide ? "true" : undefined} onClick={() => selectSlide(i)}>
+              <span className="lib-hero-nav-track"><span className="lib-hero-nav-fill" /></span>
+              <span className="lib-hero-nav-label" dir="auto">{title(item)}</span>
+            </button>
+          ))}
+        </nav>
       </section>
     </div>
   );

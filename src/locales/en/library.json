@@ -15,6 +15,14 @@
       "subscription": "Get a subscription",
       "login": "Log in / Sign up"
     },
+    "profile": {
+      "menuLabel": "Account menu",
+      "dashboard": "Dashboard",
+      "saved": "Saved videos",
+      "account": "My profile",
+      "settings": "Settings",
+      "logout": "Log out"
+    },
     "hero": {
       "eyebrow": "Featured",
       "watch": "Watch video"
