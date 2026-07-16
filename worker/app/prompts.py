@@ -126,6 +126,78 @@ supporting segment, use an empty list for it.
 material itself does.
 """
 
+# ---------------------------------------------------------------------------
+# Adaptive-learning prompts. Versioned via learning_config.ASSESS/GEN versions.
+# The assessment prompt CLASSIFIES; it must never invent teachable material.
+# The generation prompt builds flashcards/quiz strictly from the transcript;
+# every claim is validated and clamped server-side afterwards, timestamps are
+# never taken from the model, and honest small/empty output is preferred over
+# padded filler.
+# ---------------------------------------------------------------------------
+
+LEARNING_ASSESS_PROMPT = """\
+You classify whether ONE video transcript is suitable for learning practice. \
+You receive the transcript as numbered segments with Persian text and, when \
+available, the original source-language text.
+
+Return VALID JSON ONLY (no prose, no markdown, no code fences) with exactly \
+this shape:
+{"content_kind":"conceptual|procedural|factual|opinion|narrative|entertainment|promotional|mixed",
+ "content_suitability":"high|medium|low|none",
+ "language_suitability":"high|medium|low|none",
+ "reason_code":"MEANINGFUL_CONCEPTS|USEFUL_LANGUAGE|MEANINGFUL_CONCEPTS_AND_LANGUAGE|TOO_SHORT|LOW_INFORMATION|ENTERTAINMENT_ONLY|NARRATIVE_ONLY|PROMOTIONAL_ONLY",
+ "teachable_points":[{"text":"...","segment_indexes":[0]}]}
+
+Strict rules:
+- content_suitability measures whether the transcript contains distinct, \
+meaningful concepts, facts, steps, or arguments a learner could review. Pure \
+entertainment, thin promotion, or fragmentary speech is "low" or "none". Be \
+honest: NOT every video deserves practice, and "none" is a correct answer.
+- language_suitability measures whether the original-language text contains \
+useful phrases, vocabulary, or expressions for language practice. A fun or \
+narrative video can still be valuable for language practice.
+- teachable_points: ONLY distinct ideas actually present in the transcript, \
+written in fluent Persian, each grounded in the exact segment indexes that \
+support it. If nothing is genuinely teachable, return an empty list. Never \
+invent points to look useful.
+- Opinion content must be treated as the speaker's position, not fact.
+- segment_indexes must be integers copied from the input. Never invent them.
+- No emojis, no marketing language.
+"""
+
+LEARNING_GENERATE_PROMPT = """\
+You create Persian learning-practice items from ONE video transcript. You \
+receive the practice mode, item ceilings, identified teachable points, and \
+the transcript as numbered segments with Persian text and original text.
+
+Return VALID JSON ONLY (no prose, no markdown, no code fences) with exactly \
+this shape:
+{"flashcards":[{"learning_mode":"content|language","front":"...","back":"...",
+  "segment_indexes":[0]}],
+ "quiz":[{"learning_mode":"content|language","question":"...",
+  "choices":["...","...","..."],"correct_choice_index":0,
+  "explanation":"...","segment_indexes":[0]}]}
+
+Strict rules:
+- Use ONLY information present in the transcript. Never add outside knowledge.
+- FEWER, better items beat padded filler. Never repeat the same idea. If the \
+material only supports one or two items, return one or two. Respect the given \
+ceilings as maximums, never as targets.
+- content items: test central ideas, not incidental wording or trivial names. \
+Front/question and back/explanation are fluent Persian. For procedural \
+material, preserve the actual order of steps and never invent missing steps. \
+For opinions, use phrasing like «طبق دیدگاه گوینده…».
+- language items: front is an EXACT phrase or expression copied verbatim from \
+the original-language transcript text of the cited segments; back is its \
+natural Persian meaning in this context. Prefer useful phrases over isolated \
+words. Never use vocabulary that does not appear in the transcript.
+- quiz: exactly one uniquely correct choice per question, 3 or 4 distinct \
+plausible choices, no "all of the above", no trick questions, and a Persian \
+explanation grounded in the cited segments.
+- segment_indexes must be integers copied from the input; every item must \
+cite the segments that support it. Never invent indexes or timestamps.
+"""
+
 TRANSLATION_SYSTEM_PROMPT = """\
 You are a professional subtitle translator. You translate spoken-video \
 transcript segments from their source language into fluent, natural Persian \

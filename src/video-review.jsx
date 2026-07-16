@@ -62,6 +62,25 @@ import {
   saveChatAnswerToNote,
   saveNotePersonalText,
 } from "./lib/note-review";
+import {
+  MODE_LABEL_FA,
+  PROFILE_STATE_FA,
+  RECOMMENDATION_FA,
+  completeLearningSession,
+  deriveProfileState,
+  deriveSetState,
+  fetchLearningItems,
+  fetchLearningProfile,
+  fetchLearningSet,
+  fetchSessionAttempts,
+  learningItemSeekMs,
+  rateFlashcard,
+  requestAssessment,
+  requestGeneration,
+  startLearningSession,
+  submitQuizAnswer,
+  supportedModesFor,
+} from "./lib/learning-review";
 import "./video-review.css";
 
 const PERSONAL_NOTE_MAX = 20000;
@@ -184,7 +203,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [tab, setTab] = React.useState(() => {
     try {
       const stored = window.sessionStorage.getItem(`vidora.review-tab.${video.id}`);
-      return ["transcript", "summary", "chapters", "chat", "notes"].includes(stored) ? stored : "transcript";
+      return ["transcript", "summary", "chapters", "chat", "notes", "practice"].includes(stored) ? stored : "transcript";
     } catch {
       return "transcript";
     }
@@ -194,6 +213,24 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const [selectedChapter, setSelectedChapter] = React.useState(-1);
   const [chatState, setChatState] = React.useState({ loading: true, messages: [], error: "", sending: false });
   const [chatInput, setChatInput] = React.useState("");
+  const [learningState, setLearningState] = React.useState({ loading: true, profile: null, set: null, items: [] });
+  const [learningGoal, setLearningGoal] = React.useState(() => {
+    try {
+      const stored = window.sessionStorage.getItem(`vidora.learning-goal.${video.id}`);
+      return ["content", "language", "both", "watch"].includes(stored) ? stored : "";
+    } catch {
+      return "";
+    }
+  });
+  const [learningBusy, setLearningBusy] = React.useState("");
+  const [learningError, setLearningError] = React.useState("");
+  const [learningSession, setLearningSession] = React.useState(null);
+  const [learningAttempts, setLearningAttempts] = React.useState({});
+  const [revealedCards, setRevealedCards] = React.useState({});
+  const [quizAnswers, setQuizAnswers] = React.useState({});
+  const [quizSelection, setQuizSelection] = React.useState({});
+  const [sessionDone, setSessionDone] = React.useState(false);
+  const assessTriggeredRef = React.useRef(false);
   const [noteState, setNoteState] = React.useState({ loading: true, note: null, saved: [], error: "" });
   const [personalText, setPersonalText] = React.useState("");
   const [personalStatus, setPersonalStatus] = React.useState("idle"); // idle | dirty | saving | saved | error
@@ -323,6 +360,194 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
       setNoteState({ loading: false, note: null, saved: [], error: appError.messageFa });
     }
   }, [session, video.id]);
+
+  const learningActiveMode = React.useMemo(() => {
+    const profile = learningState.profile;
+    if (!profile || learningGoal === "watch") return "";
+    const supported = supportedModesFor(profile);
+    if (learningGoal && supported.includes(learningGoal)) return learningGoal;
+    const recommended = profile.recommended_mode;
+    return recommended && recommended !== "none" && supported.includes(recommended) ? recommended : "";
+  }, [learningState.profile, learningGoal]);
+
+  const loadLearning = React.useCallback(async (mode) => {
+    setLearningState((previous) => ({ ...previous, loading: true }));
+    try {
+      const profile = await fetchLearningProfile(session, video.id);
+      let set = null;
+      let items = [];
+      if (profile && deriveProfileState(profile) === "ready" && mode) {
+        set = await fetchLearningSet(session, video.id, mode);
+        if (set && deriveSetState(set) === "ready") {
+          items = await fetchLearningItems(session, set.id);
+        }
+      }
+      setLearningState({ loading: false, profile, set, items });
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.loadLearning");
+      // Practice availability must never block the rest of the review page.
+      setLearningState({ loading: false, profile: null, set: null, items: [] });
+    }
+  }, [session, video.id]);
+
+  React.useEffect(() => {
+    loadLearning();
+  }, [loadLearning]);
+
+  React.useEffect(() => {
+    try {
+      if (learningGoal) window.sessionStorage.setItem(`vidora.learning-goal.${video.id}`, learningGoal);
+    } catch {
+      // Preference persistence is non-critical.
+    }
+  }, [learningGoal, video.id]);
+
+  const handleAssess = React.useCallback(async () => {
+    if (learningBusy) return;
+    setLearningBusy("assess");
+    setLearningError("");
+    try {
+      await requestAssessment(session, video.id);
+      await loadLearning(learningActiveMode);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleAssess");
+      setLearningError(appError.messageFa);
+    } finally {
+      setLearningBusy("");
+    }
+  }, [learningBusy, session, video.id, loadLearning, learningActiveMode]);
+
+  // Assess once, lazily, the first time the practice tab is opened without a
+  // stored profile. Generation always stays behind an explicit user action.
+  React.useEffect(() => {
+    if (tab !== "practice" || learningState.loading || assessTriggeredRef.current) return;
+    if (!learningState.profile) {
+      assessTriggeredRef.current = true;
+      handleAssess();
+    }
+  }, [tab, learningState.loading, learningState.profile, handleAssess]);
+
+  // Load the set for the active mode when the goal or profile changes.
+  React.useEffect(() => {
+    if (tab !== "practice" || learningState.loading || !learningState.profile) return;
+    const wanted = learningActiveMode;
+    if (wanted && (!learningState.set || learningState.set.mode !== wanted)) {
+      loadLearning(wanted);
+    }
+  }, [tab, learningActiveMode, learningState.loading, learningState.profile, learningState.set, loadLearning]);
+
+  const resetPracticeUi = React.useCallback(() => {
+    setLearningAttempts({});
+    setRevealedCards({});
+    setQuizAnswers({});
+    setQuizSelection({});
+    setSessionDone(false);
+  }, []);
+
+  const handleGenerate = React.useCallback(async (mode, force = false) => {
+    if (learningBusy || !mode) return;
+    setLearningBusy("generate");
+    setLearningError("");
+    try {
+      await requestGeneration(session, video.id, mode, force);
+      setLearningSession(null);
+      resetPracticeUi();
+      await loadLearning(mode);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleGenerate");
+      setLearningError(appError.messageFa);
+    } finally {
+      setLearningBusy("");
+    }
+  }, [learningBusy, session, video.id, loadLearning, resetPracticeUi]);
+
+  // Start/resume the per-user session once a ready set with items is on screen.
+  React.useEffect(() => {
+    if (tab !== "practice" || !learningState.set || !learningState.items.length) return;
+    if (learningSession && learningSession.setId === learningState.set.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const practiceSession = await startLearningSession(session, video.id, learningState.set.id);
+        const attempts = await fetchSessionAttempts(session, practiceSession.id);
+        if (cancelled) return;
+        setLearningSession({ id: practiceSession.id, setId: learningState.set.id });
+        const byItem = {};
+        for (const attempt of attempts) byItem[attempt.learning_item_id] = attempt;
+        setLearningAttempts(byItem);
+        setSessionDone(false);
+      } catch (error) {
+        const appError = toAppError(error);
+        logAppError(appError, "ProcessedVideoReview.startLearningSession");
+        if (!cancelled) setLearningError(appError.messageFa);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, learningState.set, learningState.items.length, learningSession, session, video.id]);
+
+  const handleRateCard = React.useCallback(async (itemId, rating) => {
+    if (!learningSession) return;
+    setLearningAttempts((previous) => ({
+      ...previous,
+      [itemId]: { learning_item_id: itemId, response_type: "flashcard_rating", flashcard_rating: rating, selected_choice_index: null, is_correct: null },
+    }));
+    try {
+      await rateFlashcard(session, learningSession.id, itemId, rating);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleRateCard");
+      setLearningError(appError.messageFa);
+      const attempts = await fetchSessionAttempts(session, learningSession.id).catch(() => []);
+      const byItem = {};
+      for (const attempt of attempts) byItem[attempt.learning_item_id] = attempt;
+      setLearningAttempts(byItem);
+    }
+  }, [learningSession, session]);
+
+  const handleSubmitAnswer = React.useCallback(async (itemId, choiceIndex) => {
+    if (!learningSession || typeof choiceIndex !== "number") return;
+    setLearningError("");
+    try {
+      const result = await submitQuizAnswer(session, learningSession.id, itemId, choiceIndex);
+      setQuizAnswers((previous) => ({ ...previous, [itemId]: result }));
+      setLearningAttempts((previous) => ({
+        ...previous,
+        [itemId]: { learning_item_id: itemId, response_type: "quiz_answer", selected_choice_index: result.selected_choice_index, flashcard_rating: null, is_correct: result.is_correct },
+      }));
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleSubmitAnswer");
+      setLearningError(appError.messageFa);
+    }
+  }, [learningSession, session]);
+
+  const handleFinishSession = React.useCallback(async () => {
+    if (!learningSession) return;
+    try {
+      await completeLearningSession(session, learningSession.id);
+      setSessionDone(true);
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleFinishSession");
+      setLearningError(appError.messageFa);
+    }
+  }, [learningSession, session]);
+
+  const handleRestartSession = React.useCallback(async () => {
+    if (!learningSession || !learningState.set) return;
+    try {
+      await completeLearningSession(session, learningSession.id);
+      setLearningSession(null);
+      resetPracticeUi();
+    } catch (error) {
+      const appError = toAppError(error);
+      logAppError(appError, "ProcessedVideoReview.handleRestartSession");
+      setLearningError(appError.messageFa);
+    }
+  }, [learningSession, learningState.set, session, resetPracticeUi]);
 
   const applySubtitleMode = React.useCallback((show) => {
     const player = videoRef.current;
@@ -817,6 +1042,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
               ["chapters", "فصل‌ها"],
               ["chat", "پرسش از ویدیو"],
               ["notes", "یادداشت‌ها"],
+              ["practice", "تمرین"],
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -1079,6 +1305,206 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                         onChange={(event) => handlePersonalChange(event.target.value)} onBlur={flushPersonalSave} />
                       <p className="vdr-note-count">{personalText.length.toLocaleString("fa-IR")} / {PERSONAL_NOTE_MAX.toLocaleString("fa-IR")}</p>
                     </section>
+                  </>
+                );
+              })()}
+            </div>
+          ) : null}
+
+          {tab === "practice" ? (
+            <div className="vdr-practice-panel" role="tabpanel" aria-label="تمرین این ویدیو">
+              {learningState.loading || learningBusy === "assess" ? (
+                <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> {learningBusy === "assess" ? "در حال بررسی مناسب‌بودن این ویدیو برای تمرین…" : "در حال دریافت وضعیت تمرین..."}</p>
+              ) : (() => {
+                const profile = learningState.profile;
+                const profileState = deriveProfileState(profile);
+                if (profileState !== "ready") {
+                  return (
+                    <div className="vdr-practice-block">
+                      <p className="vdr-insight-status" role="status">{PROFILE_STATE_FA[profileState]}</p>
+                      {learningError ? <p className="vdr-chat-error" role="alert">{learningError}</p> : null}
+                      {profileState !== "generating" ? (
+                        <button type="button" className="vd-secondary vdr-practice-action" onClick={handleAssess} disabled={!!learningBusy}>
+                          <RefreshCw size={14} /> بررسی مناسب‌بودن برای تمرین
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }
+                const supported = supportedModesFor(profile);
+                const recommended = profile.recommended_mode || "none";
+                const activeMode = learningActiveMode;
+                const set = learningState.set && learningState.set.mode === activeMode ? learningState.set : null;
+                const setState = deriveSetState(set);
+                const flashcards = learningState.items.filter((item) => item.item_type === "flashcard");
+                const quizItems = learningState.items.filter((item) => item.item_type === "multiple_choice");
+                const ratedCount = Object.values(learningAttempts).filter((a) => a.response_type === "flashcard_rating").length;
+                const knownCount = Object.values(learningAttempts).filter((a) => a.flashcard_rating === "known").length;
+                const answeredCount = Object.values(learningAttempts).filter((a) => a.response_type === "quiz_answer").length;
+                const correctCount = Object.values(learningAttempts).filter((a) => a.is_correct === true).length;
+                return (
+                  <>
+                    <section className="vdr-practice-block">
+                      <p className="vdr-practice-recommendation" dir="rtl">{RECOMMENDATION_FA[recommended]}</p>
+                      {recommended === "none" ? (
+                        <p className="vdr-note-hint">این به معنای ضعف ویدیو نیست؛ برخی ویدیوها صرفاً برای تماشا هستند.</p>
+                      ) : null}
+                      {supported.length ? (
+                        <div className="vdr-practice-goals" role="group" aria-label="هدف تمرین">
+                          {supported.concat(["watch"]).map((mode) => (
+                            <button key={mode} type="button"
+                              className={(mode === "watch" ? learningGoal === "watch" : activeMode === mode) ? "is-active" : ""}
+                              onClick={() => setLearningGoal(mode)}>
+                              {MODE_LABEL_FA[mode]}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
+                    {learningError ? <p className="vdr-chat-error" role="alert">{learningError}</p> : null}
+                    {learningGoal === "watch" ? (
+                      <p className="vdr-note-hint">حالت «فقط تماشا» انتخاب شده است؛ تمرینی ساخته نمی‌شود.</p>
+                    ) : activeMode ? (
+                      learningBusy === "generate" || setState === "generating" ? (
+                        <p className="vdr-insight-status"><Loader2 size={16} className="vd-spin" /> در حال ساخت تمرین... این کار ممکن است چند لحظه طول بکشد.</p>
+                      ) : setState === "ready" && learningState.items.length ? (
+                        <>
+                          {flashcards.length ? (
+                            <section className="vdr-practice-block">
+                              <h3 className="vdr-practice-heading">فلش‌کارت‌ها</h3>
+                              <ul className="vdr-practice-cards">
+                                {flashcards.map((item) => {
+                                  const attempt = learningAttempts[item.id];
+                                  const revealed = !!revealedCards[item.id];
+                                  return (
+                                    <li key={item.id} className="vdr-practice-card">
+                                      <p className="vdr-practice-front" dir="auto">{item.front_text}</p>
+                                      {revealed ? (
+                                        <>
+                                          <p className="vdr-practice-back" dir="rtl">{item.back_text}</p>
+                                          {learningItemSeekMs(item) !== null ? (
+                                            <button type="button" className="vdr-practice-cite" onClick={() => seekToMs(item.start_ms)}>
+                                              <Play size={12} /> <span dir="ltr">{formatTranscriptTimestamp(item.start_ms)}</span>
+                                            </button>
+                                          ) : null}
+                                          <div className="vdr-practice-rate">
+                                            <button type="button" className={attempt?.flashcard_rating === "known" ? "is-active" : ""}
+                                              onClick={() => handleRateCard(item.id, "known")}>بلد بودم</button>
+                                            <button type="button" className={attempt?.flashcard_rating === "review" ? "is-active" : ""}
+                                              onClick={() => handleRateCard(item.id, "review")}>نیاز به مرور</button>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <button type="button" className="vd-secondary vdr-practice-action"
+                                          onClick={() => setRevealedCards((previous) => ({ ...previous, [item.id]: true }))}>
+                                          نمایش پاسخ
+                                        </button>
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </section>
+                          ) : null}
+                          {quizItems.length ? (
+                            <section className="vdr-practice-block">
+                              <h3 className="vdr-practice-heading">آزمون چهارگزینه‌ای</h3>
+                              <ol className="vdr-practice-quiz">
+                                {quizItems.map((item) => {
+                                  const attempt = learningAttempts[item.id];
+                                  const result = quizAnswers[item.id];
+                                  const selection = quizSelection[item.id];
+                                  return (
+                                    <li key={item.id} className="vdr-practice-question">
+                                      <p dir="rtl"><b>{item.question_text}</b></p>
+                                      <div className="vdr-practice-choices" role="group">
+                                        {(item.choices || []).map((choice, index) => {
+                                          let cls = "";
+                                          if (result) {
+                                            if (index === result.correct_choice_index) cls = "is-correct";
+                                            else if (index === result.selected_choice_index) cls = "is-wrong";
+                                          } else if (attempt && index === attempt.selected_choice_index) {
+                                            cls = attempt.is_correct ? "is-correct" : "is-wrong";
+                                          } else if (selection === index) {
+                                            cls = "is-selected";
+                                          }
+                                          return (
+                                            <button key={index} type="button" dir="auto" className={cls}
+                                              disabled={!!attempt || !!result}
+                                              onClick={() => setQuizSelection((previous) => ({ ...previous, [item.id]: index }))}>
+                                              {choice}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      {!attempt && !result ? (
+                                        <button type="button" className="vd-secondary vdr-practice-action"
+                                          disabled={typeof selection !== "number"}
+                                          onClick={() => handleSubmitAnswer(item.id, selection)}>
+                                          ثبت پاسخ
+                                        </button>
+                                      ) : result ? (
+                                        <div className={"vdr-practice-feedback" + (result.is_correct ? " is-correct" : " is-wrong")}>
+                                          <p dir="rtl"><b>{result.is_correct ? "درست بود." : "درست نبود."}</b> {result.explanation}</p>
+                                          {learningItemSeekMs(item) !== null ? (
+                                            <button type="button" className="vdr-practice-cite" onClick={() => seekToMs(item.start_ms)}>
+                                              <Play size={12} /> <span dir="ltr">{formatTranscriptTimestamp(item.start_ms)}</span>
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                      ) : (
+                                        <div className="vdr-practice-feedback">
+                                          <p dir="rtl">پاسخ شما قبلاً ثبت شده ({attempt.is_correct ? "درست" : "نادرست"}).</p>
+                                          <button type="button" className="vdr-practice-cite"
+                                            onClick={() => handleSubmitAnswer(item.id, attempt.selected_choice_index)}>
+                                            نمایش پاسخ درست
+                                          </button>
+                                        </div>
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ol>
+                            </section>
+                          ) : null}
+                          <section className="vdr-practice-block vdr-practice-summary">
+                            <p dir="rtl" role="status">
+                              {flashcards.length ? `کارت‌ها: ${ratedCount.toLocaleString("fa-IR")} از ${flashcards.length.toLocaleString("fa-IR")} مرور شد (${knownCount.toLocaleString("fa-IR")} بلد بودید). ` : ""}
+                              {quizItems.length ? `آزمون: ${answeredCount.toLocaleString("fa-IR")} از ${quizItems.length.toLocaleString("fa-IR")} پاسخ داده شد (${correctCount.toLocaleString("fa-IR")} درست).` : ""}
+                            </p>
+                            <div className="vdr-practice-rate">
+                              {!sessionDone ? (
+                                <button type="button" className="vd-secondary" onClick={handleFinishSession}>پایان جلسه</button>
+                              ) : (
+                                <button type="button" className="vd-secondary" onClick={handleRestartSession}><RefreshCw size={14} /> شروع دوباره</button>
+                              )}
+                            </div>
+                            {sessionDone ? <p className="vdr-note-hint">این جمع‌بندی فقط مرور همین جلسه است، نه سنجش یادگیری بلندمدت.</p> : null}
+                          </section>
+                        </>
+                      ) : setState === "failed" ? (
+                        <div className="vdr-practice-block">
+                          <p className="vdr-insight-status" role="status">ساخت تمرین این ویدیو انجام نشد؛ سایر بخش‌ها در دسترس‌اند.</p>
+                          <button type="button" className="vd-secondary vdr-practice-action" onClick={() => handleGenerate(activeMode)} disabled={!!learningBusy}>
+                            <RefreshCw size={14} /> تلاش دوباره
+                          </button>
+                        </div>
+                      ) : setState === "stale" ? (
+                        <div className="vdr-practice-block">
+                          <p className="vdr-insight-status is-warning" role="status">محتوای ویدیو تغییر کرده و تمرین باید دوباره ساخته شود.</p>
+                          <button type="button" className="vd-secondary vdr-practice-action" onClick={() => handleGenerate(activeMode, true)} disabled={!!learningBusy}>
+                            <RefreshCw size={14} /> ساخت دوباره تمرین
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="vdr-practice-block">
+                          <p className="vdr-note-hint">تمرین این حالت هنوز ساخته نشده است. ساخت تمرین ممکن است کمی طول بکشد.</p>
+                          <button type="button" className="vd-secondary vdr-practice-action" onClick={() => handleGenerate(activeMode)} disabled={!!learningBusy}>
+                            ساخت تمرین
+                          </button>
+                        </div>
+                      )
+                    ) : null}
                   </>
                 );
               })()}

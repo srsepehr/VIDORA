@@ -10,7 +10,7 @@ on:
         description: "deploy | health | drain | inspect | subtitles | subtitles-inspect | subtitles-verify | insights | insights-inspect | chat-index | chat-index-inspect"
         type: choice
         default: health
-        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect, chat-diagnose, chat-logs, note-build, note-inspect]
+        options: [deploy, health, drain, inspect, subtitles, subtitles-inspect, subtitles-verify, insights, insights-inspect, chat-index, chat-index-inspect, chat-diagnose, chat-logs, note-build, note-inspect, learning-assess, learning-build, learning-inspect]
       video_id:
         description: "video id for inspect / subtitles / insights / chat / note"
         type: string
@@ -19,8 +19,12 @@ on:
         description: "owner user id (for note-build / note-inspect)"
         type: string
         default: ""
+      mode:
+        description: "learning mode for learning-build (content | language | both)"
+        type: string
+        default: "content"
       force:
-        description: "force regeneration (subtitles / insights / chat index / note)"
+        description: "force regeneration (subtitles / insights / chat index / note / learning)"
         type: boolean
         default: false
 
@@ -90,3 +94,12 @@ jobs:
       - name: Inspect AI note state (structural facts only)
         if: ${{ inputs.step == 'note-inspect' }}
         run: modal run worker/modal_app.py::note_inspect --video-id "${{ inputs.video_id }}" --user-id "${{ inputs.user_id }}"
+      - name: Assess learning suitability (structural output only)
+        if: ${{ inputs.step == 'learning-assess' }}
+        run: modal run worker/modal_app.py::learning_assess --video-id "${{ inputs.video_id }}" ${{ inputs.force && '--force' || '' }}
+      - name: Build learning set (flashcards + quiz — structural output only)
+        if: ${{ inputs.step == 'learning-build' }}
+        run: modal run worker/modal_app.py::learning_build --video-id "${{ inputs.video_id }}" --mode "${{ inputs.mode }}" ${{ inputs.force && '--force' || '' }}
+      - name: Inspect learning state (structural facts only)
+        if: ${{ inputs.step == 'learning-inspect' }}
+        run: modal run worker/modal_app.py::learning_inspect --video-id "${{ inputs.video_id }}"

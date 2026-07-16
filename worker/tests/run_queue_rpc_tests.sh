@@ -55,6 +55,8 @@ psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_MIGRATION" >/dev/null || { echo "chat migr
 psql -qX -v ON_ERROR_STOP=1 -f "$CHAT_HARDENING_MIGRATION" >/dev/null || { echo "chat hardening migration load failed"; exit 1; }
 NOTE_MIGRATION="$REPO/supabase/migrations/202607120004_video_notes.sql"
 psql -qX -v ON_ERROR_STOP=1 -f "$NOTE_MIGRATION" >/dev/null || { echo "note migration load failed"; exit 1; }
+LEARNING_MIGRATION="$REPO/supabase/migrations/202607130001_video_learning.sql"
+psql -qX -v ON_ERROR_STOP=1 -f "$LEARNING_MIGRATION" >/dev/null || { echo "learning migration load failed"; exit 1; }
 ok "migrations + prereqs load cleanly into Postgres"
 
 U=11111111-1111-1111-1111-111111111111
@@ -396,6 +398,116 @@ eq "another user cannot read saved answers" "0" "$(auth_run 33333333-3333-3333-3
 q "delete from public.videos where id='$NOTEVID';" >/dev/null
 eq "video delete cascades notes" "0" "$(q "select count(*) from public.video_notes where video_id='$NOTEVID';")"
 eq "video delete cascades saved answers" "0" "$(q "select count(*) from public.video_note_saved_answers where video_id='$NOTEVID';")"
+
+# ---- 17. adaptive learning: profiles, sets, answer safety, sessions, RLS ----
+IDS=$(seed_job translating completed 1 3 NULL true); LVID=${IDS%|*}
+q "insert into auth.users(id) values('$U') on conflict do nothing;" >/dev/null
+U2=55555555-5555-5555-5555-555555555555
+q "insert into auth.users(id) values('$U2') on conflict do nothing;" >/dev/null
+
+# profile persistence + editorial preservation
+TP='[{"text":"نکته قابل یادگیری","segment_indexes":[0]}]'
+q "select public.persist_video_learning_profile('$LVID','both','conceptual','high','medium','MEANINGFUL_CONCEPTS_AND_LANGUAGE','$TP'::jsonb,'phashA','local','qwen','lrn-a1','lrn-as1','model');" >/dev/null
+eq "learning profile persisted ready" "ready" "$(q "select status from public.video_learning_profiles where video_id='$LVID';")"
+eq "one profile per video" "1" "$(q "select count(*) from public.video_learning_profiles where video_id='$LVID';")"
+q "update public.video_learning_profiles set editorial_policy='language' where video_id='$LVID';" >/dev/null
+q "select public.persist_video_learning_profile('$LVID','content','factual','high','none','MEANINGFUL_CONCEPTS','[]'::jsonb,'phashB','local','qwen','lrn-a1','lrn-as1','model');" >/dev/null
+eq "re-assessment preserves editorial policy" "language" "$(q "select editorial_policy from public.video_learning_profiles where video_id='$LVID';")"
+eq "re-assessment keeps one profile row" "1" "$(q "select count(*) from public.video_learning_profiles where video_id='$LVID';")"
+q "update public.video_learning_profiles set editorial_policy='auto' where video_id='$LVID';" >/dev/null
+
+# set persistence: atomic item replace + counts
+ITEMS='[{"item_index":0,"item_type":"flashcard","learning_mode":"content","front_text":"سؤال","back_text":"پاسخ","source_segment_indexes":[0],"start_ms":0,"end_ms":10000},{"item_index":1,"item_type":"multiple_choice","learning_mode":"content","question_text":"کدام درست است؟","choices":["گزینه درست","گزینه نادرست","گزینه دیگر"],"correct_choice_index":0,"explanation":"توضیح مستند","source_segment_indexes":[0],"start_ms":0,"end_ms":10000}]'
+q "select public.persist_video_learning_set('$LVID','content','ghashA','phashB','local','qwen','lrn-g1','lrn-gs1','$ITEMS'::jsonb);" >/dev/null
+eq "learning set persisted ready" "ready" "$(q "select status from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+eq "set counts computed from items" "1|1" "$(q "select flashcard_count||'|'||quiz_count from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+eq "items inserted" "2" "$(q "select count(*) from public.video_learning_items where video_id='$LVID';")"
+q "select public.persist_video_learning_set('$LVID','content','ghashA','phashB','local','qwen','lrn-g1','lrn-gs1','$ITEMS'::jsonb);" >/dev/null
+eq "re-persist keeps one set row" "1" "$(q "select count(*) from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+eq "re-persist replaces items without duplication" "2" "$(q "select count(*) from public.video_learning_items where video_id='$LVID';")"
+
+# failed status transition preserves prior counts; stale marking honors hash
+q "select public.set_video_learning_set_status('$LVID','content','failed','ghashB','LEARNING_INVALID_OUTPUT');" >/dev/null
+eq "failed set status recorded" "failed" "$(q "select status from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+eq "failed status preserves items" "2" "$(q "select count(*) from public.video_learning_items where video_id='$LVID';")"
+q "select public.persist_video_learning_set('$LVID','content','ghashA','phashB','local','qwen','lrn-g1','lrn-gs1','$ITEMS'::jsonb);" >/dev/null
+q "select public.mark_video_learning_stale('$LVID','otherhash');" >/dev/null
+eq "profile stale when hash differs" "stale" "$(q "select status from public.video_learning_profiles where video_id='$LVID';")"
+eq "set stale when profile hash differs" "stale" "$(q "select status from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+q "update public.video_learning_profiles set status='ready' where video_id='$LVID';" >/dev/null
+q "update public.video_learning_sets set status='ready' where video_id='$LVID';" >/dev/null
+q "select public.mark_video_learning_stale('$LVID','phashB');" >/dev/null
+eq "stale marking keeps matching profile ready" "ready" "$(q "select status from public.video_learning_profiles where video_id='$LVID';")"
+eq "stale marking keeps matching set ready" "ready" "$(q "select status from public.video_learning_sets where video_id='$LVID' and mode='content';")"
+
+# ANSWER SAFETY: browser column grants exclude the correct answer
+denycorrect=$(auth_run "$U" "select correct_choice_index from public.video_learning_items limit 1;" | tr -d '\n')
+eq "browser cannot read correct_choice_index" "denied" "$(echo "$denycorrect" | grep -qi 'permission denied' && echo denied || echo "$denycorrect")"
+denyexpl=$(auth_run "$U" "select explanation from public.video_learning_items limit 1;" | tr -d '\n')
+eq "browser cannot read explanation" "denied" "$(echo "$denyexpl" | grep -qi 'permission denied' && echo denied || echo "$denyexpl")"
+eq "browser reads allowed item columns" "2" "$(auth_run "$U" "select count(question_text) + count(front_text) from public.video_learning_items where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+eq "authenticated has no correct-answer column grant" "f" "$(q "select has_column_privilege('authenticated','public.video_learning_items','correct_choice_index','select');")"
+eq "authenticated has no item INSERT grant" "f" "$(q "select has_table_privilege('authenticated','public.video_learning_items','insert');")"
+
+# sessions: start, resume (no duplicate active), non-owner denied
+SETID=$(q "select id from public.video_learning_sets where video_id='$LVID' and mode='content';")
+SESS1=$(auth_run "$U" "select id from public.start_learning_session('$LVID','$SETID');" | tail -1 | tr -d '[:space:]')
+eq "owner starts a session" "1" "$(q "select count(*) from public.video_learning_sessions where id='$SESS1';")"
+SESS2=$(auth_run "$U" "select id from public.start_learning_session('$LVID','$SETID');" | tail -1 | tr -d '[:space:]')
+eq "second start resumes the active session" "$SESS1" "$SESS2"
+denysess=$(auth_run "$U2" "select public.start_learning_session('$LVID','$SETID');" | tr -d '\n')
+eq "non-owner denied session start" "denied" "$(echo "$denysess" | grep -qi 'access denied' && echo denied || echo "$denysess")"
+
+# quiz evaluation: server-side, idempotent, answer only after submission
+QID=$(q "select id from public.video_learning_items where video_id='$LVID' and item_type='multiple_choice';")
+ANS1=$(auth_run "$U" "select public.submit_learning_answer('$SESS1','$QID',1);" | tail -1)
+eq "wrong answer evaluated server-side" "false" "$(echo "$ANS1" | grep -o '"is_correct": [a-z]*' | awk '{print $2}')"
+eq "answer returns correct index after submission" "0" "$(echo "$ANS1" | grep -o '"correct_choice_index": [0-9]*' | awk '{print $2}')"
+eq "answer returns grounded explanation" "yes" "$(echo "$ANS1" | grep -q 'توضیح مستند' && echo yes || echo no)"
+eq "one attempt row recorded" "1" "$(q "select count(*) from public.video_learning_attempts where session_id='$SESS1';")"
+ANS2=$(auth_run "$U" "select public.submit_learning_answer('$SESS1','$QID',0);" | tail -1)
+eq "resubmission reuses the original result (answers are final)" "true|false" "$(echo "$ANS2" | grep -o '"reused": [a-z]*' | awk '{print $2}')|$(echo "$ANS2" | grep -o '"is_correct": [a-z]*' | awk '{print $2}')"
+eq "resubmission adds no attempt row" "1" "$(q "select count(*) from public.video_learning_attempts where session_id='$SESS1';")"
+denyans=$(auth_run "$U2" "select public.submit_learning_answer('$SESS1','$QID',0);" | tr -d '\n')
+eq "another user cannot answer in a foreign session" "denied" "$(echo "$denyans" | grep -qi 'session not found' && echo denied || echo "$denyans")"
+
+# flashcard rating: upsert in place, never duplicated
+FID=$(q "select id from public.video_learning_items where video_id='$LVID' and item_type='flashcard';")
+auth_run "$U" "select public.submit_flashcard_rating('$SESS1','$FID','review');" >/dev/null
+auth_run "$U" "select public.submit_flashcard_rating('$SESS1','$FID','known');" >/dev/null
+eq "flashcard re-rating keeps one attempt row" "1" "$(q "select count(*) from public.video_learning_attempts where session_id='$SESS1' and learning_item_id='$FID';")"
+eq "flashcard rating updated in place" "known" "$(q "select flashcard_rating from public.video_learning_attempts where session_id='$SESS1' and learning_item_id='$FID';")"
+badrate=$(auth_run "$U" "select public.submit_flashcard_rating('$SESS1','$FID','mastered');" | tr -d '\n')
+eq "invalid rating rejected" "rejected" "$(echo "$badrate" | grep -qi 'invalid rating' && echo rejected || echo "$badrate")"
+
+# completion + restart creates a NEW session, history preserved
+auth_run "$U" "select public.complete_learning_session('$SESS1');" >/dev/null
+eq "session completed" "completed" "$(q "select status from public.video_learning_sessions where id='$SESS1';")"
+SESS3=$(auth_run "$U" "select id from public.start_learning_session('$LVID','$SETID');" | tail -1 | tr -d '[:space:]')
+eq "restart creates a new active session" "different" "$([ "$SESS3" != "$SESS1" ] && echo different || echo same)"
+eq "old attempts preserved after restart" "2" "$(q "select count(*) from public.video_learning_attempts where session_id='$SESS1';")"
+
+# privacy: attempts/sessions invisible to other users; artifacts owner-only
+eq "owner reads own sessions" "2" "$(auth_run "$U" "select count(*) from public.video_learning_sessions where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read sessions" "0" "$(auth_run "$U2" "select count(*) from public.video_learning_sessions where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read attempts" "0" "$(auth_run "$U2" "select count(*) from public.video_learning_attempts where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read the profile" "0" "$(auth_run "$U2" "select count(*) from public.video_learning_profiles where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+eq "another user cannot read items" "0" "$(auth_run "$U2" "select count(item_index) from public.video_learning_items where video_id='$LVID';" | tail -1 | tr -d '[:space:]')"
+
+# privilege isolation: browsers cannot forge artifacts or call service RPCs
+denypersist=$(auth_run "$U" "select public.persist_video_learning_set('$LVID','content','x','x','x','x','x','x','[]'::jsonb);" | tr -d '\n')
+eq "authenticated denied set persist RPC" "denied" "$(echo "$denypersist" | grep -qi 'permission denied' && echo denied || echo "$denypersist")"
+denyprof=$(auth_run "$U" "select public.persist_video_learning_profile('$LVID','none','mixed','none','none','X','[]'::jsonb,'h','p','m','v','s','model');" | tr -d '\n')
+eq "authenticated denied profile persist RPC" "denied" "$(echo "$denyprof" | grep -qi 'permission denied' && echo denied || echo "$denyprof")"
+denyitem=$(auth_run "$U" "insert into public.video_learning_items(learning_set_id,video_id,item_index,item_type,learning_mode) values('$SETID','$LVID',9,'flashcard','content');" | tr -d '\n')
+eq "browser cannot forge learning items" "denied" "$(echo "$denyitem" | grep -qi 'permission denied' && echo denied || echo "$denyitem")"
+denyupd=$(auth_run "$U" "update public.video_learning_items set correct_choice_index=2 where id='$QID';" | tr -d '\n')
+eq "browser cannot alter correct answers" "denied" "$(echo "$denyupd" | grep -qi 'permission denied' && echo denied || echo "$denyupd")"
+
+# cascade cleanup
+q "delete from public.videos where id='$LVID';" >/dev/null
+eq "video delete cascades learning profile" "0" "$(q "select count(*) from public.video_learning_profiles where video_id='$LVID';")"
+eq "video delete cascades sets/items/sessions/attempts" "0|0|0|0" "$(q "select (select count(*) from public.video_learning_sets where video_id='$LVID')||'|'||(select count(*) from public.video_learning_items where video_id='$LVID')||'|'||(select count(*) from public.video_learning_sessions where video_id='$LVID')||'|'||(select count(*) from public.video_learning_attempts where video_id='$LVID');")"
 
 echo "---------------------------------------------"
 echo "queue RPC tests: $pass passed, $fail failed"

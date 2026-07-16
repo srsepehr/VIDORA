@@ -637,6 +637,139 @@ def note_api():
     return api
 
 
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
+def assess_video_learning(video_id: str, force: bool = False):
+    """Internal learning-suitability assessment. Transcript-only; no media,
+    STT, translation, subtitle, insight, chat, or note regeneration."""
+    from worker.app.learning_service import backfill_learning_assessment
+    from worker.app.errors import WorkerError
+    try:
+        return backfill_learning_assessment(video_id, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:240], "retryable": err.retryable}
+
+
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288, retries=0)
+def build_video_learning_set(video_id: str, mode: str, force: bool = False):
+    """Internal learning-set generation (flashcards + quiz) for one mode."""
+    from worker.app.learning_service import backfill_learning_set
+    from worker.app.errors import WorkerError
+    try:
+        return backfill_learning_set(video_id, mode, force=force)
+    except WorkerError as err:
+        return {"status": "error", "code": err.code, "detail": err.dev_detail[:240], "retryable": err.retryable}
+
+
+@app.function(image=subtitle_image, secrets=[secret], timeout=120, max_containers=1)
+def inspect_video_learning(video_id: str):
+    from worker.app.learning_service import inspect_learning
+    return inspect_learning(video_id)
+
+
+@app.function(image=chat_image, secrets=[secret], timeout=900, max_containers=1, cpu=4.0, memory=12288)
+@modal.asgi_app()
+def learning_api():
+    """Authenticated scale-to-zero learning API for the frontend.
+
+    Reached ONLY through the Supabase Edge gateway (Browser -> Edge -> here);
+    the browser never calls this URL directly. One POST endpoint with
+    body.action = "assess" | "generate"; the caller's token is verified, the
+    user resolved server-side, ownership checked, and results persisted via
+    service_role RPCs."""
+    import json
+    from fastapi import FastAPI, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
+    from worker.app.learning_service import assess_learning, generate_learning
+    from worker.app.errors import WorkerError, spec_for
+
+    api = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    api.add_middleware(CORSMiddleware,
+        allow_origins=["https://srsepehr.github.io", "http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_credentials=False, allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "apikey", "X-Request-ID"], max_age=600)
+
+    status_for = {
+        "LEARNING_AUTH_REQUIRED": 401, "LEARNING_ACCESS_DENIED": 403,
+        "LEARNING_VIDEO_NOT_FOUND": 404, "LEARNING_RATE_LIMITED": 429,
+        "LEARNING_PROVIDER_UNAVAILABLE": 503,
+        "LEARNING_TRANSCRIPT_MISSING": 409, "LEARNING_TRANSLATION_INCOMPLETE": 409,
+        "LEARNING_NOT_RECOMMENDED": 409, "LEARNING_MODE_UNSUPPORTED": 409,
+        "LEARNING_INSUFFICIENT_CONTENT": 409, "LEARNING_SET_STALE": 409,
+        "LEARNING_INVALID_OUTPUT": 502, "LEARNING_GROUNDING_FAILED": 502,
+        "LEARNING_ASSESSMENT_FAILED": 502, "LEARNING_GENERATION_FAILED": 502,
+    }
+
+    async def practice(request):
+        try:
+            declared_length = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared_length = 4001
+        if declared_length > 4000:
+            return JSONResponse({"error": {"code": "LEARNING_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=413)
+        raw_body = await request.body()
+        if len(raw_body) > 4000:
+            return JSONResponse({"error": {"code": "LEARNING_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=413)
+        auth = request.headers.get("authorization", "")
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        try:
+            body = json.loads(raw_body)
+            if not isinstance(body, dict):
+                raise ValueError("request body must be an object")
+            action = str(body.get("action") or "").strip().lower()
+            if action == "assess":
+                return JSONResponse(assess_learning(body, token))
+            if action == "generate":
+                return JSONResponse(generate_learning(body, token))
+            raise ValueError("unknown action")
+        except (json.JSONDecodeError, ValueError):
+            return JSONResponse({"error": {"code": "LEARNING_INVALID_OUTPUT", "message_fa": "ساختار درخواست معتبر نیست."}}, status_code=400)
+        except WorkerError as err:
+            status = status_for.get(err.code, 400)
+            # Structural diagnostics only — never log tokens, bodies, transcript
+            # text, prompts, or generated items.
+            print(json.dumps({"event": "learning_api_worker_error", "code": err.code,
+                              "status": status, "retryable": bool(err.retryable)}, sort_keys=True), flush=True)
+            try:
+                message_fa = spec_for(err.code).message_fa
+            except KeyError:
+                message_fa = "در ساخت تمرین خطایی رخ داد."
+            return JSONResponse({"error": {"code": err.code, "message_fa": message_fa}}, status_code=status,
+                headers={"Retry-After": "3600"} if err.code == "LEARNING_RATE_LIMITED" else None)
+        except Exception as exc:
+            print(json.dumps({"event": "learning_api_unhandled", "error_type": type(exc).__name__}, sort_keys=True), flush=True)
+            return JSONResponse({"error": {"code": "LEARNING_PROVIDER_UNAVAILABLE",
+                "message_fa": "سرویس ساخت تمرین در دسترس نیست. دوباره تلاش کنید."}}, status_code=500)
+
+    practice.__annotations__["request"] = Request
+    api.add_api_route("/", practice, methods=["POST"])
+    return api
+
+
+@app.local_entrypoint()
+def learning_assess(video_id: str = "", force: bool = False):
+    import json
+    result = assess_video_learning.remote(video_id, force)
+    print("assess_video_learning:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
+
+
+@app.local_entrypoint()
+def learning_build(video_id: str = "", mode: str = "content", force: bool = False):
+    import json
+    result = build_video_learning_set.remote(video_id, mode, force)
+    print("build_video_learning_set:", json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") == "error":
+        raise SystemExit(1)
+
+
+@app.local_entrypoint()
+def learning_inspect(video_id: str = ""):
+    import json
+    print("inspect_video_learning:", json.dumps(inspect_video_learning.remote(video_id), ensure_ascii=False, indent=2))
+
+
 @app.local_entrypoint()
 def note_build(video_id: str = "", user_id: str = "", force: bool = False):
     import json

@@ -39,6 +39,7 @@ compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
 compileTs("src/lib/insight-review.ts", "insight-review.mjs");
 compileTs("src/lib/video-chat.ts", "video-chat.mjs");
 compileTs("src/lib/note-review.ts", "note-review.mjs");
+compileTs("src/lib/learning-review.ts", "learning-review.mjs");
 
 const load = (name) => import(pathToFileURL(path.join(tmp, name)));
 const videoConfig = await load("video-config.mjs");
@@ -51,6 +52,7 @@ const subtitleReview = await load("subtitle-review.mjs");
 const insightReview = await load("insight-review.mjs");
 const videoChat = await load("video-chat.mjs");
 const noteReview = await load("note-review.mjs");
+const learningReview = await load("learning-review.mjs");
 
 // ---------------------------------------------------------------------------
 // Upload config + file validation
@@ -598,6 +600,86 @@ test("review page adds the یادداشت‌ها tab with AI note, saved answers
   assert.match(source, /افزودن به یادداشت/);
   assert.match(source, /role="tabpanel" aria-label="یادداشت‌های این ویدیو"/);
   // Existing review tools remain.
+  assert.match(source, /"chat", "پرسش از ویدیو"/);
+  assert.match(source, /متن و ترجمه/);
+});
+
+test("learning profile/set states derive from status + schema version", () => {
+  const profile = (over = {}) => ({
+    id: "p1", status: "ready", recommended_mode: "both", content_kind: "conceptual",
+    content_suitability: "high", language_suitability: "high", reason_code: "X",
+    editorial_policy: "auto", schema_version: learningReview.LEARNING_ASSESS_SCHEMA_VERSION,
+    assessed_at: null, ...over });
+  assert.equal(learningReview.deriveProfileState(profile({})), "ready");
+  assert.equal(learningReview.deriveProfileState(profile({ status: "generating" })), "generating");
+  assert.equal(learningReview.deriveProfileState(profile({ status: "failed" })), "failed");
+  assert.equal(learningReview.deriveProfileState(profile({ schema_version: "lrn-as0" })), "stale");
+  assert.equal(learningReview.deriveProfileState(null), "none");
+  const set = (over = {}) => ({ id: "s1", mode: "content", status: "ready",
+    schema_version: learningReview.LEARNING_GEN_SCHEMA_VERSION, flashcard_count: 1,
+    quiz_count: 1, generated_at: null, ...over });
+  assert.equal(learningReview.deriveSetState(set({})), "ready");
+  assert.equal(learningReview.deriveSetState(set({ schema_version: "lrn-gs0" })), "stale");
+  assert.equal(learningReview.deriveSetState(null), "none");
+});
+
+test("supported modes mirror the server rule including editorial overrides", () => {
+  const base = { id: "p", status: "ready", recommended_mode: "content", content_kind: "conceptual",
+    reason_code: "X", schema_version: "lrn-as1", assessed_at: null };
+  assert.deepEqual(learningReview.supportedModesFor({ ...base, editorial_policy: "auto",
+    content_suitability: "medium", language_suitability: "none" }), ["content"]);
+  assert.deepEqual(learningReview.supportedModesFor({ ...base, editorial_policy: "auto",
+    content_suitability: "medium", language_suitability: "low" }), ["content", "language", "both"]);
+  assert.deepEqual(learningReview.supportedModesFor({ ...base, editorial_policy: "disabled",
+    content_suitability: "high", language_suitability: "high" }), []);
+  assert.deepEqual(learningReview.supportedModesFor({ ...base, editorial_policy: "language",
+    content_suitability: "high", language_suitability: "none" }), ["language"]);
+  assert.deepEqual(learningReview.supportedModesFor(null), []);
+});
+
+test("recommendation copy exists for every mode and none is honest", () => {
+  for (const mode of ["content", "language", "both", "none"]) {
+    assert.ok(learningReview.RECOMMENDATION_FA[mode].length > 10, mode);
+  }
+  assert.match(learningReview.RECOMMENDATION_FA.none, /پیشنهاد نمی‌شود/);
+});
+
+test("frontend learning schema versions match the worker (no drift)", () => {
+  const py = fs.readFileSync(path.join(root, "worker/app/learning_config.py"), "utf8");
+  assert.equal(learningReview.LEARNING_ASSESS_SCHEMA_VERSION, py.match(/ASSESS_SCHEMA_VERSION\s*=\s*"([^"]+)"/)[1]);
+  assert.equal(learningReview.LEARNING_GEN_SCHEMA_VERSION, py.match(/GEN_SCHEMA_VERSION\s*=\s*"([^"]+)"/)[1]);
+});
+
+test("learning client never fetches correct answers and uses the Edge gateway", () => {
+  const source = fs.readFileSync(path.join(root, "src/lib/learning-review.ts"), "utf8");
+  // AI calls go through the Edge gateway, never directly to Modal.
+  assert.match(source, /functions\/v1\/video-learning/);
+  assert.doesNotMatch(source, /modal\.run/);
+  // Item reads are column-limited: the browser never requests the answer.
+  const itemSelect = source.match(/fetchLearningItems[\s\S]*?ownedRead/)[0];
+  assert.doesNotMatch(itemSelect, /correct_choice_index|explanation/);
+  // Evaluation happens via the server-side RPC.
+  assert.match(source, /"submit_learning_answer"/);
+  assert.match(source, /"start_learning_session"/);
+  assert.match(source, /"submit_flashcard_rating"/);
+  assert.match(source, /"complete_learning_session"/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role/);
+});
+
+test("review page adds the تمرین tab with goal selection, flashcards, and quiz", () => {
+  const source = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+  assert.match(source, /\["practice", "تمرین"\]/);
+  assert.match(source, /requestAssessment/);
+  assert.match(source, /requestGeneration/);
+  assert.match(source, /startLearningSession/);
+  assert.match(source, /submitQuizAnswer/);
+  assert.match(source, /rateFlashcard/);
+  assert.match(source, /ساخت تمرین/);
+  assert.match(source, /بلد بودم/);
+  assert.match(source, /نیاز به مرور/);
+  assert.match(source, /role="tabpanel" aria-label="تمرین این ویدیو"/);
+  // Existing review tools remain.
+  assert.match(source, /"notes", "یادداشت‌ها"/);
   assert.match(source, /"chat", "پرسش از ویدیو"/);
   assert.match(source, /متن و ترجمه/);
 });

@@ -215,6 +215,45 @@ NOTE_GROUNDING_FAILED = _reg(
 NOTE_PERSIST_FAILED = _reg(
     "NOTE_PERSIST_FAILED", "ثبت یادداشت هوشمند ناموفق بود.", True, STAGE_VIDEO_NOTE)
 
+# --- adaptive learning tools (assessment / flashcards / quiz) ---------------
+# Learning state is independent from the video processing lifecycle. This stage
+# is classification metadata only and is never written to videos.status.
+STAGE_VIDEO_LEARNING = "video_learning"
+LEARNING_AUTH_REQUIRED = _reg(
+    "LEARNING_AUTH_REQUIRED", "برای استفاده از تمرین ابتدا وارد حساب شوید.", False, STAGE_VIDEO_LEARNING)
+LEARNING_ACCESS_DENIED = _reg(
+    "LEARNING_ACCESS_DENIED", "شما به تمرین این ویدیو دسترسی ندارید.", False, STAGE_VIDEO_LEARNING)
+LEARNING_VIDEO_NOT_FOUND = _reg(
+    "LEARNING_VIDEO_NOT_FOUND", "ویدیوی موردنظر یافت نشد.", False, STAGE_VIDEO_LEARNING)
+LEARNING_TRANSCRIPT_MISSING = _reg(
+    "LEARNING_TRANSCRIPT_MISSING", "متن این ویدیو برای ساخت تمرین یافت نشد.", False, STAGE_VIDEO_LEARNING)
+LEARNING_TRANSLATION_INCOMPLETE = _reg(
+    "LEARNING_TRANSLATION_INCOMPLETE", "ترجمه فارسی این ویدیو هنوز کامل نیست.", False, STAGE_VIDEO_LEARNING)
+LEARNING_ASSESSMENT_FAILED = _reg(
+    "LEARNING_ASSESSMENT_FAILED", "بررسی مناسب‌بودن این ویدیو برای تمرین انجام نشد.", True, STAGE_VIDEO_LEARNING)
+LEARNING_NOT_RECOMMENDED = _reg(
+    "LEARNING_NOT_RECOMMENDED", "برای این ویدیو تمرین آموزشی معناداری پیشنهاد نمی‌شود.", False, STAGE_VIDEO_LEARNING)
+LEARNING_MODE_UNSUPPORTED = _reg(
+    "LEARNING_MODE_UNSUPPORTED", "این نوع تمرین برای این ویدیو پشتیبانی نمی‌شود.", False, STAGE_VIDEO_LEARNING)
+LEARNING_INSUFFICIENT_CONTENT = _reg(
+    "LEARNING_INSUFFICIENT_CONTENT", "محتوای این ویدیو برای ساخت تمرین معنادار کافی نیست.", False, STAGE_VIDEO_LEARNING)
+LEARNING_GENERATION_FAILED = _reg(
+    "LEARNING_GENERATION_FAILED", "ساخت تمرین این ویدیو انجام نشد.", True, STAGE_VIDEO_LEARNING)
+LEARNING_INVALID_OUTPUT = _reg(
+    "LEARNING_INVALID_OUTPUT", "خروجی تمرین نامعتبر بود.", True, STAGE_VIDEO_LEARNING)
+LEARNING_GROUNDING_FAILED = _reg(
+    "LEARNING_GROUNDING_FAILED", "تمرین ساخته‌شده به بخش معتبری از ویدیو متصل نبود.", True, STAGE_VIDEO_LEARNING)
+LEARNING_SET_STALE = _reg(
+    "LEARNING_SET_STALE", "محتوای ویدیو تغییر کرده و تمرین باید دوباره ساخته شود.", True, STAGE_VIDEO_LEARNING)
+LEARNING_SESSION_NOT_FOUND = _reg(
+    "LEARNING_SESSION_NOT_FOUND", "جلسه تمرین یافت نشد.", False, STAGE_VIDEO_LEARNING)
+LEARNING_RATE_LIMITED = _reg(
+    "LEARNING_RATE_LIMITED", "تعداد درخواست‌های تمرین بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.", True, STAGE_VIDEO_LEARNING)
+LEARNING_PROVIDER_UNAVAILABLE = _reg(
+    "LEARNING_PROVIDER_UNAVAILABLE", "سرویس ساخت تمرین در دسترس نیست. دوباره تلاش کنید.", True, STAGE_VIDEO_LEARNING)
+LEARNING_PERSISTENCE_FAILED = _reg(
+    "LEARNING_PERSISTENCE_FAILED", "ثبت تمرین ناموفق بود.", True, STAGE_VIDEO_LEARNING)
+
 # --- lifecycle -------------------------------------------------------------
 JOB_TIMEOUT = _reg("JOB_TIMEOUT", "زمان پردازش این ویدیو به پایان رسید.", True, STAGE_ACQUIRING)
 JOB_CANCELLED = _reg("JOB_CANCELLED", "پردازش این ویدیو لغو شد.", False, STAGE_ACQUIRING)
