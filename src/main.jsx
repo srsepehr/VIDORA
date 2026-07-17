@@ -2,22 +2,29 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   BadgeDollarSign,
+  BookOpen,
+  Bookmark,
   CheckCircle2,
+  CirclePlus,
+  Crown,
   Download,
   FileText,
-  Gauge,
   Heart,
+  Headphones,
+  Home,
   Library,
-  Link2,
-  LogOut,
+  Menu,
   MessageCircle,
   MoreHorizontal,
   Search,
   Trash2,
   Upload,
+  Video,
+  X,
 } from "lucide-react";
 import "./styles.css";
 import "./tailwind.css";
+import "./components/dashboard/dashboard-shell.css";
 import dashboardEn from "./locales/en/dashboard.json";
 import dashboardFa from "./locales/fa/dashboard.json";
 import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
@@ -40,6 +47,7 @@ import { getCurrentInternalPath, getReturnToFromHash, loginHashFor, sanitizeRetu
 import { fetchActiveSubscription, fetchUserVideos, normalizeVideoStatus } from "./lib/user-data";
 import { deleteVideo, retryVideoProcessing } from "./lib/video-service";
 import { TranslationIntakePanel, VideoProcessingDetail, isActiveVideoStatus, statusLabel } from "./video-workflow.jsx";
+import { DashboardHome } from "./components/dashboard/dashboard-home.jsx";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -8398,33 +8406,28 @@ const sidebarGroups = [
   {
     labelKey: "primary",
     items: [
-      { icon: Gauge, labelKey: "dashboard", view: "dashboard" },
-      { icon: Upload, labelKey: "newTranslation", view: "new-video" },
-      { icon: Library, labelKey: "myVideos", view: "library" },
-      { icon: Library, labelKey: "publicLibrary", externalHash: "#/library" },
+      { icon: Home, labelKey: "dashboard", view: "dashboard" },
+      { icon: CirclePlus, labelKey: "newTranslation", view: "new-video" },
+      { icon: Video, labelKey: "myVideos", view: "library" },
+      { icon: BookOpen, labelKey: "publicLibrary", externalHash: "#/library" },
     ],
   },
   {
     labelKey: "saved",
     items: [
-      { icon: Heart, labelKey: "saved", view: "saved" },
-    ],
-  },
-  {
-    labelKey: "account",
-    items: [
-      { icon: BadgeDollarSign, labelKey: "subscription", view: "subscription" },
+      { icon: Bookmark, labelKey: "saved", view: "saved" },
+      { icon: Crown, labelKey: "subscription", view: "subscription" },
     ],
   },
   {
     labelKey: "help",
     items: [
-      { icon: MessageCircle, labelKey: "support", view: "support" },
+      { icon: Headphones, labelKey: "support", view: "support" },
     ],
   },
 ];
 
-function VidoraDashboard({ session }) {
+function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   const { lang } = window.useLang();
   const t = dashboardCopy[lang] || dashboardCopy.fa;
   const isFa = lang === "fa";
@@ -8437,6 +8440,7 @@ function VidoraDashboard({ session }) {
     return match ? match[1] : "";
   };
   const getInitialView = () => {
+    if (previewMode) return "dashboard";
     if (getVideoDetailId()) return "video-detail";
     const segment = window.location.hash.replace(/^#\/(?:dashboard|panel)\/?/, "") || "dashboard";
     const view = dashboardViewAliases[segment] || segment;
@@ -8451,8 +8455,14 @@ function VidoraDashboard({ session }) {
   const [supportSent, setSupportSent] = React.useState(false);
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [toast, setToast] = React.useState("");
-  const [dashboardData, setDashboardData] = React.useState({
+  const [dashboardData, setDashboardData] = React.useState(() => previewData ? {
+    loading: false,
+    error: "",
+    videos: previewData.videos,
+    subscription: previewData.subscription,
+  } : {
     loading: true,
     error: "",
     videos: [],
@@ -8460,6 +8470,7 @@ function VidoraDashboard({ session }) {
   });
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     let alive = true;
     setDashboardData((state) => ({ ...state, loading: true, error: "" }));
     Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
@@ -8474,27 +8485,40 @@ function VidoraDashboard({ session }) {
     return () => {
       alive = false;
     };
-  }, [session]);
+  }, [previewMode, session]);
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     const onHashChange = () => {
       setActiveView(getInitialView());
       setVideoDetailId(getVideoDetailId());
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  }, [previewMode]);
 
   const selectView = (view) => {
     if (!dashboardViews.has(view)) return;
+    if (previewMode && (view === "new-video" || view === "video-detail")) {
+      showToast(isFa ? "این اقدام در پیش‌نمایش توسعه به سرور ارسال نمی‌شود." : "This action is disabled in the development preview.");
+      return;
+    }
     setActiveView(view);
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
+    setMobileNavOpen(false);
+    if (previewMode) return;
     const segment = dashboardRouteSegments[view] || view;
     window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
   };
 
   const signOut = async () => {
+    if (previewMode) {
+      setLogoutConfirm(false);
+      setProfileMenuOpen(false);
+      showToast(isFa ? "خروج در پیش‌نمایش توسعه غیرفعال است." : "Sign out is disabled in the development preview.");
+      return;
+    }
     await signOutUser();
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
@@ -8507,6 +8531,10 @@ function VidoraDashboard({ session }) {
   };
 
   const openVideoDetail = (videoId) => {
+    if (previewMode) {
+      showToast(isFa ? "جزئیات ویدیو در پیش‌نمایش به API متصل نمی‌شود." : "Video details do not call the API in preview mode.");
+      return;
+    }
     window.location.hash = `#/dashboard/videos/${videoId}`;
   };
   const userVideoRows = React.useMemo(() => (
@@ -8514,6 +8542,15 @@ function VidoraDashboard({ session }) {
       const status = normalizeVideoStatus(video.status);
       const minutes = video.duration_seconds ? `${Math.max(1, Math.round(video.duration_seconds / 60))} ${isFa ? "دقیقه" : "min"}` : "";
       const sourceType = video.source_type === "upload" ? (isFa ? "آپلود" : "Upload") : video.source_type === "youtube" ? (isFa ? "یوتیوب" : "YouTube") : (isFa ? "لینک ویدیو" : "Video link");
+      const totalSeconds = Math.max(0, Math.round(video.duration_seconds || 0));
+      const durationLabel = totalSeconds
+        ? `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`
+        : "";
+      const ageInDays = Math.round((new Date(video.created_at).getTime() - Date.now()) / 86400000);
+      const relativeCreated = Math.abs(ageInDays) < 1
+        ? (isFa ? "امروز" : "Today")
+        : new Intl.RelativeTimeFormat(isFa ? "fa-IR" : "en-US", { numeric: "auto" }).format(ageInDays, "day");
+      const preview = video.preview || null;
       return {
         id: video.id,
         raw: video,
@@ -8523,7 +8560,14 @@ function VidoraDashboard({ session }) {
         failure: video.failure_message_fa || "",
         created: new Date(video.created_at).toLocaleDateString(isFa ? "fa-IR" : "en-US"),
         minutes,
+        durationLabel,
+        relativeCreated,
         sourceType,
+        action: preview?.action,
+        displayStatus: preview ? (isFa ? preview.displayStatusFa : preview.displayStatusEn) : "",
+        format: preview?.format || "",
+        progressPercent: preview?.progressPercent,
+        resolution: preview?.resolution || "",
       };
     })
   ), [dashboardData.videos, isFa]);
@@ -8533,7 +8577,7 @@ function VidoraDashboard({ session }) {
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
-  const renewalLabel = activeSubscription?.ends_at ? new Date(activeSubscription.ends_at).toLocaleDateString(isFa ? "fa-IR" : "en-US") : "—";
+  const processedCount = previewData?.processedCount ?? dashboardData.videos.filter((video) => video.status === "completed").length;
 
   const renderHeader = () => {
     const detailTitles = isFa
@@ -8551,6 +8595,10 @@ function VidoraDashboard({ session }) {
   };
 
   const retryVideoRow = (video) => {
+    if (previewMode) {
+      showToast(isFa ? "تلاش مجدد در پیش‌نمایش به صف پردازش ارسال نمی‌شود." : "Retry does not enqueue work in preview mode.");
+      return;
+    }
     retryVideoProcessing(session, video.id)
       .then(() => {
         showToast(t.toast.retryQueued);
@@ -8582,6 +8630,11 @@ function VidoraDashboard({ session }) {
   );
 
   const reloadDashboardData = (silent = false) => {
+    if (previewMode) {
+      setDashboardData({ loading: false, error: "", videos: previewData.videos, subscription: previewData.subscription });
+      if (!silent) showToast(isFa ? "داده‌های نمونه دوباره بارگذاری شد." : "Fixture data reloaded.");
+      return;
+    }
     if (!silent) setDashboardData((state) => ({ ...state, loading: true, error: "" }));
     Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
       .then(([videos, subscription]) => setDashboardData({ loading: false, error: "", videos, subscription }))
@@ -8593,12 +8646,13 @@ function VidoraDashboard({ session }) {
   };
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     const hasActive = dashboardData.videos.some((video) => isActiveVideoStatus(video.status));
     if (!hasActive) return undefined;
     const timer = window.setInterval(() => reloadDashboardData(true), 15000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardData.videos]);
+  }, [dashboardData.videos, previewMode]);
 
   const renderIntakePanel = () => (
     <TranslationIntakePanel
@@ -8616,6 +8670,10 @@ function VidoraDashboard({ session }) {
     const target = deleteTarget;
     if (!target) return;
     setDeleteTarget(null);
+    if (previewMode) {
+      showToast(isFa ? "حذف نمونه نمایشی به سرور ارسال نشد." : "The fixture was not deleted or sent to a server.");
+      return;
+    }
     deleteVideo(session, target)
       .then(() => {
         showToast(isFa ? "ویدیو حذف شد." : "Video deleted.");
@@ -8656,23 +8714,22 @@ function VidoraDashboard({ session }) {
   };
 
   const renderDashboard = () => (
-    <>
-      <div className="vd-top-grid">
-        <div className="vd-stats single">
-          <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>{remainingMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
-        </div>
-        <aside className="vd-card vd-plan-card">
-          <h2>{t.dashboard.currentPlan}</h2>
-          <div className="vd-plan-line"><span>{t.dashboard.plan}</span><strong>{planName}</strong></div>
-          <div className="vd-plan-line"><span>{t.dashboard.monthlyMinutes}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")} / {includedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></div>
-          <div className="vd-meter"><span style={{ width: `${usagePercent}%` }} /></div>
-          <div className="vd-plan-line"><span>{t.dashboard.renewal}</span><strong>{renewalLabel}</strong></div>
-          <button className="vd-secondary" onClick={() => selectView("subscription")}>{t.actions.manageSubscription}</button>
-        </aside>
-      </div>
-      {renderIntakePanel()}
-      <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2>{renderVideoList(userVideoRows.slice(0, 5))}</section>
-    </>
+    <DashboardHome
+      isFa={isFa}
+      t={t}
+      loading={dashboardData.loading}
+      error={dashboardData.error}
+      videos={userVideoRows}
+      planName={planName}
+      includedMinutes={includedMinutes}
+      remainingMinutes={remainingMinutes}
+      usagePercent={usagePercent}
+      processedCount={processedCount}
+      onOpenVideo={openVideoDetail}
+      onRetryVideo={retryVideoRow}
+      onSelectView={selectView}
+      onReload={() => reloadDashboardData()}
+    />
   );
 
   const renderNewTranslation = () => (
@@ -8797,7 +8854,9 @@ function VidoraDashboard({ session }) {
   };
 
   const sidebarPanel = (
-    <aside className="vd-sidebar" dir={isFa ? "rtl" : "ltr"}>
+    <aside className={`vd-sidebar${mobileNavOpen ? " is-open" : ""}`} dir={isFa ? "rtl" : "ltr"} aria-label={isFa ? "ناوبری داشبورد" : "Dashboard navigation"}>
+      <button className="vd-sidebar-close" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
+      <div className="vd-sidebar-brand" aria-label="Vidora">vidora</div>
       <div>
         {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
       </div>
@@ -8806,7 +8865,7 @@ function VidoraDashboard({ session }) {
           <div className="vd-profile-menu" role="menu">
             <button role="menuitem" onClick={() => selectView("profile")}>{t.profileMenu.account}</button>
             <button role="menuitem" onClick={() => selectView("settings")}>{t.profileMenu.settings}</button>
-            <button role="menuitem" onClick={() => { setProfileMenuOpen(false); window.location.hash = "#/"; }}>{t.profileMenu.backToWebsite}</button>
+            <button role="menuitem" onClick={() => { setProfileMenuOpen(false); if (previewMode) window.location.assign("/"); else window.location.hash = "#/"; }}>{t.profileMenu.backToWebsite}</button>
             <button role="menuitem" className="is-danger" onClick={() => setLogoutConfirm(true)}>{t.profileMenu.logout}</button>
           </div>
         ) : null}
@@ -8821,13 +8880,17 @@ function VidoraDashboard({ session }) {
 
   const mainPanel = (
     <section className="vd-main" dir={isFa ? "rtl" : "ltr"}>
+      <div className="vd-mobile-bar">
+        <span className="vd-mobile-wordmark">vidora</span>
+        <button className="vd-mobile-menu-button" aria-label={isFa ? "باز کردن منو" : "Open menu"} onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button>
+      </div>
       {renderHeader()}
       {renderActiveView()}
     </section>
   );
 
   return (
-    <main className={`vd-page ${isFa ? "is-fa" : ""}`}>
+    <main className={`vd-page vd-dashboard-redesign ${isFa ? "is-fa" : ""}`} dir={isFa ? "rtl" : "ltr"}>
       <style dangerouslySetInnerHTML={{ __html: `
         .vd-page{min-height:100vh;background:radial-gradient(circle at 14% 8%,rgba(255,255,255,.7),transparent 32%),linear-gradient(135deg,#d8d8d5 0%,#c4c5c1 48%,#dededb 100%);display:flex;align-items:center;justify-content:center;padding:32px;font-family:var(--font-sans);color:#111;overflow:hidden}
         .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden;direction:ltr}.is-fa .vd-shell{grid-template-columns:minmax(0,1fr) 310px}
@@ -8857,6 +8920,7 @@ function VidoraDashboard({ session }) {
       <section className="vd-shell" dir={isFa ? "rtl" : "ltr"} aria-label="Vidora dashboard">
         {isFa ? <>{mainPanel}{sidebarPanel}</> : <>{sidebarPanel}{mainPanel}</>}
       </section>
+      {mobileNavOpen ? <button className="vd-mobile-backdrop" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)} /> : null}
       {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={signOut}>{t.actions.logout}</button></div></div></div> : null}
       {deleteTarget ? (
         <div className="vd-modal" role="dialog" aria-modal="true">
@@ -9180,6 +9244,21 @@ function ProtectedDashboard({ returnTo }) {
   return <VidoraDashboard session={authState.session} />;
 }
 
+const DashboardPreview = __VIDORA_DASHBOARD_PREVIEW_ENABLED__ ? React.lazy(async () => {
+  const { dashboardPreviewFixture } = await import("./components/dashboard/dashboard-preview-fixtures");
+  return {
+    default: function DashboardPreviewRoute() {
+      return (
+        <VidoraDashboard
+          session={dashboardPreviewFixture.session}
+          previewData={dashboardPreviewFixture}
+          previewMode
+        />
+      );
+    },
+  };
+}) : null;
+
 function useHashRoute() {
   const [hash, setHash] = React.useState(() => window.location.hash);
   React.useEffect(() => {
@@ -9197,6 +9276,9 @@ function Page() {
   if (hash.startsWith("#/library")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
   if (hash.startsWith("#/search")) return <SearchPage />;
+  if (__VIDORA_DASHBOARD_PREVIEW_ENABLED__ && path === "/dev/dashboard-preview" && DashboardPreview) {
+    return <React.Suspense fallback={<AuthLoadingScreen />}><DashboardPreview /></React.Suspense>;
+  }
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <ProtectedDashboard returnTo={getCurrentInternalPath()} />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;

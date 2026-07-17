@@ -11,7 +11,7 @@
     "primary": "PRIMARY",
     "saved": "SAVED",
     "account": "ACCOUNT",
-    "help": "HELP"
+    "help": "SUPPORT"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -31,7 +31,7 @@
     "logout": "Log Out"
   },
   "titles": {
-    "dashboard": ["Dashboard", "Translate videos, generate subtitles, and keep learning outputs in one place."],
+    "dashboard": ["Dashboard", "Manage your videos and continue your work from here."],
     "new-video": ["New Translation", "Upload a video or paste a YouTube link to start."],
     "library": ["My Videos", "Search, filter, and continue work on every translated video."],
     "saved": ["Saved", "Liked videos, watchlist items, and notes in one quiet place."],

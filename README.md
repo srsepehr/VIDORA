@@ -13,6 +13,20 @@ npm run dev
 Fill the Supabase values in `.env.local` before testing real login/signup.
 Backend setup details are in `docs/backend-setup.md`.
 
+### Development dashboard preview
+
+To review the dashboard without authentication or database access, add this
+development-only flag to your untracked `.env.local`:
+
+```bash
+VIDORA_ENABLE_DASHBOARD_PREVIEW=true
+```
+
+Run `npm run dev`, then open
+`http://127.0.0.1:5173/dev/dashboard-preview`. The route returns HTTP 404 unless
+the flag is exactly `true` and the app is running in development mode with
+`NODE_ENV=development`.
+
 ## Build
 
 ```bash
