@@ -1,10 +1,10 @@
-// Temporary product access policy. Until pricing ships, every authenticated
-// user may upload and submit videos; ownership stays enforced by RLS. This
-// abstraction is the single seam where plan/subscription checks will plug in
-// later — upload and processing flows must only ever consult this policy and
-// never hardcode access rules.
+// Product-level access policy. New paid operations resolve the current
+// server-trusted subscription; ownership of existing private records remains
+// enforced independently by RLS and private storage paths.
 import type { AuthSession } from "./auth";
 import { getCachedSession } from "./auth";
+import { fetchActiveSubscription } from "./user-data";
+import { isSubscriptionActive } from "./subscription-access";
 
 export interface AccessDecision {
   allowed: boolean;
@@ -26,15 +26,19 @@ const AUTH_REQUIRED: AccessDecision = {
   reason: "AUTH_REQUIRED",
   messageFa: "برای ادامه ابتدا وارد حساب خود شوید.",
 };
+const SUBSCRIPTION_REQUIRED: AccessDecision = {
+  allowed: false,
+  reason: "SUBSCRIPTION_REQUIRED",
+  messageFa: "برای افزودن و پردازش ویدیوی جدید، اشتراک فعال ویدورا لازم است.",
+};
 
 function sessionUserId(session: AuthSession | null): string {
   return session?.user.id || "";
 }
 
 /**
- * Development-phase policy: any authenticated user is allowed. Ownership of
- * specific records is still enforced by RLS at the data layer; this policy
- * only answers the product-level "may this user use the feature" question.
+ * Test/compatibility policy: any authenticated user is allowed. Production
+ * uses SubscriptionAwareAccessPolicy below.
  */
 export class AllowAuthenticatedAccessPolicy implements ProductAccessPolicy {
   constructor(private readonly resolveSession: () => AuthSession | null = getCachedSession) {}
@@ -60,7 +64,40 @@ export class AllowAuthenticatedAccessPolicy implements ProductAccessPolicy {
   }
 }
 
-let activePolicy: ProductAccessPolicy = new AllowAuthenticatedAccessPolicy();
+export class SubscriptionAwareAccessPolicy implements ProductAccessPolicy {
+  constructor(
+    private readonly resolveSession: () => AuthSession | null = getCachedSession,
+    private readonly resolveSubscription = fetchActiveSubscription,
+  ) {}
+
+  private sessionFor(userId: string): AuthSession | null {
+    const session = this.resolveSession();
+    return session && sessionUserId(session) === userId ? session : null;
+  }
+
+  private async paidAction(userId: string): Promise<AccessDecision> {
+    const session = this.sessionFor(userId);
+    if (!session) return AUTH_REQUIRED;
+    const subscription = await this.resolveSubscription(session);
+    return isSubscriptionActive(subscription) ? ALLOWED : SUBSCRIPTION_REQUIRED;
+  }
+
+  async canUploadVideo(userId: string): Promise<AccessDecision> {
+    return this.paidAction(userId);
+  }
+
+  async canSubmitVideoUrl(userId: string): Promise<AccessDecision> {
+    return this.paidAction(userId);
+  }
+
+  async canViewProcessedVideo(userId: string, _videoId: string): Promise<AccessDecision> {
+    // Existing private outputs remain owner-accessible. RLS and storage paths
+    // enforce ownership; a subscription never grants access to another user.
+    return this.sessionFor(userId) ? ALLOWED : AUTH_REQUIRED;
+  }
+}
+
+let activePolicy: ProductAccessPolicy = new SubscriptionAwareAccessPolicy();
 
 export function getAccessPolicy(): ProductAccessPolicy {
   return activePolicy;

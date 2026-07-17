@@ -27,6 +27,7 @@ function compileTs(source, targetName) {
 
 compileTs("src/lib/app-error.ts", "app-error.mjs");
 compileTs("src/lib/env-core.ts", "env-core.mjs");
+compileTs("src/lib/routes.ts", "routes.mjs");
 compileTs("src/lib/return-to.ts", "return-to.mjs");
 fs.writeFileSync(path.join(tmp, "env.mjs"), `export function getBrowserEnv() { return { supabaseUrl: "https://test.supabase.co", supabaseAnonKey: "anon-test", appUrl: "http://localhost" }; }`);
 compileTs("src/lib/auth.ts", "auth.mjs");

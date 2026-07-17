@@ -9,6 +9,10 @@ import {
   Crown,
   Download,
   FileText,
+  Captions,
+  CircleHelp,
+  Folder,
+  Gauge,
   Heart,
   Headphones,
   Home,
@@ -16,10 +20,13 @@ import {
   Menu,
   MessageCircle,
   MoreHorizontal,
+  ChevronDown,
+  Lock,
   Search,
   Trash2,
   Upload,
   Video,
+  User,
   X,
 } from "lucide-react";
 import "./styles.css";
@@ -29,12 +36,15 @@ import dashboardEn from "./locales/en/dashboard.json";
 import dashboardFa from "./locales/fa/dashboard.json";
 import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/heroui-card";
+import MotionButton from "@/components/ui/motion-button";
+import { VidoraFooter } from "@/components/ui/footer-section";
 import { SignInPage } from "@/components/ui/sign-in";
 import { SignUpPage } from "@/components/ui/sign-up";
 import { LibraryPage, WatchPage, SearchPage } from "./library.jsx";
 import { AuthDiagnostics } from "./components/dev/AuthDiagnostics";
 import {
   getDisplayName,
+  getCachedSession,
   getUserEmail,
   restoreAuthSession,
   signInWithPassword,
@@ -43,8 +53,14 @@ import {
   subscribeAuthState,
 } from "./lib/auth";
 import { AppError, logAppError, toAppError } from "./lib/app-error";
-import { getCurrentInternalPath, getReturnToFromHash, loginHashFor, sanitizeReturnTo, toHash } from "./lib/return-to";
+import { getCurrentInternalPath, sanitizeReturnTo, toHash } from "./lib/return-to";
 import { fetchActiveSubscription, fetchUserVideos, normalizeVideoStatus } from "./lib/user-data";
+import { buildAuthHash, consumeAuthIntent, createAuthIntent, persistAuthIntent, readAuthIntent, readAuthIntentFromHash } from "./lib/auth-intent";
+import { isSubscriptionActive } from "./lib/subscription-access";
+import { fetchPublicPlans, formatPlanPrice } from "./lib/plans";
+import { paymentAdapter, PaymentNotConfiguredError } from "./lib/payment";
+import { ROUTES } from "./lib/routes";
+import { trackEvent } from "./lib/analytics";
 import { deleteVideo, retryVideoProcessing } from "./lib/video-service";
 import { TranslationIntakePanel, VideoProcessingDetail, isActiveVideoStatus, statusLabel } from "./video-workflow.jsx";
 import { DashboardHome } from "./components/dashboard/dashboard-home.jsx";
@@ -5260,9 +5276,8 @@ function EditorialHero() {
     .vh-cardslot{ display:flex; }
     .vh-cardslot > div{ width:100%; min-height:102px; }
     .vh-catcta{ margin-top:2px; }
-    .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
-    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
-    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
+    .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:28px; flex-wrap:wrap; align-items:center; }
+    .vh-support{ width:min(100%,520px); margin-top:20px; color:#71717a; font-size:13px; line-height:1.9; }
     @media (max-width:1320px){
       .vh-grid{ grid-template-columns:1fr 1fr; }
       .vh-center{ order:2; grid-column:1 / -1; min-height:380px; }
@@ -5274,7 +5289,7 @@ function EditorialHero() {
       .vh-grid{ grid-template-columns:1fr; gap:28px; }
       .vh-center{ min-height:260px; }
       .vh-right{ flex-direction:column; }
-      .vh-cta,.vh-chips{ width:100%; }
+      .vh-cta,.vh-support{ width:100%; }
     }
   `;
   return /*#__PURE__*/React.createElement("section", {
@@ -5767,7 +5782,133 @@ window.EditorialPillars = EditorialPillars;
 window.EditorialKnowledge = EditorialKnowledge;
 window.EditorialFeatures = EditorialFeatures;
 window.EditorialCurated = EditorialCurated;
+
+const landingAsset = (name) => `${import.meta.env.BASE_URL}images/landing/${name}`;
+
+function LandingSectionHeading({ children }) {
+  return <div className="landing-centered-heading"><h2>{children}</h2><span aria-hidden="true" /></div>;
+}
+
+function ProcessStep({ number, title, body, icon: StepIcon }) {
+  return <article className="landing-process-step"><span className="landing-process-num" aria-hidden="true">{number}</span><span className="landing-process-icon"><StepIcon size={20} strokeWidth={1.7} /></span><h3>{title}</h3><p>{body}</p></article>;
+}
+
+function LandingAddVideoSection() {
+  const { lang } = window.useLang();
+  const rtl = lang === "fa";
+  const steps = rtl ? [
+    ["01", "ویدیوی دلخواهتان را اضافه کنید", "فایل یا لینک ویدیوی خود را وارد کنید تا پردازش آن شروع شود.", Upload],
+    ["02", "محتوای آن را سریع‌تر درک کنید", "زیرنویس فارسی، خلاصه و نکات کلیدی به‌صورت خودکار آماده می‌شوند.", FileText],
+    ["03", "ویدیوهای خودتان را یک‌جا داشته باشید", "همه ویدیوها در کتابخانه شخصی شما ذخیره و قابل جست‌وجو خواهند بود.", Library],
+  ] : [
+    ["01", "Add your video", "Upload a file or add a video link to start processing immediately.", Upload],
+    ["02", "Receive the Persian version", "Persian subtitles, summaries, and key takeaways are prepared automatically.", FileText],
+    ["03", "Always within reach", "Every video stays searchable and available in your personal library.", Library],
+  ];
+  const goAdd = () => {
+    const session = getCachedSession();
+    trackEvent("add_video_attempted", { source: "landing", authenticated: Boolean(session), intent: "add-video" });
+    window.location.hash = session ? "#/dashboard/new-translation" : buildAuthHash({ intent: "add-video", returnTo: ROUTES.addVideo });
+  };
+  return (
+    <section className="landing-add" dir={rtl ? "rtl" : "ltr"}>
+      <style>{`
+        .landing-add{background:#050505;color:#fff}.landing-add-in{max-width:1280px;margin:auto;padding:52px 48px 34px}.landing-add-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.landing-process-step{position:relative;display:grid;min-height:142px;grid-template-rows:42px auto auto;align-content:start;justify-items:start;padding:0 46px}.landing-process-step+.landing-process-step{border-inline-start:1px solid rgba(255,255,255,.15)}.landing-process-num{position:absolute;top:0;inset-inline-start:92px;font-size:56px;line-height:.8;font-weight:800;color:rgba(255,255,255,.1)}.landing-process-icon{position:relative;z-index:1;display:grid;width:40px;height:40px;place-items:center;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:#151515;color:#fff}.landing-process-step h3{position:relative;margin:17px 0 0;font-size:16px;line-height:1.55}.landing-process-step p{position:relative;width:100%;max-width:270px;margin:7px 0 0;color:#a1a1aa;font-size:12px;line-height:1.85}.landing-add-action-wrap{display:flex;justify-content:center;margin-top:18px}@media(max-width:900px){.landing-process-step{padding-inline:30px}.landing-process-num{inset-inline-start:76px}}@media(max-width:820px){.landing-add-in{padding:42px 32px 34px}.landing-add-grid{grid-template-columns:1fr}.landing-process-step{min-height:0;grid-template-rows:42px auto auto;padding:28px 0}.landing-process-step:first-child{padding-top:0}.landing-process-step+.landing-process-step{border-inline-start:0;border-top:1px solid rgba(255,255,255,.13)}.landing-process-num{top:28px;inset-inline-start:46px;font-size:50px}.landing-process-step:first-child .landing-process-num{top:0}.landing-process-step p{max-width:420px}.landing-add-action-wrap{margin-top:22px}.landing-add-action-wrap>button{width:100%;max-width:320px}}@media(max-width:600px){.landing-add-in{padding-inline:20px}}
+      `}</style>
+      <div className="landing-add-in">
+        <div className="landing-add-grid">{steps.map(([number, title, body, StepIcon]) => <ProcessStep key={number} number={number} title={title} body={body} icon={StepIcon} />)}</div>
+        <div className="landing-add-action-wrap"><MotionButton rtl={rtl} onClick={goAdd} label={rtl ? "افزودن ویدیوی جدید" : "Add a new video"} /></div>
+      </div>
+    </section>
+  );
+}
+
+function LandingCategoryCard({ item, rtl }) {
+  const CategoryIcon = item.icon;
+  return <button className="landing-category-card" onClick={() => { window.location.hash = `#/library?topic=${item.topic}`; }}>
+    <span className="landing-category-media"><img src={landingAsset(item.image)} alt={item.alt} width="600" height="400" loading="lazy" style={{ objectPosition: item.position }} /></span>
+    <span className="landing-category-badge"><CategoryIcon size={18} strokeWidth={1.7} /></span>
+    <span className="landing-category-content"><strong>{item.title}</strong><span className="landing-category-desc">{item.desc}</span><span className="landing-category-meta"><span>{item.count}</span>{rtl ? <ArrowLeft size={15} /> : <ArrowRight size={15} />}</span></span>
+  </button>;
+}
+
+function LandingCategories() {
+  const { lang } = window.useLang();
+  const rtl = lang === "fa";
+  const items = rtl ? [
+    { title: "هوش مصنوعی و ابزارهای جدید", desc: "کاربردهای عملی و ابزارهای جدید هوش مصنوعی", count: "۱۲ ویدیو", image: "category-ai.png", alt: "ربات انسان‌نما برای دسته‌بندی هوش مصنوعی", position: "38% 46%", icon: BrainCircuit, topic: "ai" },
+    { title: "ساخت محصول و برنامه‌نویسی", desc: "از ایده تا محصول، طراحی، توسعه و رشد استارتاپ", count: "۲۰ ویدیو", image: "category-product.png", alt: "لپ‌تاپ و کد برای دسته‌بندی ساخت محصول", position: "45% 58%", icon: Code2, topic: "product" },
+    { title: "یادگیری زبان با ویدیو", desc: "تقویت مکالمه، شنیداری و دایره لغات با ویدیوهای واقعی", count: "۱۵ ویدیو", image: "category-language.jpg", alt: "هدفون برای دسته‌بندی یادگیری زبان", position: "50% 52%", icon: Languages, topic: "language" },
+    { title: "کسب‌وکار و رشد فردی", desc: "مهارت‌های مدیریتی، بهره‌وری و رشد فردی و شغلی", count: "۱۸ ویدیو", image: "category-business.jpg", alt: "گیاه مینیمال برای دسته‌بندی رشد فردی", position: "44% 56%", icon: TrendingUp, topic: "startups" },
+  ] : [
+    { title: "AI and new tools", desc: "Practical applications and the latest artificial intelligence tools.", count: "12 videos", image: "category-ai.png", alt: "Humanoid robot for the artificial intelligence category", position: "38% 46%", icon: BrainCircuit, topic: "ai" },
+    { title: "Product and programming", desc: "From idea to product, design, development, and startup growth.", count: "20 videos", image: "category-product.png", alt: "Laptop and code for the product category", position: "45% 58%", icon: Code2, topic: "product" },
+    { title: "Language learning with video", desc: "Build listening, speaking, and vocabulary with real videos.", count: "15 videos", image: "category-language.jpg", alt: "Headphones for the language learning category", position: "50% 52%", icon: Languages, topic: "language" },
+    { title: "Business and personal growth", desc: "Management, productivity, and personal and career growth.", count: "18 videos", image: "category-business.jpg", alt: "Minimal plant for the personal growth category", position: "44% 56%", icon: TrendingUp, topic: "startups" },
+  ];
+  return (
+    <section className="landing-categories" dir={rtl ? "rtl" : "ltr"}>
+      <style>{`
+        .landing-categories{background:#fff;color:#111}.landing-categories-in{max-width:1280px;margin:auto;padding:52px 48px 58px}.landing-centered-heading{text-align:center;margin-bottom:26px}.landing-centered-heading h2{margin:0;font-size:24px;font-weight:800;line-height:1.4}.landing-centered-heading>span{display:block;width:34px;height:1.5px;margin:10px auto 0;background:#18181b}.landing-category-heading{margin-bottom:28px;text-align:center}.landing-category-heading h2{margin:0;font-size:25px;font-weight:800;line-height:1.45}.landing-category-heading p{margin:5px 0 0;color:#71717a;font-size:12.5px;line-height:1.7}.landing-category-heading span{display:block;width:34px;height:1.5px;margin:11px auto 0;background:#18181b}.landing-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}.landing-category-card{position:relative;display:flex;min-width:0;overflow:hidden;flex-direction:column;align-self:stretch;padding:0;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-align:inherit;font:inherit;cursor:pointer;transition:border-color 160ms ease}.landing-category-card:hover{border-color:#a1a1aa}.landing-category-media{display:block;aspect-ratio:2.18/1;overflow:hidden;background:#e4e4e7}.landing-category-media img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1);transition:transform 180ms ease}.landing-category-card:hover img{transform:scale(1.015)}.landing-category-badge{position:relative;z-index:1;display:grid;width:36px;height:36px;flex:none;place-items:center;align-self:flex-start;margin-top:-18px;margin-inline-start:16px;border-radius:7px;background:#090909;color:#fff}.landing-category-content{display:flex;min-height:126px;flex-direction:column;margin-top:-18px;padding:22px 18px 13px}.landing-category-content strong{font-size:14px;line-height:1.55}.landing-category-desc{display:-webkit-box;min-height:40px;margin-top:6px;overflow:hidden;color:#52525b;font-size:11.5px;line-height:1.75;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-category-meta{display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding-top:0;font-size:11.5px;font-weight:700;white-space:nowrap}.landing-category-meta svg{flex:none;transition:transform 160ms ease}.landing-category-card:hover .landing-category-meta svg{transform:translateX(-3px)}@media(max-width:980px){.landing-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.landing-category-media{aspect-ratio:2.25/1}}@media(max-width:600px){.landing-categories-in{padding:46px 20px 50px}.landing-category-grid{grid-template-columns:1fr}.landing-category-media{aspect-ratio:2.05/1}}
+      `}</style>
+      <div className="landing-categories-in">
+        <div className="landing-category-heading"><h2>{rtl ? "از موضوع مورد علاقه‌تان شروع کنید" : "Start with a topic you love"}</h2><p>{rtl ? "دسته‌بندی‌های محبوب ویدورا" : "Popular Vidora categories"}</p><span aria-hidden="true" /></div>
+        <div className="landing-category-grid">{items.map((item) => <LandingCategoryCard key={item.title} item={item} rtl={rtl} />)}</div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturedVideoCard({ video }) {
+  return <a className="landing-video" href={`#/watch/${video.slug}`}>
+    <span className="landing-video-visual"><img src={landingAsset(video.image)} alt={video.alt} width="800" height="450" loading="lazy" style={{ objectPosition: video.position }} /><span className="landing-video-duration" dir="ltr">{video.duration}</span></span>
+    <span className="landing-video-content"><strong>{video.title}</strong><span className="landing-video-meta"><span dir="ltr">{video.speaker}</span><i aria-hidden="true">•</i><span>{video.meta}</span></span></span>
+  </a>;
+}
+
+function LandingSelectedVideos() {
+  const { lang } = window.useLang();
+  const rtl = lang === "fa";
+  const railRef = React.useRef(null);
+  const videos = rtl ? [
+    { title: "عادت‌های کوچک، تغییرات بزرگ", speaker: "Sam Altman", meta: "زیرنویس فارسی", duration: "28:31", image: "featured-video-3.jpg", alt: "پرتره سیاه و سفید سم آلتمن", position: "50% 36%", slug: "sam-altman-talk" },
+    { title: "چطور در ۳۰ روز عادت جدید بسازیم", speaker: "Steve Jobs", meta: "زیرنویس فارسی", duration: "19:12", image: "featured-video-2.jpg", alt: "استیو جابز در حال سخنرانی", position: "54% 43%", slug: "product-builders" },
+    { title: "آینده هوش مصنوعی و تأثیر آن بر انسان", speaker: "Elon Musk", meta: "زیرنویس فارسی", duration: "23:47", image: "featured-video-1.jpg", alt: "ایلان ماسک در یک گفت‌وگو", position: "50% 50%", slug: "future-of-ai" },
+  ] : [
+    { title: "Small habits, big changes", speaker: "Sam Altman", meta: "Persian subtitles", duration: "28:31", image: "featured-video-3.jpg", alt: "Black and white portrait of Sam Altman", position: "50% 36%", slug: "sam-altman-talk" },
+    { title: "How to build a new habit in 30 days", speaker: "Steve Jobs", meta: "Persian subtitles", duration: "19:12", image: "featured-video-2.jpg", alt: "Steve Jobs speaking on stage", position: "54% 43%", slug: "product-builders" },
+    { title: "Artificial intelligence and its impact on humanity", speaker: "Elon Musk", meta: "Persian subtitles", duration: "23:47", image: "featured-video-1.jpg", alt: "Elon Musk in conversation", position: "50% 50%", slug: "future-of-ai" },
+  ];
+  const scroll = (direction) => railRef.current?.scrollBy({ left: direction * Math.max(280, railRef.current.clientWidth * .72), behavior: "smooth" });
+  return (
+    <section className="landing-selected" dir={rtl ? "rtl" : "ltr"}>
+      <style>{`
+        .landing-selected{background:#fff;color:#111}.landing-selected-in{position:relative;max-width:1280px;margin:auto;padding:0 48px 70px}.landing-video-rail{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}.landing-video-rail::-webkit-scrollbar{display:none}.landing-video{flex:0 0 calc((100% - 36px)/3);min-width:0;overflow:hidden;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-decoration:none;scroll-snap-align:start;transition:border-color 160ms ease}.landing-video:hover{border-color:#a1a1aa}.landing-video-visual{position:relative;display:block;aspect-ratio:16/8.8;overflow:hidden;background:#111}.landing-video-visual img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1);transition:transform 180ms ease}.landing-video:hover img{transform:scale(1.015)}.landing-video-duration{position:absolute;inset-inline-start:10px;bottom:9px;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.85);color:#fff;font-size:10.5px}.landing-video-content{display:block;padding:14px 16px 15px}.landing-video-content strong{display:-webkit-box;min-height:44px;overflow:hidden;font-size:14.5px;line-height:1.55;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-video-meta{display:flex;align-items:center;gap:8px;margin-top:9px;color:#71717a;font-size:10.5px}.landing-video-meta i{font-style:normal;color:#a1a1aa}.landing-carousel-arrow{position:absolute;top:calc(50% - 8px);left:6px;z-index:2;display:grid;width:34px;height:34px;place-items:center;border:1px solid #dedee2;border-radius:999px;background:#fff;color:#18181b;cursor:pointer}.landing-carousel-arrow:disabled{cursor:default;opacity:.42}.landing-selected-action{display:flex;justify-content:center;margin-top:26px}@media(max-width:900px){.landing-video{flex-basis:calc((100% - 18px)/2)}}@media(max-width:760px){.landing-selected-in{padding:0 20px 56px}.landing-video{flex-basis:84%}.landing-carousel-arrow{display:none}.landing-selected-action>button{width:100%;max-width:320px}}
+      `}</style>
+      <div className="landing-selected-in">
+        <LandingSectionHeading>{rtl ? "ویدیوهای منتخب" : "Featured videos"}</LandingSectionHeading>
+        <button className="landing-carousel-arrow is-prev" aria-label={rtl ? "ویدیوهای قبلی" : "Previous videos"} onClick={() => scroll(-1)}><ArrowLeft size={17} /></button>
+        <div className="landing-video-rail" ref={railRef} tabIndex="0" aria-label={rtl ? "ویدیوهای منتخب" : "Featured videos"} onKeyDown={(event) => { if (event.key === "ArrowLeft") scroll(-1); if (event.key === "ArrowRight") scroll(1); }}>{videos.map((video) => <FeaturedVideoCard key={video.slug} video={video} />)}</div>
+        <div className="landing-selected-action"><MotionButton rtl={rtl} onClick={() => { window.location.hash = "#/library"; }} label={rtl ? "مشاهده همه ویدیوها" : "View all videos"} /></div>
+      </div>
+    </section>
+  );
+}
+
+function LandingFooter() {
+  const { lang } = window.useLang();
+  return <VidoraFooter locale={lang === "fa" ? "fa" : "en"} />;
+}
+window.LandingAddVideoSection = LandingAddVideoSection;
+window.LandingCategories = LandingCategories;
+window.LandingSelectedVideos = LandingSelectedVideos;
+window.LandingFooter = LandingFooter;
 })(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/marketing/EditorialSections.jsx", error: String((e && e.message) || e) }); }
+
+const LandingAddVideoSection = window.LandingAddVideoSection;
+const LandingCategories = window.LandingCategories;
+const LandingSelectedVideos = window.LandingSelectedVideos;
+const LandingFooter = window.LandingFooter;
 
 // ui_kits/marketing/Footer.jsx
 try { (() => {
@@ -6501,9 +6642,10 @@ window.VIDORA_DICT = {
     startFree: "شروع رایگان",
     startMembership: "شروع عضویت",
     exploreLibrary: "کاوش در کتابخانه",
-    heroTitle: ["ویدیوهای آموزشی دنیا،", "قابل‌فهم به زبان فارسی"],
-    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل‌فهم و کاربردی تبدیل می‌کنیم.",
-    ctaPrimary: "شروع یادگیری",
+    heroTitle: ["ویدیوهای روز دنیا را", "به زبان خودتان درک کنید"],
+    heroSubNew: "ویدیوهای مرتبط با علایق و نیازتان را پیدا کنید، به فارسی تماشا کنید و با کمک خلاصه‌ها و نکات کلیدی هوشمند، سریع‌تر به محتوای اصلی برسید. همچنین می‌توانید ویدیوهای دلخواه خودتان را به Vidora اضافه کنید.",
+    ctaPrimary: "شروع استفاده از ویدورا",
+    heroSupport: "جست‌وجوی هوشمند · زیرنویس فارسی · خلاصه و نکات کلیدی · کتابخانه شخصی",
     ctaSecondary: "ترجمه ویدیوی خودم",
     heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند", "ترجمه ویدیوی خودت"],
     categories: [{
@@ -6611,9 +6753,10 @@ window.VIDORA_DICT = {
     startFree: "Start free",
     startMembership: "Start membership",
     exploreLibrary: "Explore library",
-    heroTitle: ["The world's best educational videos,", "now in your language"],
-    heroSubNew: "We turn English videos into an understandable, practical experience — Persian subtitles, smart summaries, key takeaways, and learning tools.",
-    ctaPrimary: "Start learning",
+    heroTitle: ["Understand today's videos", "in your own language"],
+    heroSubNew: "Find videos that match your interests, watch them in Persian, and reach the key ideas faster with smart summaries and takeaways. You can also add your own videos to Vidora.",
+    ctaPrimary: "Start using Vidora",
+    heroSupport: "Smart discovery · Persian subtitles · Summaries and takeaways · Personal library",
     ctaSecondary: "Translate my video",
     heroChips: ["Accurate Persian subtitles", "Summaries & key points", "Smart learning tools"],
     categories: [{
@@ -7612,9 +7755,10 @@ window.VIDORA_DICT = {
     startFree: "شروع رایگان",
     startMembership: "شروع عضویت",
     exploreLibrary: "کاوش در کتابخانه",
-    heroTitle: ["ویدیوهای آموزشی دنیا،", "قابل‌فهم به زبان فارسی"],
-    heroSubNew: "ویدیوهای انگلیسی را با زیرنویس فارسی، خلاصه هوشمند، نکات کلیدی و ابزارهای یادگیری به تجربه‌ای قابل‌فهم و کاربردی تبدیل می‌کنیم.",
-    ctaPrimary: "شروع یادگیری",
+    heroTitle: ["ویدیوهای روز دنیا را", "به زبان خودتان درک کنید"],
+    heroSubNew: "ویدیوهای مرتبط با علایق و نیازتان را پیدا کنید، به فارسی تماشا کنید و با کمک خلاصه‌ها و نکات کلیدی هوشمند، سریع‌تر به محتوای اصلی برسید. همچنین می‌توانید ویدیوهای دلخواه خودتان را به Vidora اضافه کنید.",
+    ctaPrimary: "شروع استفاده از ویدورا",
+    heroSupport: "جست‌وجوی هوشمند · زیرنویس فارسی · خلاصه و نکات کلیدی · کتابخانه شخصی",
     ctaSecondary: "ترجمه ویدیوی خودم",
     heroChips: ["زیرنویس دقیق فارسی", "خلاصه و نکات کلیدی", "ابزارهای یادگیری هوشمند", "ترجمه ویدیوی خودت"],
     categories: [
@@ -7673,9 +7817,10 @@ window.VIDORA_DICT = {
     startFree: "Start free",
     startMembership: "Start membership",
     exploreLibrary: "Explore library",
-    heroTitle: ["The world's best educational videos,", "now in your language"],
-    heroSubNew: "We turn English videos into an understandable, practical experience — Persian subtitles, smart summaries, key takeaways, and learning tools.",
-    ctaPrimary: "Start learning",
+    heroTitle: ["Understand today's videos", "in your own language"],
+    heroSubNew: "Find videos that match your interests, watch them in Persian, and reach the key ideas faster with smart summaries and takeaways. You can also add your own videos to Vidora.",
+    ctaPrimary: "Start using Vidora",
+    heroSupport: "Smart discovery · Persian subtitles · Summaries and takeaways · Personal library",
     ctaSecondary: "Translate my video",
     heroChips: ["Accurate Persian subtitles", "Summaries & key points", "Smart learning tools"],
     categories: [
@@ -7795,10 +7940,13 @@ function MenuToggleIcon({ open, size = 20, duration = 300 }) {
 
 function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light", auth = null, layoutDirection = null } = {}) {
   const { Button, IconButton } = window.VidoraDesignSystem_0f84f2;
-  const { d } = window.useLang();
+  const { d, lang } = window.useLang();
   const [open, setOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const [vw, setVw] = React.useState(typeof window !== "undefined" ? window.innerWidth : 1440);
+  const [account, setAccount] = React.useState({ loading: true, session: getCachedSession(), subscription: null });
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const profileRef = React.useRef(null);
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -7815,15 +7963,47 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+  React.useEffect(() => {
+    let alive = true;
+    const load = async (session) => {
+      if (!session) {
+        if (alive) setAccount({ loading: false, session: null, subscription: null });
+        return;
+      }
+      try {
+        const subscription = await fetchActiveSubscription(session);
+        if (alive) setAccount({ loading: false, session, subscription });
+      } catch {
+        if (alive) setAccount({ loading: false, session, subscription: null });
+      }
+    };
+    restoreAuthSession().then(load).catch(() => load(null));
+    const unsubscribe = subscribeAuthState(load);
+    return () => { alive = false; unsubscribe(); };
+  }, []);
+  React.useEffect(() => {
+    if (!profileOpen) return undefined;
+    const onPointer = (event) => {
+      if (!profileRef.current?.contains(event.target)) setProfileOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileOpen]);
 
   const isMobile = vw < 768;
   const floating = scrolled && !open && !isMobile;
   const dark = tone === "dark";
   const searchOpen = Boolean(search?.open);
   const defaultLinks = [
-    { label: d.nav.product },
-    { label: d.nav.library, onClick: () => { window.location.hash = "#/library"; } },
-    { label: d.nav.pricing },
+    { label: lang === "fa" ? "کتابخانه" : "Library", onClick: () => { trackEvent("library_opened", { source: mode }); window.location.hash = "#/library"; } },
+    { label: lang === "fa" ? "خرید اشتراک" : "Buy subscription", onClick: () => { window.location.hash = "#/subscriptions"; } },
   ];
   const links = navItems || defaultLinks;
   const authAction = auth || { label: d.login, onClick: () => { window.location.hash = "#/login"; } };
@@ -7840,6 +8020,51 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
     </span>
   );
 
+  const profileMenu = account.session ? (
+    <div ref={profileRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={profileOpen}
+        onClick={() => { setProfileOpen((value) => !value); trackEvent("profile_menu_opened", { source: mode }); }}
+        style={{ height: 38, maxWidth: 190, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 10px", borderRadius: 999, border: `1px solid ${borderColor}`, background: dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.72)", color: headerInk, cursor: "pointer", fontFamily: "var(--font-sans)", fontWeight: 700 }}
+      >
+        <span style={{ width: 26, height: 26, borderRadius: 999, display: "grid", placeItems: "center", background: dark ? "#fff" : "#18181b", color: dark ? "#18181b" : "#fff", flex: "none" }}><User size={14} /></span>
+        {vw >= 920 ? <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }}>{getDisplayName(account.session)}</span> : null}
+        <ChevronDown size={14} style={{ transform: profileOpen ? "rotate(180deg)" : "none", transition: "transform 160ms ease" }} />
+      </button>
+      {profileOpen ? (
+        <div role="menu" dir={lang === "fa" ? "rtl" : "ltr"} style={{ position: "absolute", top: 46, insetInlineEnd: 0, width: "min(300px,calc(100vw - 32px))", padding: 10, borderRadius: 16, border: `1px solid ${borderColor}`, background: dark ? "rgba(14,14,16,.98)" : "rgba(255,255,255,.98)", color: headerInk, boxShadow: "0 24px 60px rgba(0,0,0,.2)", zIndex: 80, display: "grid", gap: 3 }}>
+          <div style={{ padding: "10px 11px 12px", borderBottom: `1px solid ${borderColor}`, marginBottom: 4 }}>
+            <strong style={{ display: "block", fontSize: 13 }}>{getDisplayName(account.session)}</strong>
+            <span dir="ltr" style={{ display: "block", marginTop: 4, fontSize: 11.5, color: headerMuted, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>{account.session.user.email}</span>
+          </div>
+          {!isSubscriptionActive(account.subscription) ? (
+            <div style={{ margin: "4px 3px 7px", padding: 12, borderRadius: 12, border: `1px solid ${borderColor}`, background: dark ? "rgba(255,255,255,.05)" : "#f4f4f5" }}>
+              <span style={{ display: "block", fontSize: 12.5, fontWeight: 750 }}>{lang === "fa" ? "اشتراک فعالی ندارید" : "No active subscription"}</span>
+              <button onClick={() => { setProfileOpen(false); window.location.hash = "#/subscriptions"; }} style={{ marginTop: 8, border: 0, background: "transparent", padding: 0, color: headerInk, font: "inherit", fontSize: 12, fontWeight: 800, textDecoration: "underline", cursor: "pointer" }}>{lang === "fa" ? "خرید اشتراک" : "Buy subscription"}</button>
+            </div>
+          ) : (
+            <div style={{ padding: "8px 11px", color: headerMuted, fontSize: 12 }}>{lang === "fa" ? `اشتراک فعال: ${account.subscription?.plans?.name_fa || "ویدورا"}` : "Subscription active"}</div>
+          )}
+          {[
+            [lang === "fa" ? "داشبورد" : "Dashboard", "#/dashboard"],
+            [lang === "fa" ? "افزودن ویدیوی جدید" : "Add new video", "#/dashboard/new-translation"],
+            [lang === "fa" ? "ویدیوهای من" : "My videos", "#/dashboard/videos"],
+            [lang === "fa" ? "ذخیره‌شده‌ها" : "Saved", "#/dashboard/saved"],
+            [lang === "fa" ? "وضعیت اشتراک" : "Subscription status", "#/dashboard/subscription"],
+            [lang === "fa" ? "خرید یا تمدید اشتراک" : "Buy or renew subscription", "#/subscriptions"],
+            [lang === "fa" ? "تنظیمات حساب" : "Account settings", "#/dashboard/settings"],
+            [lang === "fa" ? "پشتیبانی" : "Support", "#/dashboard/support"],
+          ].map(([label, href]) => (
+            <button key={href} role="menuitem" onClick={() => { setProfileOpen(false); window.location.hash = href; }} style={{ height: 38, border: 0, borderRadius: 10, padding: "0 11px", background: "transparent", color: "inherit", font: "inherit", fontSize: 12.5, fontWeight: 650, textAlign: lang === "fa" ? "right" : "left", cursor: "pointer" }}>{label}</button>
+          ))}
+          <button role="menuitem" onClick={async () => { setProfileOpen(false); await signOutUser(); window.location.hash = "#/"; }} style={{ height: 38, marginTop: 3, border: 0, borderTop: `1px solid ${borderColor}`, background: "transparent", color: "inherit", font: "inherit", fontSize: 12.5, fontWeight: 750, textAlign: lang === "fa" ? "right" : "left", cursor: "pointer" }}>{lang === "fa" ? "خروج از حساب" : "Log out"}</button>
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
     <header
       data-screen-label="Header"
@@ -7849,7 +8074,8 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
         zIndex: 50,
         margin: "0 auto",
         width: "100%",
-        maxWidth: floating ? 896 : 1024,
+        boxSizing: "border-box",
+        maxWidth: floating ? 960 : 1280,
         borderRadius: floating ? "var(--radius-md)" : 0,
         border: floating ? `1px solid ${borderColor}` : "1px solid transparent",
         borderBottomColor: (scrolled || open || dark) && !floating ? borderColor : (floating ? borderColor : "transparent"),
@@ -7866,9 +8092,10 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
           display: "flex",
           height: floating ? 48 : 56,
           width: "100%",
+          boxSizing: "border-box",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: floating ? "0 8px" : "0 16px",
+          padding: floating ? "0 12px" : isMobile ? "0 20px" : "0 48px",
           transition: "height 260ms var(--ease-standard), padding 260ms var(--ease-standard)",
         }}
       >
@@ -7922,8 +8149,9 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
               />
             ) : null}
             <div style={{ width: 1, height: 24, background: dark ? "rgba(255,255,255,.14)" : "var(--border)", margin: "0 4px" }} />
-            <Button variant="secondary" onClick={authAction.onClick}>{authAction.label}</Button>
-            {mode === "landing" ? <Button variant="primary" onClick={() => { window.location.hash = "#/signup"; }}>{d.startFree}</Button> : null}
+            {auth ? <Button variant="secondary" onClick={authAction.onClick}>{authAction.label}</Button> : account.loading ? <span aria-label={lang === "fa" ? "در حال بررسی حساب" : "Checking account"} style={{ width: 92, height: 36, borderRadius: 999, background: dark ? "rgba(255,255,255,.08)" : "#f4f4f5" }} /> : account.session ? profileMenu : (
+              <Button variant="primary" onClick={() => { trackEvent("auth_opened", { source: mode, intent: "general-entry" }); window.location.hash = buildAuthHash({ intent: "general-entry", returnTo: ROUTES.dashboard }); }}>{lang === "fa" ? "ورود / عضویت" : "Login / Sign up"}</Button>
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -7997,8 +8225,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
             ))}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Button variant="secondary" fullWidth onClick={() => { setOpen(false); authAction.onClick?.(); }}>{authAction.label}</Button>
-            {mode === "landing" ? <Button variant="primary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/signup"; }}>{d.startFree}</Button> : null}
+            {auth ? <Button variant="secondary" fullWidth onClick={() => { setOpen(false); authAction.onClick?.(); }}>{authAction.label}</Button> : account.session ? profileMenu : <Button variant="primary" fullWidth onClick={() => { setOpen(false); trackEvent("auth_opened", { source: mode, intent: "general-entry" }); window.location.hash = buildAuthHash({ intent: "general-entry", returnTo: ROUTES.dashboard }); }}>{lang === "fa" ? "ورود / عضویت" : "Login / Sign up"}</Button>}
           </div>
         </div>
       ) : null}
@@ -8037,7 +8264,6 @@ function MockupPlaceholder() {
         width={1375}
         height={827}
         loading="eager"
-        fetchPriority="high"
         decoding="sync"
         style={{
           display: "block",
@@ -8105,36 +8331,35 @@ function EditorialHero() {
   const { d, lang } = window.useLang();
   const rtl = lang === "fa";
   const align = rtl ? "right" : "left";
+  const valueItems = rtl
+    ? ["زیرنویس فارسی", "خلاصه و نکات کلیدی", "پرسش از محتوای ویدیو", "کتابخانه شخصی"]
+    : ["Persian subtitles", "Summary and key points", "Ask about the video", "Personal library"];
 
   const css = `
-    .vh-wrap{ max-width:1440px; margin:0 auto; padding:52px 40px 40px; }
-    .vh-grid{ display:grid; grid-template-columns:minmax(380px,.92fr) minmax(560px,1.45fr); gap:44px; align-items:center; }
-    .vh-right{ display:flex; align-items:center; justify-content:center; align-self:center; min-height:440px; }
-    .vh-right .vh-mockup{ max-width:720px; }
-    .vh-cardslot{ display:flex; }
-    .vh-cardslot > div{ width:100%; min-height:118px; }
-    /* Category cards (components/ui/heroui-card) — calm grayscale tuning via
-       the component's data-slot hooks: modest radius, Persian-friendly type. */
-    .vh-cardslot > [data-slot="card"]{ --radius-3xl:16px; box-sizing:border-box; justify-content:center; }
-    .vh-cardslot [data-slot="card-title"]{ margin:0; font-size:16px; font-weight:700; line-height:1.5; }
-    .vh-cardslot [data-slot="card-description"]{ margin:0; font-size:12px; line-height:1.7; }
-    .vh-card-row .vh-cardslot > div{ min-height:142px; }
-    .vh-cta{ display:flex; gap:12px; width:min(100%,520px); margin-top:24px; flex-wrap:wrap; align-items:center; }
-    .vh-chips{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; width:min(100%,520px); margin-top:22px; }
-    .vh-chip{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:42px; padding:0 12px; border-radius:var(--radius-full); border:1px solid var(--ed-line); background:var(--ed-paper); font-family:var(--font-sans); font-size:13px; font-weight:500; line-height:1; color:var(--ed-ink); text-align:center; white-space:nowrap; }
-    @media (max-width:1320px){
-      .vh-grid{ grid-template-columns:1fr 1fr; }
-      .vh-left{ order:1; }
-      .vh-right{ order:2; min-height:360px; }
-      .vh-card-row{ grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+    .vh-wrap{max-width:1280px;margin:0 auto;padding:32px 48px 30px;}
+    .vh-grid{display:grid;grid-template-columns:minmax(330px,.78fr) minmax(520px,1.35fr);gap:38px;align-items:center;min-height:420px;}
+    .vh-left{min-width:0;}
+    .vh-right{display:flex;align-items:center;justify-content:flex-end;min-width:0;}
+    .vh-right .vh-mockup{width:min(100%,700px);max-width:none;transform:translateX(12px);}
+    .vh-cta{display:flex;width:min(100%,430px);margin-top:23px;margin-inline-end:auto;align-items:center;justify-content:flex-start;}
+    .vh-values{display:flex;width:min(100%,520px);margin-top:24px;align-items:center;justify-content:flex-start;gap:12px 18px;flex-wrap:wrap;}
+    .vh-value{display:inline-flex;min-width:0;align-items:center;gap:6px;color:#71717a;white-space:nowrap;}
+    .vh-value svg{flex:none;color:#3f3f46;}
+    .vh-value span{font-size:11px;font-weight:550;line-height:1.6;}
+    @media (max-width:1020px){
+      .vh-wrap{padding-inline:32px;}
+      .vh-grid{grid-template-columns:minmax(300px,.85fr) minmax(400px,1.15fr);gap:24px;min-height:430px;}
+      .vh-right .vh-mockup{transform:none;}
     }
-    @media (max-width:760px){
-      .vh-wrap{ padding:28px 20px; }
-      .vh-grid{ grid-template-columns:1fr; gap:28px; }
-      .vh-right{ min-height:260px; }
-      .vh-card-row{ display:flex!important; overflow-x:auto; gap:12px; padding-bottom:4px; scroll-snap-type:x mandatory; }
-      .vh-card-row .vh-cardslot{ min-width:282px; scroll-snap-align:start; }
-      .vh-cta,.vh-chips{ width:100%; }
+    @media (max-width:820px){
+      .vh-wrap{padding:34px 20px 42px;}
+      .vh-grid{grid-template-columns:1fr;gap:34px;min-height:0;}
+      .vh-right{justify-content:center;}
+      .vh-left{order:1;}
+      .vh-right{order:2;}
+      .vh-cta,.vh-values{width:100%;}
+      .vh-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 18px;margin-top:24px;}
+      .vh-value{white-space:normal;}
     }
   `;
 
@@ -8143,35 +8368,29 @@ function EditorialHero() {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="vh-wrap">
         <div className="vh-grid">
-          {/* LEFT — headline / paragraph / CTAs / chips */}
           <div className="vh-left" dir={rtl ? "rtl" : "ltr"} style={{ textAlign: align }}>
-            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "clamp(34px, 3.15vw, 46px)", lineHeight: 1.22, letterSpacing: "-0.01em", color: "var(--ed-ink)", maxWidth: 520, marginInlineEnd: "auto" }}>
+            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "clamp(32px,3.1vw,40px)", lineHeight: 1.38, letterSpacing: 0, color: "var(--ed-ink)", maxWidth: 430, marginInlineEnd: "auto" }}>
               {d.heroTitle.map((l, i) => (<React.Fragment key={i}>{i > 0 ? <br /> : null}{l}</React.Fragment>))}
             </h1>
-            <p style={{ margin: "20px 0 0", fontFamily: "var(--font-sans)", fontSize: 16.5, lineHeight: 1.9, color: "#52525b", maxWidth: 520, textAlign: rtl ? "right" : "left", marginInlineEnd: "auto", textWrap: "balance" }}>
+            <p style={{ margin: "20px 0 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: 2, color: "#3f3f46", maxWidth: 430, textAlign: rtl ? "right" : "left", marginInlineEnd: "auto", textWrap: "pretty" }}>
               {d.heroSubNew}
             </p>
-            <div className="vh-cta" style={{ justifyContent: rtl ? "flex-end" : "flex-start", flexDirection: rtl ? "row-reverse" : "row", marginInlineEnd: "auto" }}>
-              <Button variant="primary" size="lg" style={{ height: 44, padding: "0 24px", fontSize: 14.5, fontWeight: 600 }}>{d.ctaPrimary}</Button>
-              <Button variant="secondary" size="md" iconLeft={<Icon name="upload" size={15} stroke={1.7} />} style={{ height: 38, padding: "0 14px", fontSize: 13.5 }}>{d.ctaSecondary}</Button>
+            <div className="vh-cta">
+              <MotionButton rtl={rtl} onClick={() => {
+                trackEvent("landing_primary_cta_clicked", { authenticated: Boolean(getCachedSession()), intent: "general-entry" });
+                window.location.hash = getCachedSession() ? "#/dashboard" : buildAuthHash({ intent: "general-entry", returnTo: ROUTES.dashboard });
+              }} label={rtl ? "شروع با Vidora" : "Start with Vidora"} />
             </div>
-            <div className="vh-chips" dir={rtl ? "rtl" : "ltr"} style={{ marginInlineEnd: "auto" }}>
-              {d.heroChips.map((c, i) => (
-                <span key={i} className="vh-chip">
-                  <Icon name="check" size={13} stroke={2.4} />
-                  {c}
-                </span>
-              ))}
+            <div className="vh-values">
+              {valueItems.map((label) => <div className="vh-value" key={label}><CheckCircle2 size={13} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span></div>)}
             </div>
           </div>
 
-          {/* RIGHT — Mac mockup in the former floating-card area */}
           <div className="vh-right">
             <MockupPlaceholder />
           </div>
         </div>
 
-        <StatsBar d={d} rtl={rtl} />
       </div>
     </section>
   );
@@ -8364,15 +8583,9 @@ function EditorialFooter() {
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
                 {section.links.map((title) => (
                   <li key={title}>
-                    <a
-                      href="#"
-                      onClick={(e) => e.preventDefault()}
-                      style={linkStyle}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.62)")}
-                    >
+                    <span style={{ ...linkStyle, cursor: "default" }}>
                       {title}
-                    </a>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -8456,6 +8669,8 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [subscriptionPromptOpen, setSubscriptionPromptOpen] = React.useState(false);
+  const subscriptionPromptRef = React.useRef(null);
   const [toast, setToast] = React.useState("");
   const [dashboardData, setDashboardData] = React.useState(() => previewData ? {
     loading: false,
@@ -8571,13 +8786,48 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
       };
     })
   ), [dashboardData.videos, isFa]);
-  const activeSubscription = dashboardData.subscription;
+  const activeSubscription = isSubscriptionActive(dashboardData.subscription) ? dashboardData.subscription : null;
   const includedMinutes = Number(activeSubscription?.included_minutes || 0);
   const usedMinutes = Number(activeSubscription?.used_minutes || 0);
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
   const processedCount = previewData?.processedCount ?? dashboardData.videos.filter((video) => video.status === "completed").length;
+
+  React.useEffect(() => {
+    if (dashboardData.loading || activeSubscription || activeView !== "dashboard") return;
+    const key = `vidora.subscription-prompt.dismissed.${session.user.id}`;
+    if (window.sessionStorage.getItem(key) !== "1") {
+      setSubscriptionPromptOpen(true);
+      trackEvent("dashboard_subscription_popup_viewed", { source: "dashboard", intent: "general-entry", subscription_status: "inactive" });
+    }
+  }, [activeSubscription, activeView, dashboardData.loading, session.user.id]);
+
+  React.useEffect(() => {
+    if (!subscriptionPromptOpen) return undefined;
+    const dialog = subscriptionPromptRef.current;
+    const focusable = () => Array.from(dialog?.querySelectorAll("button,a[href]") || []);
+    focusable()[0]?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") dismissSubscriptionPrompt();
+      if (event.key === "Tab") {
+        const nodes = focusable();
+        if (!nodes.length) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [subscriptionPromptOpen]);
+
+  const dismissSubscriptionPrompt = () => {
+    window.sessionStorage.setItem(`vidora.subscription-prompt.dismissed.${session.user.id}`, "1");
+    setSubscriptionPromptOpen(false);
+    trackEvent("dashboard_subscription_popup_closed", { source: "dashboard", subscription_status: "inactive" });
+  };
 
   const renderHeader = () => {
     const detailTitles = isFa
@@ -8654,7 +8904,7 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardData.videos, previewMode]);
 
-  const renderIntakePanel = () => (
+  const renderIntakePanel = () => activeSubscription ? (
     <TranslationIntakePanel
       session={session}
       isFa={isFa}
@@ -8664,6 +8914,13 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
         openVideoDetail(videoId);
       }}
     />
+  ) : (
+    <section className="vd-card vd-upload vd-locked-feature">
+      <div className="vd-lock-mark"><Lock size={22} /></div>
+      <h2>{isFa ? "افزودن و ترجمه ویدیو به اشتراک نیاز دارد" : "Adding and translating videos requires a subscription"}</h2>
+      <p>{isFa ? "داشبورد و ویدیوهای قبلی شما در دسترس‌اند؛ برای شروع پردازش جدید، یکی از پلن‌های فعال را انتخاب کنید." : "Your dashboard and existing videos remain available. Choose an active plan to start new processing."}</p>
+      <button className="vd-primary" onClick={() => { trackEvent("add_video_attempted", { source: "dashboard", authenticated: true, subscription_status: "inactive" }); window.location.hash = "#/subscriptions"; }}>{isFa ? "مشاهده اشتراک‌ها" : "View subscriptions"}</button>
+    </section>
   );
 
   const confirmDeleteVideo = () => {
@@ -8770,16 +9027,7 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
 
   const renderSubscription = () => (
     <section className="vd-view-stack">
-      <div className="vd-card-grid">
-        {[
-          ["free", t.subscription.free, "$0", t.subscription.minutes120, t.subscription.freeFeature, t.subscription.upgradePro],
-          ["pro", t.subscription.pro, "$19", t.subscription.minutes2000, t.subscription.proFeature, t.subscription.buyPlan],
-          ["team", t.subscription.team, "$49", t.subscription.minutes8000, t.subscription.teamFeature, t.subscription.buyPlan],
-        ].map(([slug, plan, price, minutes, feature, action]) => {
-          const current = activeSubscription?.plans?.slug === slug;
-          return <article className={`vd-card vd-plan-option ${current ? "is-current" : ""}`} key={slug}><h2>{plan}</h2><strong>{price}</strong><p>{minutes}</p><p>{feature}</p><button className={current ? "vd-secondary" : "vd-primary"} onClick={() => showToast(current ? t.actions.manageSubscription : (isFa ? "اتصال پرداخت در مرحله بعد انجام می‌شود." : "Payment connection is planned for the next phase."))}>{current ? t.actions.manageSubscription : action}</button></article>;
-        })}
-      </div>
+      <article className="vd-card vd-plan-card"><h2>{isFa ? "وضعیت اشتراک" : "Subscription status"}</h2><div className="vd-plan-line"><span>{isFa ? "پلن فعلی" : "Current plan"}</span><strong>{planName}</strong></div><p className="vd-muted">{activeSubscription ? (isFa ? "وضعیت اشتراک از اطلاعات معتبر حساب شما دریافت شده است." : "Subscription status comes from your trusted account record.") : (isFa ? "اشتراک فعالی برای این حساب ثبت نشده است." : "No active subscription is recorded for this account.")}</p><button className="vd-primary" onClick={() => { window.location.hash = "#/subscriptions"; }}>{isFa ? "مشاهده پلن‌های واقعی" : "View available plans"}</button></article>
       <article className="vd-card vd-recent"><h2>{t.subscription.usage}</h2>
       <div className="vd-stats two">
         <article className="vd-card vd-stat"><span>{t.subscription.minutesUsed}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
@@ -8902,7 +9150,7 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
         .vd-upload{margin-bottom:22px}.vd-wide{margin-bottom:0}.vd-upload-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}.vd-upload p,.vd-muted{margin:8px 0 0;color:#6d706c;font-size:15px;line-height:1.65;max-width:680px}.vd-helper{margin:0 0 18px!important;color:#5f625e!important}.vd-drop{min-height:184px;border:1.5px dashed rgba(35,35,33,.24);border-radius:22px;background:rgba(255,255,255,.22);display:grid;place-items:center;text-align:center;padding:28px}.vd-drop.is-large{min-height:260px}.vd-drop-icon{width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.58);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;color:#1f1f1f}.vd-drop h3{margin:0;font-size:18px}.vd-drop p{margin:6px auto 0;color:#777a76;font-size:13px}.vd-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;justify-content:center}.vd-selected-file{font-weight:720;color:#232421!important}.vd-youtube-section{margin-top:14px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.24);padding:16px;display:grid;grid-template-columns:minmax(220px,.46fr) minmax(0,1fr);gap:14px;align-items:center}.vd-youtube-copy{display:flex;align-items:center;gap:12px}.vd-inline-icon{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.42);border:1px solid rgba(35,35,35,.1);display:inline-flex;align-items:center;justify-content:center;color:#202020;flex:0 0 auto}.vd-youtube-copy h3{margin:0;font-size:16px}.vd-youtube-copy p{margin:4px 0 0;font-size:13px;color:#777a76}.vd-primary,.vd-secondary,.vd-open{border-radius:13px;border:1px solid transparent;font-weight:720;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer}.vd-primary,.vd-secondary{height:42px;padding:0 15px}.vd-primary{background:#1f1f1f;color:#fff;box-shadow:0 12px 22px rgba(0,0,0,.13)}.vd-primary:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}.vd-secondary,.vd-open{background:rgba(255,255,255,.42);border-color:rgba(35,35,35,.14);color:#151515}.vd-open{height:34px;padding:0 13px}.vd-secondary.danger{color:#3a1717}.vd-link-input{margin-top:16px;display:flex;gap:10px}.vd-input,.vd-link-input input,.vd-controls input{height:42px;flex:1;min-width:0;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.42);padding:0 14px;font:inherit;outline:none;color:#151515}.is-fa .vd-input,.is-fa .vd-link-input input,.is-fa .vd-controls input{text-align:right}.vd-url-input,.is-fa .vd-url-input{direction:ltr;text-align:left;unicode-bidi:plaintext}.vd-textarea{height:124px;padding:12px 14px;resize:vertical}.vd-start{margin-top:18px}.vd-start-full{width:100%;height:46px}.vd-success{display:flex;align-items:center;gap:8px;margin:14px 0 0;color:#2f4035;font-weight:700;font-size:14px}
         .vd-video-list{display:grid;gap:10px;margin-top:16px}.vd-video{min-height:74px;border-radius:18px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.28);display:grid;grid-template-columns:62px minmax(0,1fr) auto auto auto;align-items:center;gap:12px;padding:12px}.vd-thumb{width:62px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2c2d2d,#777872);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}.vd-thumb.wide{width:100%;height:120px}.vd-video h3,.vd-mini-card h3{margin:0;font-size:16px;line-height:1.2}.vd-video p,.vd-mini-card p{margin:5px 0 0;color:#747672;font-size:13px}.vd-video-meta{font-size:12px!important;color:#8a8c88!important}.vd-status{height:28px;border-radius:999px;padding:0 10px;background:rgba(255,255,255,.42);display:flex;align-items:center;font-size:12px;font-weight:750;color:#555754}.vd-status.is-ready{color:#263529}.vd-status.is-processing{color:#4d4c43}.vd-status.is-failed{color:#553333}.vd-icon-action{width:34px;height:34px;border-radius:10px;border:1px solid rgba(30,30,28,.14);background:rgba(255,255,255,.28);display:grid;place-items:center;cursor:pointer;color:#191919}
         .vd-controls{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.vd-controls label{height:42px;min-width:250px;display:flex;align-items:center;gap:9px;border-radius:13px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.34);padding:0 12px}.vd-controls input{border:0;background:transparent;padding:0}.vd-controls div{display:flex;gap:8px}.vd-controls button{height:36px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.28);padding:0 13px;font-weight:700;cursor:pointer}.vd-controls button.is-active{background:#202020;color:#fff}.vd-form-grid,.vd-toggle-grid,.vd-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.vd-form-grid label{display:grid;gap:8px;color:#555854;font-weight:700;font-size:13px}.vd-toggle{height:44px;border-radius:999px;border:1px solid rgba(35,35,35,.14);background:rgba(255,255,255,.32);display:flex;align-items:center;gap:10px;padding:0 14px;font-weight:720;color:#202020}.vd-toggle span{width:24px;height:24px;border-radius:999px;background:#202020;box-shadow:inset 0 0 0 7px #fff}.vd-mini-card,.vd-plan-option{padding:18px;border-radius:18px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}.vd-tags{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}.vd-tags span{height:26px;border-radius:999px;background:rgba(255,255,255,.45);padding:0 9px;display:inline-flex;align-items:center;font-size:12px;font-weight:700;color:#555854}.vd-empty{min-height:360px;display:grid;place-items:center;text-align:center;padding:44px}.vd-empty h2{margin:12px 0 0}.vd-empty p{margin:6px 0 0;color:#70736f}.vd-note-date{font-size:12px;color:#777a76}.vd-mini-card blockquote{margin:14px 0;color:#31322f;line-height:1.6}.vd-profile{display:grid;gap:18px}.vd-profile-head{display:flex;align-items:center;gap:18px}.vd-plan-option{display:grid;gap:12px}.vd-plan-option strong{font-size:38px;font-weight:560}.vd-plan-option.is-current{box-shadow:0 18px 38px rgba(65,66,62,.12),inset 0 0 0 1px rgba(0,0,0,.08)}.vd-view-stack{display:grid;gap:18px}.vd-table{display:grid;gap:8px;margin-top:16px}.vd-table>div{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:center;border-radius:14px;background:rgba(255,255,255,.28);padding:10px 12px;color:#555854;font-size:14px}.vd-support-card{width:100%;min-height:90px;border:1px solid rgba(255,255,255,.55);cursor:pointer;display:flex;align-items:center;gap:12px;color:#171817;font-weight:750}.vd-danger-zone{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(35,35,35,.1);padding-top:18px}
-        .vd-modal{position:fixed;inset:0;background:rgba(30,31,29,.28);display:grid;place-items:center;z-index:50}.vd-modal-card{width:min(420px,calc(100% - 32px));border-radius:24px;border:1px solid rgba(255,255,255,.58);background:rgba(242,243,240,.9);box-shadow:0 28px 80px rgba(0,0,0,.2);padding:24px;backdrop-filter:blur(18px)}.vd-modal-card h2{margin:0;font-size:24px}.vd-modal-card p{color:#666965;line-height:1.6}.vd-modal-actions{display:flex;justify-content:flex-end;gap:10px}.vd-toast{position:fixed;right:34px;bottom:34px;border-radius:15px;background:#202020;color:#fff;padding:12px 16px;font-weight:720;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:60}
+        .vd-modal{position:fixed;inset:0;background:rgba(30,31,29,.28);display:grid;place-items:center;z-index:50}.vd-modal-card{width:min(420px,calc(100% - 32px));border-radius:24px;border:1px solid rgba(255,255,255,.58);background:rgba(242,243,240,.94);box-shadow:0 28px 80px rgba(0,0,0,.2);padding:24px;backdrop-filter:blur(18px)}.vd-modal-card h2{margin:0;font-size:24px}.vd-modal-card p{color:#666965;line-height:1.75}.vd-modal-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}.vd-modal-close{width:36px;height:36px;display:grid;place-items:center;margin-inline-start:auto;margin-bottom:14px;border:1px solid rgba(35,35,35,.14);border-radius:11px;background:rgba(255,255,255,.45);cursor:pointer}.vd-locked-feature{display:grid;justify-items:start;gap:12px}.vd-lock-mark{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.45);border:1px solid rgba(35,35,35,.12)}.vd-locked-feature .vd-primary{margin-top:4px}.vd-toast{position:fixed;right:34px;bottom:34px;border-radius:15px;background:#202020;color:#fff;padding:12px 16px;font-weight:720;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:60}
         .vd-drop.is-over{border-color:rgba(31,31,31,.55);background:rgba(255,255,255,.4)}
         .vd-upload-file{margin-top:14px;display:flex;align-items:center;gap:12px;border:1px solid rgba(35,35,35,.12);border-radius:15px;background:rgba(255,255,255,.36);padding:12px 14px;color:#1f1f1f}.vd-upload-file-info{flex:1;min-width:0;display:grid;gap:2px}.vd-upload-file-info strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;unicode-bidi:plaintext}.vd-upload-file-info span{font-size:12.5px;color:#777a76}
         .vd-upload-progress{margin-top:14px;display:grid;gap:10px;border:1px solid rgba(255,255,255,.5);border-radius:15px;background:rgba(255,255,255,.28);padding:14px}.vd-upload-progress .vd-secondary{justify-self:start}
@@ -8921,6 +9169,7 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
         {isFa ? <>{mainPanel}{sidebarPanel}</> : <>{sidebarPanel}{mainPanel}</>}
       </section>
       {mobileNavOpen ? <button className="vd-mobile-backdrop" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)} /> : null}
+      {subscriptionPromptOpen ? <div className="vd-modal" role="presentation"><div ref={subscriptionPromptRef} className="vd-modal-card" role="dialog" aria-modal="true" aria-labelledby="subscription-prompt-title" dir={isFa ? "rtl" : "ltr"}><button className="vd-modal-close" onClick={dismissSubscriptionPrompt} aria-label={isFa ? "بستن" : "Close"}><X size={17} /></button><h2 id="subscription-prompt-title">{isFa ? "برای استفاده کامل از Vidora اشتراک تهیه کنید" : "Subscribe for the complete Vidora experience"}</h2><p>{isFa ? "با فعال‌کردن اشتراک، می‌توانید ویدیوهای کتابخانه را تماشا کنید، ویدیوهای دلخواهتان را اضافه کنید و به زیرنویس فارسی، خلاصه و نکات کلیدی هوشمند دسترسی داشته باشید." : "An active subscription unlocks Library playback, adding your own videos, Persian subtitles, summaries, and smart takeaways."}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={dismissSubscriptionPrompt}>{isFa ? "فعلاً بعداً" : "Maybe later"}</button><button className="vd-primary" onClick={() => { dismissSubscriptionPrompt(); window.location.hash = "#/subscriptions"; }}>{isFa ? "مشاهده اشتراک‌ها" : "View subscriptions"}</button></div></div></div> : null}
       {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={signOut}>{t.actions.logout}</button></div></div></div> : null}
       {deleteTarget ? (
         <div className="vd-modal" role="dialog" aria-modal="true">
@@ -9059,6 +9308,22 @@ function signUpFieldErrors(error) {
   return {};
 }
 
+async function completeAuthNavigation(session, authIntent) {
+  try {
+    await fetchActiveSubscription(session);
+  } catch (error) {
+    logAppError(toAppError(error), "completeAuthNavigation.subscription");
+  }
+  trackEvent("auth_completed", { intent: authIntent.intent, selected_plan: authIntent.planSlug || null });
+  const isPlanCheckout = authIntent.intent === "buy-subscription" && authIntent.planSlug;
+  if (isPlanCheckout) persistAuthIntent(authIntent);
+  else consumeAuthIntent();
+  const destination = isPlanCheckout
+    ? `${ROUTES.checkout}?plan=${encodeURIComponent(authIntent.planSlug)}`
+    : authIntent.intent === "general-entry" ? ROUTES.dashboard : sanitizeReturnTo(authIntent.returnTo, ROUTES.dashboard);
+  window.location.hash = toHash(destination);
+}
+
 function LoginPage() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
@@ -9068,7 +9333,7 @@ function LoginPage() {
   const [formError, setFormError] = React.useState("");
   const [formNotice, setFormNotice] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState({});
-  const returnTo = getReturnToFromHash();
+  const authIntent = React.useMemo(() => persistAuthIntent(readAuthIntentFromHash()), []);
 
   const handleSignIn = async (event) => {
     event.preventDefault();
@@ -9078,8 +9343,8 @@ function LoginPage() {
     setFormNotice("");
     setFieldErrors({});
     try {
-      await signInWithPassword(String(data.email || ""), String(data.password || ""));
-      window.location.hash = toHash(returnTo);
+      const session = await signInWithPassword(String(data.email || ""), String(data.password || ""));
+      await completeAuthNavigation(session, authIntent);
     } catch (error) {
       const appError = toAppError(error);
       logAppError(appError, "LoginPage.handleSignIn");
@@ -9101,11 +9366,11 @@ function LoginPage() {
         formError={formError}
         fieldErrors={fieldErrors}
         heroImageSrc={AUTH_HERO_IMAGE()}
-        testimonials={t.testimonials}
+        testimonials={[]}
         onSignIn={handleSignIn}
         onGoogleSignIn={() => setFormError(rtl ? OAUTH_DISABLED_FA : OAUTH_DISABLED_EN)}
         onResetPassword={() => setFormError(rtl ? "بازیابی رمز عبور در مرحله بعد به Supabase Email Templates وصل می‌شود." : "Password reset will be connected to Supabase email templates in the next phase.")}
-        onCreateAccount={() => { window.location.hash = `#/signup?returnTo=${encodeURIComponent(returnTo)}`; }}
+        onCreateAccount={() => { window.location.hash = buildAuthHash({ mode: "signup", intent: authIntent.intent, returnTo: authIntent.returnTo, planSlug: authIntent.planSlug }); }}
       />
     </div>
   );
@@ -9120,7 +9385,7 @@ function SignupPage() {
   const [formError, setFormError] = React.useState("");
   const [formNotice, setFormNotice] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState({});
-  const returnTo = getReturnToFromHash();
+  const authIntent = React.useMemo(() => persistAuthIntent(readAuthIntentFromHash()), []);
 
   const handleSignUp = async (event) => {
     event.preventDefault();
@@ -9168,7 +9433,7 @@ function SignupPage() {
         setFormNotice(rtl ? "حساب شما ساخته شد. برای ورود، ایمیل خود را تأیید کنید و سپس وارد شوید." : "Your account was created. Confirm your email, then sign in.");
         return;
       }
-      window.location.hash = toHash(returnTo);
+      if (result.session) await completeAuthNavigation(result.session, authIntent);
     } catch (error) {
       const appError = toAppError(error);
       logAppError(appError, "SignupPage.handleSignUp");
@@ -9193,13 +9458,63 @@ function SignupPage() {
         formNotice={formNotice}
         fieldErrors={fieldErrors}
         heroImageSrc={AUTH_HERO_IMAGE()}
-        testimonials={t.testimonials}
+        testimonials={[]}
         onSignUp={handleSignUp}
         onGoogleSignUp={() => setFormError(rtl ? OAUTH_DISABLED_FA : OAUTH_DISABLED_EN)}
-        onSignIn={() => { window.location.hash = `#/login?returnTo=${encodeURIComponent(returnTo)}`; }}
+        onSignIn={() => { window.location.hash = buildAuthHash({ intent: authIntent.intent, returnTo: authIntent.returnTo, planSlug: authIntent.planSlug }); }}
       />
     </div>
   );
+}
+
+function usePublicPlansPageState() {
+  const [state, setState] = React.useState({ loading: true, plans: [], error: "", session: getCachedSession() });
+  React.useEffect(() => {
+    const controller = new AbortController();
+    let alive = true;
+    Promise.all([fetchPublicPlans(controller.signal), restoreAuthSession()])
+      .then(([plans, session]) => { if (alive) setState({ loading: false, plans, error: "", session }); })
+      .catch((error) => { if (alive && error?.name !== "AbortError") setState((current) => ({ ...current, loading: false, error: "دریافت اطلاعات اشتراک با خطا مواجه شد." })); });
+    const unsubscribe = subscribeAuthState((session) => setState((current) => ({ ...current, session })));
+    return () => { alive = false; controller.abort(); unsubscribe(); };
+  }, []);
+  return state;
+}
+
+function SubscriptionPlansPage() {
+  const { lang } = window.useLang();
+  const isFa = lang === "fa";
+  const state = usePublicPlansPageState();
+  React.useEffect(() => { window.scrollTo(0, 0); trackEvent("subscription_plans_viewed", { source: "public" }); }, []);
+  const selectPlan = (plan) => {
+    const priorIntent = readAuthIntent();
+    const returnTo = priorIntent?.intent === "buy-subscription" ? priorIntent.returnTo : ROUTES.dashboard;
+    const purchaseIntent = createAuthIntent({ intent: "buy-subscription", returnTo, planSlug: plan.slug });
+    trackEvent("plan_selected", { selected_plan: plan.slug, authenticated: Boolean(state.session) });
+    if (state.session) {
+      persistAuthIntent(purchaseIntent);
+      window.location.hash = `#/checkout?plan=${encodeURIComponent(plan.slug)}`;
+    } else {
+      window.location.hash = buildAuthHash({ intent: "buy-subscription", returnTo, planSlug: plan.slug });
+    }
+  };
+  return <main className="plans-page" dir={isFa ? "rtl" : "ltr"}><EditorialHeader /><style>{`.plans-page{min-height:100vh;background:#f7f7f7;color:#18181b;font-family:var(--font-sans)}.plans-in{max-width:1120px;margin:auto;padding:86px 32px 110px}.plans-head{max-width:680px}.plans-head h1{margin:0;font-size:clamp(34px,4vw,52px);line-height:1.25}.plans-head p{margin:18px 0 0;color:#71717a;line-height:1.9}.plans-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:42px}.plan-card{display:flex;flex-direction:column;min-height:390px;padding:26px;border:1px solid #dedee2;border-radius:14px;background:#fff}.plan-card h2{margin:0;font-size:22px}.plan-card-desc{min-height:52px;margin:10px 0 0;color:#71717a;font-size:13.5px;line-height:1.75}.plan-price{margin-top:28px;font-size:34px;font-weight:750}.plan-period{margin-top:6px;color:#71717a;font-size:12px}.plan-facts{display:grid;gap:12px;margin:28px 0;color:#3f3f46;font-size:13px}.plan-card button{height:44px;margin-top:auto;border:0;border-radius:10px;background:#18181b;color:#fff;font:inherit;font-weight:750;cursor:pointer}.plans-message{margin-top:32px;padding:18px;border:1px solid #dedee2;border-radius:12px;background:#fff;color:#52525b;line-height:1.8}.plans-error{color:#542c2c}@media(max-width:850px){.plans-grid{grid-template-columns:1fr}.plan-card{min-height:0}.plans-in{padding:58px 20px 80px}}`}</style><div className="plans-in"><div className="plans-head"><h1>{isFa ? "اشتراک ویدورا" : "Vidora subscription"}</h1><p>{isFa ? "پلن‌ها از اطلاعات واقعی سرویس ویدورا دریافت می‌شوند. پرداخت فقط پس از اتصال و تأیید درگاه انجام خواهد شد." : "Plans are loaded from Vidora's real service. Payment will only proceed after a verified provider is connected."}</p></div>{state.loading ? <div className="plans-message">{isFa ? "در حال دریافت پلن‌ها..." : "Loading plans..."}</div> : state.error ? <div className="plans-message plans-error">{state.error}</div> : state.plans.length === 0 ? <div className="plans-message">{isFa ? "در حال حاضر پلن فعالی برای خرید وجود ندارد." : "There are no active plans available right now."}</div> : <div className="plans-grid">{state.plans.map((plan) => <article className="plan-card" key={plan.id}><h2>{plan.name_fa}</h2><p className="plan-card-desc">{plan.description_fa}</p><strong className="plan-price" dir="ltr">{formatPlanPrice(plan, isFa ? "fa-IR" : "en-US")}</strong><span className="plan-period">{isFa ? `${plan.billing_period_days.toLocaleString("fa-IR")} روز` : `${plan.billing_period_days} days`}</span><div className="plan-facts"><span>{isFa ? `${plan.included_minutes.toLocaleString("fa-IR")} دقیقه استفاده` : `${plan.included_minutes.toLocaleString()} included minutes`}</span><span>{isFa ? `حداکثر زمان هر ویدیو: ${Math.round(plan.max_video_duration_seconds / 60).toLocaleString("fa-IR")} دقیقه` : `Maximum video duration: ${Math.round(plan.max_video_duration_seconds / 60)} minutes`}</span></div><button onClick={() => selectPlan(plan)}>{isFa ? "انتخاب پلن" : "Select plan"}</button></article>)}</div>}</div></main>;
+}
+
+function CheckoutEntryPage() {
+  const { lang } = window.useLang();
+  const isFa = lang === "fa";
+  const state = usePublicPlansPageState();
+  const planSlug = new URLSearchParams(window.location.hash.split("?")[1] || "").get("plan") || "";
+  const selected = state.plans.find((plan) => plan.slug === planSlug);
+  const purchaseIntent = readAuthIntent();
+  const purchaseReturnTo = purchaseIntent?.intent === "buy-subscription" ? purchaseIntent.returnTo : ROUTES.dashboard;
+  const [notice, setNotice] = React.useState("");
+  React.useEffect(() => {
+    if (!state.loading && !state.session) window.location.hash = buildAuthHash({ intent: "buy-subscription", returnTo: purchaseReturnTo, planSlug });
+  }, [state.loading, state.session, planSlug, purchaseReturnTo]);
+  if (state.loading || !state.session) return <AuthLoadingScreen />;
+  return <main className="plans-page" dir={isFa ? "rtl" : "ltr"}><EditorialHeader /><style>{`.plans-page{min-height:100vh;background:#f7f7f7;color:#18181b;font-family:var(--font-sans)}.plans-in{max-width:760px;margin:auto;padding:86px 32px 110px}.plans-head h1{margin:0;font-size:clamp(34px,4vw,52px);line-height:1.25}.plans-head p{margin:18px 0 0;color:#71717a;line-height:1.9}.plans-message{margin-top:32px;padding:26px;border:1px solid #dedee2;border-radius:12px;background:#fff;color:#52525b;line-height:1.8}.plans-error{color:#542c2c}@media(max-width:850px){.plans-in{padding:58px 20px 80px}}`}</style><div className="plans-in"><div className="plans-head"><h1>{isFa ? "ادامه خرید اشتراک" : "Continue subscription purchase"}</h1><p>{selected ? `${selected.name_fa} · ${formatPlanPrice(selected, isFa ? "fa-IR" : "en-US")}` : (isFa ? "پلن انتخاب‌شده معتبر یا فعال نیست." : "The selected plan is not valid or active.")}</p></div><div className="plans-message"><h2 style={{ marginTop: 0 }}>{isFa ? "درگاه پرداخت هنوز متصل نشده است" : "Payment is not connected yet"}</h2><p>{isFa ? "هیچ پرداخت یا اشتراک فعالی به‌صورت آزمایشی ساخته نمی‌شود. پس از اتصال درگاه معتبر، همین مرحله خرید را ادامه خواهد داد." : "No fake payment or active subscription will be created. This boundary is ready for a verified payment provider."}</p>{notice ? <p className="plans-error">{notice}</p> : null}<button disabled={!selected} onClick={async () => { if (!selected) return; trackEvent("checkout_started", { selected_plan: selected.slug }); try { await paymentAdapter.startCheckout({ planSlug: selected.slug, returnTo: purchaseReturnTo }); } catch (error) { setNotice(error instanceof PaymentNotConfiguredError ? error.messageFa : "در شروع پرداخت خطایی رخ داد."); } }} style={{ height: 44, border: 0, borderRadius: 10, paddingInline: 18, background: "#18181b", color: "#fff", font: "inherit", fontWeight: 750, cursor: selected ? "pointer" : "not-allowed", opacity: selected ? 1 : .5 }}>{isFa ? "ادامه به پرداخت" : "Continue to payment"}</button></div></div></main>;
 }
 
 function AuthLoadingScreen({ message = "در حال بررسی حساب..." }) {
@@ -9235,7 +9550,7 @@ function ProtectedDashboard({ returnTo }) {
 
   React.useEffect(() => {
     if (!authState.loading && !authState.session) {
-      window.location.hash = loginHashFor(safeReturnTo);
+      window.location.hash = buildAuthHash({ intent: safeReturnTo === ROUTES.addVideo ? "add-video" : "general-entry", returnTo: safeReturnTo });
     }
   }, [authState.loading, authState.session, safeReturnTo]);
 
@@ -9279,6 +9594,8 @@ function Page() {
   if (__VIDORA_DASHBOARD_PREVIEW_ENABLED__ && path === "/dev/dashboard-preview" && DashboardPreview) {
     return <React.Suspense fallback={<AuthLoadingScreen />}><DashboardPreview /></React.Suspense>;
   }
+  if (hash.startsWith("#/subscriptions")) return <SubscriptionPlansPage />;
+  if (hash.startsWith("#/checkout")) return <CheckoutEntryPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <ProtectedDashboard returnTo={getCurrentInternalPath()} />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;
@@ -9289,11 +9606,10 @@ function Page() {
     <React.Fragment>
       <EditorialHeader />
       <EditorialHero />
-      <EditorialPillars />
-      <EditorialKnowledge />
-      <EditorialFeatures />
-      <EditorialCurated />
-      <EditorialFooter />
+      <LandingAddVideoSection />
+      <LandingCategories />
+      <LandingSelectedVideos />
+      <LandingFooter />
     </React.Fragment>
   );
 }

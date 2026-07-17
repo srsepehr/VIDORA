@@ -145,7 +145,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                   <input type="checkbox" name="rememberMe" className="custom-checkbox" />
                   <span className="text-foreground/90">{t.keepSignedIn}</span>
                 </label>
-                <a href="#" onClick={(e) => { e.preventDefault(); onResetPassword?.(); }} className="hover:underline text-zinc-900 dark:text-zinc-100 font-medium transition-colors">{t.resetPassword}</a>
+                <button type="button" onClick={onResetPassword} className="border-0 bg-transparent p-0 font-inherit cursor-pointer hover:underline text-zinc-900 dark:text-zinc-100 font-medium transition-colors">{t.resetPassword}</button>
               </div>
 
               <button type="submit" disabled={isSubmitting} className="animate-element animate-delay-600 w-full rounded-2xl bg-primary py-4 font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
@@ -164,7 +164,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             </button>
 
             <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
-              {t.newToPlatform} <a href="#" onClick={(e) => { e.preventDefault(); onCreateAccount?.(); }} className="text-zinc-900 dark:text-zinc-100 font-medium hover:underline transition-colors">{t.createAccount}</a>
+              {t.newToPlatform} <button type="button" onClick={onCreateAccount} className="border-0 bg-transparent p-0 font-inherit cursor-pointer text-zinc-900 dark:text-zinc-100 font-medium hover:underline transition-colors">{t.createAccount}</button>
             </p>
           </div>
         </div>

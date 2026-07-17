@@ -70,6 +70,7 @@ export const dashboardPreviewFixture: DashboardPreviewFixture = {
   subscription: {
     id: "00000000-0000-4000-8000-000000000010",
     status: "active",
+    starts_at: "2026-07-17T00:00:00.000Z",
     included_minutes: 120,
     used_minutes: 35,
     ends_at: "2026-08-17T00:00:00.000Z",

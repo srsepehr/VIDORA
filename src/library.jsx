@@ -48,7 +48,11 @@ import {
 import enDict from "./locales/en/library.json";
 import faDict from "./locales/fa/library.json";
 import { getCachedSession, getDisplayName, getUserEmail, restoreAuthSession, signOut as signOutUser, subscribeAuthState } from "./lib/auth";
+import { buildAuthHash, createAuthIntent, persistAuthIntent } from "./lib/auth-intent";
+import { trackEvent } from "./lib/analytics";
 import { loginHashFor } from "./lib/return-to";
+import { canWatchLibraryVideo, resolveSubscriptionState } from "./lib/subscription-access";
+import { fetchActiveSubscription } from "./lib/user-data";
 
 const DICTS = { en: enDict, fa: faDict };
 
@@ -724,15 +728,25 @@ function LibraryProvider({ children, surface = "default" }) {
   const { lang } = window.useLang();
   const rtl = lang === "fa";
   const t = React.useMemo(() => makeT(lang), [lang]);
-  const [session, setSession] = React.useState(getCachedSession);
+  const [access, setAccess] = React.useState({ loading: true, session: getCachedSession(), subscription: null });
   const [toasts, setToasts] = React.useState([]);
 
   React.useEffect(() => {
     let alive = true;
-    restoreAuthSession().then((activeSession) => {
-      if (alive) setSession(activeSession);
-    });
-    const unsubscribe = subscribeAuthState(setSession);
+    const loadAccess = async (activeSession) => {
+      if (!activeSession) {
+        if (alive) setAccess({ loading: false, session: null, subscription: null });
+        return;
+      }
+      try {
+        const subscription = await fetchActiveSubscription(activeSession);
+        if (alive) setAccess({ loading: false, session: activeSession, subscription });
+      } catch {
+        if (alive) setAccess({ loading: false, session: activeSession, subscription: null });
+      }
+    };
+    restoreAuthSession().then(loadAccess).catch(() => loadAccess(null));
+    const unsubscribe = subscribeAuthState(loadAccess);
     return () => {
       alive = false;
       unsubscribe();
@@ -749,8 +763,25 @@ function LibraryProvider({ children, surface = "default" }) {
   const title = (video) => video.title[lang] || video.title.en;
   const desc = (video) => (video.desc ? video.desc[lang] || video.desc.en : GENERIC_DESC[lang] || GENERIC_DESC.en);
 
-  const viewer = session ? "member" : "guest";
-  const ctx = { t, lang, rtl, viewer, session, showToast, catName, title, desc };
+  const subscriptionState = resolveSubscriptionState({
+    loading: access.loading,
+    session: access.session,
+    subscription: access.subscription,
+  });
+  const viewer = access.session ? "member" : "guest";
+  const ctx = {
+    t,
+    lang,
+    rtl,
+    viewer,
+    session: access.session,
+    subscription: access.subscription,
+    subscriptionState,
+    showToast,
+    catName,
+    title,
+    desc,
+  };
   return (
     <Ctx.Provider value={ctx}>
       <div className={`lib-root is-${surface}`} dir={rtl ? "rtl" : "ltr"} lang={lang}>
@@ -1937,7 +1968,7 @@ function WatchFooter() {
 }
 
 function WatchPageInner() {
-  const { t, lang, rtl, viewer, title, desc, catName, showToast } = useLib();
+  const { t, lang, rtl, viewer, subscriptionState, title, desc, catName, showToast } = useLib();
   const slug = window.location.hash.replace(/^#\/watch\//, "").split("?")[0];
   const video = bySlug(slug);
   const [playing, setPlaying] = React.useState(false);
@@ -1951,16 +1982,37 @@ function WatchPageInner() {
     return null;
   }
 
-  const canWatchFull = video.access === "free";
-  const canPreview = canWatchFull || video.access === "preview";
+  const canWatchFull = canWatchLibraryVideo(subscriptionState).allowed;
   const group = LIBRARY_GROUPS.find((item) => item.categories.includes(video.category));
   const breadcrumbCategory = group ? t(`libraryPage.groups.${group.key}.title`) : catName(video.category);
   const similar = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category)
     .concat(VIDEOS.filter((v) => v.slug !== video.slug && v.category !== video.category))
     .slice(0, 8);
-  const gateCta = viewer === "guest" ? { label: t("watch.guestCta"), href: loginHashFor(`/watch/${video.slug}`) } : { label: t("watch.memberCta"), href: "#/dashboard/subscription" };
-  const gateMsg = viewer === "guest" ? t("watch.guestGate") : t("watch.memberGate");
   const relatedHref = `#/library/all?category=${group?.key || video.category}`;
+  const currentVideoRoute = `/watch/${video.slug}`;
+
+  const startPlayback = () => {
+    trackEvent("video_play_attempted", {
+      video_id: video.slug,
+      authenticated: viewer !== "guest",
+      subscription_status: subscriptionState,
+    });
+    if (subscriptionState === "guest") {
+      window.location.hash = buildAuthHash({ intent: "watch-video", returnTo: currentVideoRoute });
+    } else if (subscriptionState === "active") {
+      setPlaying(true);
+    }
+  };
+
+  const openPlans = () => {
+    persistAuthIntent(createAuthIntent({ intent: "buy-subscription", returnTo: currentVideoRoute }));
+    trackEvent("video_paywall_viewed", {
+      video_id: video.slug,
+      authenticated: true,
+      subscription_status: subscriptionState,
+    });
+    window.location.hash = "#/subscriptions";
+  };
 
   const shareVideo = async () => {
     const shareData = { title: title(video), url: window.location.href };
@@ -1993,33 +2045,43 @@ function WatchPageInner() {
           <div className="lib-watch-main">
             <div className="lib-player">
               <img className="lib-player-poster" src={`${BASE()}${imageOf(video)}`} alt="" />
-              {playing ? (
+              {subscriptionState === "loading" ? (
+                <div className="lib-player-center">
+                  <span className="lib-pillbadge">{lang === "fa" ? "در حال بررسی دسترسی..." : "Checking access..."}</span>
+                </div>
+              ) : playing ? (
                 <div className="lib-player-center">
                   <span className="lib-pillbadge">{t("watch.playing")}</span>
                 </div>
-              ) : canPreview ? (
+              ) : subscriptionState === "guest" || canWatchFull ? (
                 <div className="lib-player-center">
-                  <button className="lib-playbtn" onClick={() => setPlaying(true)} aria-label={canWatchFull ? t("hero.watch") : t("watch.playPreview")}>
+                  <button className="lib-playbtn" onClick={startPlayback} aria-label={t("hero.watch")}>
                     <Play size={28} style={{ marginInlineStart: 3 }} />
                   </button>
                 </div>
               ) : null}
-              {!canWatchFull && !canPreview ? (
+              {subscriptionState === "inactive" ? (
                 <div className="lib-gate">
                   <Lock size={30} />
-                  <p>{gateMsg}</p>
-                  <a className="lib-btn is-primary" href={gateCta.href}>
-                    {gateCta.label}
-                  </a>
+                  <h2 style={{ margin: 0, fontSize: 21 }}>
+                    {lang === "fa" ? "برای تماشای این ویدیو اشتراک ویدورا را فعال کنید" : "Activate Vidora to watch this video"}
+                  </h2>
+                  <p>
+                    {lang === "fa"
+                      ? "با اشتراک ویدورا به ویدیوهای فارسی‌شده، خلاصه‌ها، نکات کلیدی و امکانات کامل پلتفرم دسترسی خواهید داشت."
+                      : "A Vidora subscription unlocks Persian videos, summaries, key takeaways, and the complete experience."}
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+                    <button className="lib-btn is-primary" onClick={openPlans}>
+                      {lang === "fa" ? "خرید اشتراک" : "Buy subscription"}
+                    </button>
+                    <a className="lib-btn is-ghost" href="#/library">
+                      {lang === "fa" ? "بازگشت به کتابخانه" : "Back to Library"}
+                    </a>
+                  </div>
                 </div>
               ) : null}
             </div>
-            {canPreview && !canWatchFull ? (
-              <div className="lib-watch-note">
-                {t("watch.previewNote")}{" "}
-                <a href={gateCta.href}>{gateCta.label}</a>
-              </div>
-            ) : null}
 
             <section className="lib-watch-info">
               <div className="lib-watch-copy">
@@ -2028,8 +2090,6 @@ function WatchPageInner() {
                   <span>{catName(video.category)}</span>
                   <span>·</span>
                   <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-                  <span>·</span>
-                  <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
                 </div>
               </div>
               <div className="lib-watch-actions">

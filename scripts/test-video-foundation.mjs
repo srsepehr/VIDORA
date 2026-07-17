@@ -29,6 +29,8 @@ compileTs("src/lib/app-error.ts", "app-error.mjs");
 compileTs("src/lib/env-core.ts", "env-core.mjs");
 fs.writeFileSync(path.join(tmp, "env.mjs"), `export function getBrowserEnv() { return { supabaseUrl: "https://test.supabase.co", supabaseAnonKey: "anon-test", appUrl: "http://localhost" }; }`);
 compileTs("src/lib/auth.ts", "auth.mjs");
+compileTs("src/lib/user-data.ts", "user-data.mjs");
+compileTs("src/lib/subscription-access.ts", "subscription-access.mjs");
 compileTs("src/lib/access-policy.ts", "access-policy.mjs");
 compileTs("src/lib/video-config.ts", "video-config.mjs");
 compileTs("src/lib/video-sources.ts", "video-sources.mjs");
