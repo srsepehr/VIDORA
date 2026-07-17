@@ -715,3 +715,203 @@ test("review page attaches a Persian VTT track and secure downloads, and never g
   // The browser must not build authoritative subtitle files.
   assert.doesNotMatch(source, /WEBVTT|to_vtt|buildCues|content_hash/);
 });
+
+// ---------------------------------------------------------------------------
+// Automatic upload dispatch (enqueue -> best-effort kick of the Modal drain)
+// ---------------------------------------------------------------------------
+
+// Far-future expiry so getValidAuthSession() never triggers a token refresh
+// network call, and the same session lives in storage so preferLatestSession
+// returns it unchanged. Returns a restore function for global state.
+function withDispatchHarness(fetchImpl) {
+  const now = Math.floor(Date.now() / 1000);
+  const session = {
+    accessToken: "access-token",
+    refreshToken: "refresh-token",
+    expiresAt: now + 36000,
+    user: { id: "user-1", email: "owner@example.com" },
+  };
+  const store = new Map([["vidora.supabase.session.v1", JSON.stringify(session)]]);
+  const prevWindow = global.window;
+  const prevFetch = global.fetch;
+  global.window = {
+    location: { origin: "http://localhost" },
+    sessionStorage: {
+      getItem: (key) => store.get(key) || null,
+      setItem: (key, value) => store.set(key, value),
+      removeItem: (key) => store.delete(key),
+    },
+  };
+  global.fetch = fetchImpl;
+  return {
+    session,
+    restore() {
+      global.window = prevWindow;
+      global.fetch = prevFetch;
+    },
+  };
+}
+
+test("enqueue durably persists the job, then fires the dispatch gateway (order + target)", async () => {
+  const calls = [];
+  const harness = withDispatchHarness(async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/rpc/enqueue_video_processing")) {
+      return new Response(JSON.stringify({ id: "job-1", video_id: "vid-1", status: "queued" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // The dispatch gateway.
+    return new Response(JSON.stringify({ dispatched: true }), { status: 202, headers: { "Content-Type": "application/json" } });
+  });
+  try {
+    const result = await videoService.jobDispatcher.enqueueVideoProcessing({ session: harness.session, videoId: "vid-1" });
+    // The job returned is the one persisted by the enqueue RPC.
+    assert.equal(result.job.id, "job-1");
+    // Enqueue happens first; the dispatch is only fired once the job is durable.
+    assert.equal(calls.length, 2);
+    assert.match(calls[0], /\/rest\/v1\/rpc\/enqueue_video_processing$/);
+    assert.match(calls[1], /\/functions\/v1\/video-dispatch$/);
+    // The browser dispatch never talks to Modal directly.
+    assert.ok(!calls[1].includes("modal.run"));
+  } finally {
+    harness.restore();
+  }
+});
+
+test("a failing dispatch is swallowed and leaves the enqueued job recoverable", async () => {
+  // Upstream gateway rejects (500) — the durable queue row already exists.
+  const rejecting = withDispatchHarness(async (input) => {
+    const url = String(input);
+    if (url.includes("/rpc/enqueue_video_processing")) {
+      return new Response(JSON.stringify({ id: "job-2", video_id: "vid-2", status: "queued" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("upstream unavailable", { status: 500 });
+  });
+  try {
+    const result = await videoService.jobDispatcher.enqueueVideoProcessing({ session: rejecting.session, videoId: "vid-2" });
+    assert.equal(result.job.id, "job-2");
+    assert.equal(result.job.status, "queued");
+  } finally {
+    rejecting.restore();
+  }
+
+  // Network-level failure (thrown / aborted) is also swallowed.
+  const throwing = withDispatchHarness(async (input) => {
+    const url = String(input);
+    if (url.includes("/rpc/enqueue_video_processing")) {
+      return new Response(JSON.stringify({ id: "job-3", video_id: "vid-3", status: "queued" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw new TypeError("network down");
+  });
+  try {
+    const result = await videoService.jobDispatcher.enqueueVideoProcessing({ session: throwing.session, videoId: "vid-3" });
+    assert.equal(result.job.id, "job-3");
+    assert.equal(result.job.status, "queued");
+  } finally {
+    throwing.restore();
+  }
+});
+
+test("kickVideoProcessing reports gateway success/failure without ever throwing", async () => {
+  const ok = withDispatchHarness(async () => new Response(JSON.stringify({ dispatched: true }), { status: 202 }));
+  try {
+    assert.equal(await videoService.kickVideoProcessing(ok.session), true);
+  } finally {
+    ok.restore();
+  }
+  const bad = withDispatchHarness(async () => new Response("no", { status: 503 }));
+  try {
+    assert.equal(await videoService.kickVideoProcessing(bad.session), false);
+  } finally {
+    bad.restore();
+  }
+  const dead = withDispatchHarness(async () => { throw new Error("unreachable"); });
+  try {
+    assert.equal(await videoService.kickVideoProcessing(dead.session), false);
+  } finally {
+    dead.restore();
+  }
+});
+
+test("duplicate enqueue+dispatch is safe: enqueue is idempotent and dispatch only spawns a drain", async () => {
+  // Two rapid enqueues for the same video must both return the SAME durable job
+  // (idempotent enqueue) and each fires a dispatch — the dispatch itself only
+  // asks the worker to drain, never creating or claiming a job.
+  const calls = [];
+  const harness = withDispatchHarness(async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/rpc/enqueue_video_processing")) {
+      // Server-side idempotency: same active job row on every call.
+      return new Response(JSON.stringify({ id: "job-dup", video_id: "vid-dup", status: "queued" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ dispatched: true }), { status: 202 });
+  });
+  try {
+    const a = await videoService.jobDispatcher.enqueueVideoProcessing({ session: harness.session, videoId: "vid-dup" });
+    const b = await videoService.jobDispatcher.enqueueVideoProcessing({ session: harness.session, videoId: "vid-dup" });
+    assert.equal(a.job.id, "job-dup");
+    assert.equal(b.job.id, a.job.id);
+    // Two enqueues + two dispatches, all pointed at the safe endpoints.
+    const enqueues = calls.filter((u) => u.includes("/rpc/enqueue_video_processing"));
+    const dispatches = calls.filter((u) => u.includes("/functions/v1/video-dispatch"));
+    assert.equal(enqueues.length, 2);
+    assert.equal(dispatches.length, 2);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("frontend dispatch goes through the Edge gateway and never hits Modal directly", () => {
+  const source = fs.readFileSync(path.join(root, "src/lib/video-service.ts"), "utf8");
+  // The dispatch URL is the Supabase Edge function, not a modal.run endpoint.
+  assert.match(source, /functions\/v1\/video-dispatch/);
+  assert.doesNotMatch(source, /modal\.run/);
+  // The kick is authenticated (JWT via fetchWithAuth) and best-effort (swallows
+  // failures, returns a boolean rather than throwing).
+  assert.match(source, /export async function kickVideoProcessing/);
+  assert.match(source, /fetchWithAuth\(session, VIDEO_DISPATCH_URL/);
+  // Enqueue fires the kick only after the durable job is returned.
+  assert.match(source, /const job = await restJson<VideoJob>[\s\S]*?await kickVideoProcessing\(session\);\s*return \{ job \};/);
+  // No server secret ever lives in the frontend dispatch path.
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role/);
+});
+
+test("video-dispatch Edge gateway requires a bearer, holds no secret, and only spawns a drain", () => {
+  const source = fs.readFileSync(path.join(root, "supabase/functions/video-dispatch/index.ts"), "utf8");
+  // Authenticated caller required — not an open "spin up a worker" trigger.
+  assert.match(source, /authorization/i);
+  assert.match(source, /bearer /i);
+  assert.match(source, /status:\s*401/);
+  // Proxies to the private Modal trigger; the browser never calls Modal.
+  assert.match(source, /MODAL_TRIGGER_URL/);
+  assert.match(source, /vidora-worker-trigger\.modal\.run/);
+  // CORS is allowlisted to the known origins only.
+  assert.match(source, /srsepehr\.github\.io/);
+  // A failed upstream is non-fatal (503, durable queue keeps the job).
+  assert.match(source, /status:\s*503/);
+  // No server secret is embedded in the gateway.
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|service_role|MODAL_TOKEN/);
+});
+
+test("worker trigger spawns a bounded drain (event-driven, no always-on poller, single container)", () => {
+  const source = fs.readFileSync(path.join(root, "worker/modal_app.py"), "utf8");
+  // The trigger endpoint must return immediately by SPAWNING the drain, never
+  // blocking on the minutes-long pipeline.
+  assert.match(source, /def trigger\(/);
+  assert.match(source, /drain\.spawn\(max_jobs=1\)/);
+  // Single-container guarantee on the drain path prevents concurrent processing.
+  assert.match(source, /max_containers=1/);
+});

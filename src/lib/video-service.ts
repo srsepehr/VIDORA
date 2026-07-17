@@ -152,6 +152,37 @@ export interface VideoJobDispatcher {
   enqueueVideoProcessing(input: EnqueueVideoInput): Promise<DispatchResult>;
 }
 
+// Authenticated dispatch gateway (Browser -> Supabase Edge -> Modal trigger).
+// The browser never calls Modal directly.
+export const VIDEO_DISPATCH_URL = (import.meta.env?.VITE_VIDEO_DISPATCH_URL as string | undefined)
+  || "https://kvqrkphoyuoblfonjcvo.supabase.co/functions/v1/video-dispatch";
+
+// Ask the worker to start draining the durable queue right after a job is
+// enqueued. This is strictly BEST-EFFORT and advisory: the job is already
+// durably persisted by enqueue_video_processing, so any failure here (network,
+// gateway, cold Modal) leaves the job queued and recoverable by a later
+// dispatch or a manual drain — it must never surface as an enqueue/upload
+// error, and it never creates or mutates a job.
+export async function kickVideoProcessing(session: AuthSession): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetchWithAuth(session, VIDEO_DISPATCH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch (error) {
+    // Advisory only — swallow every failure; the durable queue is the source
+    // of truth and the reaper/next dispatch will pick the job up.
+    console.warn(`[Vidora] processing dispatch best-effort failed: ${error instanceof Error ? error.name : "error"}`);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class SupabaseQueueDispatcher implements VideoJobDispatcher {
   async enqueueVideoProcessing({ session, videoId }: EnqueueVideoInput): Promise<DispatchResult> {
     const response = await fetchWithAuth(session, rest("/rpc/enqueue_video_processing"), {
@@ -160,6 +191,9 @@ export class SupabaseQueueDispatcher implements VideoJobDispatcher {
       body: JSON.stringify({ p_video_id: videoId }),
     });
     const job = await restJson<VideoJob>(response, "ثبت ویدیو در صف پردازش ناموفق بود.", "enqueueVideoProcessing");
+    // Fire the dispatch only after the job is durably enqueued. Best-effort:
+    // its result never changes what we return, and its failure never throws.
+    await kickVideoProcessing(session);
     return { job };
   }
 }

@@ -172,16 +172,21 @@ def _spawn_insights_for(drain_result: dict) -> None:
             pass
 
 
-@app.function(image=image, secrets=[secret], timeout=1500, max_containers=1)
+@app.function(image=image, secrets=[secret], timeout=60, max_containers=1)
 @modal.fastapi_endpoint(method="POST")
 def trigger():
-    """On-demand HTTP trigger: the app calls this after enqueuing a test job so
-    work starts without any always-on poller. Still scale-to-zero."""
-    from worker.app.main import run_drain
-
-    result = run_drain(max_jobs=1, max_seconds=1400.0)
-    _spawn_insights_for(result)
-    return result
+    """On-demand HTTP dispatch: the app calls this right after enqueuing a job so
+    processing starts without any always-on poller. It SPAWNS a scale-to-zero
+    drain and returns immediately, so the caller never blocks on the (minutes-
+    long) pipeline. Safety comes entirely from the durable queue, not from this
+    call: the spawned drain claims jobs atomically (claim_next_video_job uses
+    FOR UPDATE SKIP LOCKED) and drain runs max_containers=1, so duplicate or
+    concurrent triggers can never double-process a job or create a duplicate —
+    and if this dispatch fails, the enqueued job simply stays queued and is
+    recovered by the next dispatch, a manual drain, or the lease reaper. The
+    body only spawns work and loads no model, so container start is cheap."""
+    drain.spawn(max_jobs=1)
+    return {"dispatched": True}
 
 
 @app.function(image=image, secrets=[secret], timeout=600, max_containers=1)
