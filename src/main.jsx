@@ -2,22 +2,29 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   BadgeDollarSign,
+  BookOpen,
+  Bookmark,
   CheckCircle2,
+  CirclePlus,
+  Crown,
   Download,
   FileText,
-  Gauge,
   Heart,
+  Headphones,
+  Home,
   Library,
-  Link2,
-  LogOut,
+  Menu,
   MessageCircle,
   MoreHorizontal,
   Search,
   Trash2,
   Upload,
+  Video,
+  X,
 } from "lucide-react";
 import "./styles.css";
 import "./tailwind.css";
+import "./components/dashboard/dashboard-shell.css";
 import dashboardEn from "./locales/en/dashboard.json";
 import dashboardFa from "./locales/fa/dashboard.json";
 import { ArrowLeft, ArrowRight, BrainCircuit, Code2, Languages, TrendingUp } from "lucide-react";
@@ -40,6 +47,7 @@ import { getCurrentInternalPath, getReturnToFromHash, loginHashFor, sanitizeRetu
 import { fetchActiveSubscription, fetchUserVideos, normalizeVideoStatus } from "./lib/user-data";
 import { deleteVideo, retryVideoProcessing } from "./lib/video-service";
 import { TranslationIntakePanel, VideoProcessingDetail, isActiveVideoStatus, statusLabel } from "./video-workflow.jsx";
+import { DashboardHome } from "./components/dashboard/dashboard-home.jsx";
 
 window.React = React;
 window.ReactDOM = { createRoot };
@@ -8398,28 +8406,23 @@ const sidebarGroups = [
   {
     labelKey: "primary",
     items: [
-      { icon: Gauge, labelKey: "dashboard", view: "dashboard" },
-      { icon: Upload, labelKey: "newTranslation", view: "new-video" },
-      { icon: Library, labelKey: "myVideos", view: "library" },
-      { icon: Library, labelKey: "publicLibrary", externalHash: "#/library" },
+      { icon: Home, labelKey: "dashboard", view: "dashboard" },
+      { icon: CirclePlus, labelKey: "newTranslation", view: "new-video" },
+      { icon: Video, labelKey: "myVideos", view: "library" },
+      { icon: BookOpen, labelKey: "publicLibrary", externalHash: "#/library" },
     ],
   },
   {
     labelKey: "saved",
     items: [
-      { icon: Heart, labelKey: "saved", view: "saved" },
-    ],
-  },
-  {
-    labelKey: "account",
-    items: [
-      { icon: BadgeDollarSign, labelKey: "subscription", view: "subscription" },
+      { icon: Bookmark, labelKey: "saved", view: "saved" },
+      { icon: Crown, labelKey: "subscription", view: "subscription" },
     ],
   },
   {
     labelKey: "help",
     items: [
-      { icon: MessageCircle, labelKey: "support", view: "support" },
+      { icon: Headphones, labelKey: "support", view: "support" },
     ],
   },
 ];
@@ -8451,6 +8454,7 @@ function VidoraDashboard({ session }) {
   const [supportSent, setSupportSent] = React.useState(false);
   const [logoutConfirm, setLogoutConfirm] = React.useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [toast, setToast] = React.useState("");
   const [dashboardData, setDashboardData] = React.useState({
     loading: true,
@@ -8490,6 +8494,7 @@ function VidoraDashboard({ session }) {
     setActiveView(view);
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
+    setMobileNavOpen(false);
     const segment = dashboardRouteSegments[view] || view;
     window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
   };
@@ -8514,6 +8519,14 @@ function VidoraDashboard({ session }) {
       const status = normalizeVideoStatus(video.status);
       const minutes = video.duration_seconds ? `${Math.max(1, Math.round(video.duration_seconds / 60))} ${isFa ? "دقیقه" : "min"}` : "";
       const sourceType = video.source_type === "upload" ? (isFa ? "آپلود" : "Upload") : video.source_type === "youtube" ? (isFa ? "یوتیوب" : "YouTube") : (isFa ? "لینک ویدیو" : "Video link");
+      const totalSeconds = Math.max(0, Math.round(video.duration_seconds || 0));
+      const durationLabel = totalSeconds
+        ? `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`
+        : "";
+      const ageInDays = Math.round((new Date(video.created_at).getTime() - Date.now()) / 86400000);
+      const relativeCreated = Math.abs(ageInDays) < 1
+        ? (isFa ? "امروز" : "Today")
+        : new Intl.RelativeTimeFormat(isFa ? "fa-IR" : "en-US", { numeric: "auto" }).format(ageInDays, "day");
       return {
         id: video.id,
         raw: video,
@@ -8523,6 +8536,8 @@ function VidoraDashboard({ session }) {
         failure: video.failure_message_fa || "",
         created: new Date(video.created_at).toLocaleDateString(isFa ? "fa-IR" : "en-US"),
         minutes,
+        durationLabel,
+        relativeCreated,
         sourceType,
       };
     })
@@ -8533,7 +8548,7 @@ function VidoraDashboard({ session }) {
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
-  const renewalLabel = activeSubscription?.ends_at ? new Date(activeSubscription.ends_at).toLocaleDateString(isFa ? "fa-IR" : "en-US") : "—";
+  const processedCount = dashboardData.videos.filter((video) => video.status === "completed").length;
 
   const renderHeader = () => {
     const detailTitles = isFa
@@ -8656,23 +8671,22 @@ function VidoraDashboard({ session }) {
   };
 
   const renderDashboard = () => (
-    <>
-      <div className="vd-top-grid">
-        <div className="vd-stats single">
-          <article className="vd-card vd-stat"><span>{t.dashboard.minutesRemaining}</span><strong>{remainingMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></article>
-        </div>
-        <aside className="vd-card vd-plan-card">
-          <h2>{t.dashboard.currentPlan}</h2>
-          <div className="vd-plan-line"><span>{t.dashboard.plan}</span><strong>{planName}</strong></div>
-          <div className="vd-plan-line"><span>{t.dashboard.monthlyMinutes}</span><strong>{usedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")} / {includedMinutes.toLocaleString(isFa ? "fa-IR" : "en-US")}</strong></div>
-          <div className="vd-meter"><span style={{ width: `${usagePercent}%` }} /></div>
-          <div className="vd-plan-line"><span>{t.dashboard.renewal}</span><strong>{renewalLabel}</strong></div>
-          <button className="vd-secondary" onClick={() => selectView("subscription")}>{t.actions.manageSubscription}</button>
-        </aside>
-      </div>
-      {renderIntakePanel()}
-      <section className="vd-card vd-recent"><h2>{t.dashboard.recentVideos}</h2>{renderVideoList(userVideoRows.slice(0, 5))}</section>
-    </>
+    <DashboardHome
+      isFa={isFa}
+      t={t}
+      loading={dashboardData.loading}
+      error={dashboardData.error}
+      videos={userVideoRows}
+      planName={planName}
+      includedMinutes={includedMinutes}
+      remainingMinutes={remainingMinutes}
+      usagePercent={usagePercent}
+      processedCount={processedCount}
+      onOpenVideo={openVideoDetail}
+      onRetryVideo={retryVideoRow}
+      onSelectView={selectView}
+      onReload={() => reloadDashboardData()}
+    />
   );
 
   const renderNewTranslation = () => (
@@ -8797,7 +8811,9 @@ function VidoraDashboard({ session }) {
   };
 
   const sidebarPanel = (
-    <aside className="vd-sidebar" dir={isFa ? "rtl" : "ltr"}>
+    <aside className={`vd-sidebar${mobileNavOpen ? " is-open" : ""}`} dir={isFa ? "rtl" : "ltr"} aria-label={isFa ? "ناوبری داشبورد" : "Dashboard navigation"}>
+      <button className="vd-sidebar-close" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
+      <div className="vd-sidebar-brand" aria-label="Vidora">vidora</div>
       <div>
         {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
       </div>
@@ -8821,13 +8837,17 @@ function VidoraDashboard({ session }) {
 
   const mainPanel = (
     <section className="vd-main" dir={isFa ? "rtl" : "ltr"}>
+      <div className="vd-mobile-bar">
+        <span className="vd-mobile-wordmark">vidora</span>
+        <button className="vd-mobile-menu-button" aria-label={isFa ? "باز کردن منو" : "Open menu"} onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button>
+      </div>
       {renderHeader()}
       {renderActiveView()}
     </section>
   );
 
   return (
-    <main className={`vd-page ${isFa ? "is-fa" : ""}`}>
+    <main className={`vd-page vd-dashboard-redesign ${isFa ? "is-fa" : ""}`} dir={isFa ? "rtl" : "ltr"}>
       <style dangerouslySetInnerHTML={{ __html: `
         .vd-page{min-height:100vh;background:radial-gradient(circle at 14% 8%,rgba(255,255,255,.7),transparent 32%),linear-gradient(135deg,#d8d8d5 0%,#c4c5c1 48%,#dededb 100%);display:flex;align-items:center;justify-content:center;padding:32px;font-family:var(--font-sans);color:#111;overflow:hidden}
         .vd-shell{width:min(1420px,100%);height:min(860px,calc(100vh - 64px));min-height:690px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;border-radius:36px;border:1px solid rgba(255,255,255,.48);background:rgba(238,239,236,.44);box-shadow:0 34px 105px rgba(36,37,34,.18),inset 0 1px 0 rgba(255,255,255,.58);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);padding:14px;overflow:hidden;direction:ltr}.is-fa .vd-shell{grid-template-columns:minmax(0,1fr) 310px}
@@ -8857,6 +8877,7 @@ function VidoraDashboard({ session }) {
       <section className="vd-shell" dir={isFa ? "rtl" : "ltr"} aria-label="Vidora dashboard">
         {isFa ? <>{mainPanel}{sidebarPanel}</> : <>{sidebarPanel}{mainPanel}</>}
       </section>
+      {mobileNavOpen ? <button className="vd-mobile-backdrop" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)} /> : null}
       {logoutConfirm ? <div className="vd-modal" role="dialog" aria-modal="true"><div className="vd-modal-card" dir={isFa ? "rtl" : "ltr"}><h2>{t.modal.logoutTitle}</h2><p>{t.modal.logoutText}</p><div className="vd-modal-actions"><button className="vd-secondary" onClick={() => setLogoutConfirm(false)}>{t.actions.cancel}</button><button className="vd-primary" onClick={signOut}>{t.actions.logout}</button></div></div></div> : null}
       {deleteTarget ? (
         <div className="vd-modal" role="dialog" aria-modal="true">
