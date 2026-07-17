@@ -43,7 +43,9 @@ function EmptyWork({ isFa, onStart }) {
 }
 
 function ActiveWork({ video, isFa, onOpen }) {
-  const meta = [video.sourceType, video.minutes].filter(Boolean).join(" · ");
+  const meta = [video.format, video.resolution, video.sourceType, video.minutes].filter(Boolean).join(" · ");
+  const hasProgress = Number.isFinite(video.progressPercent);
+  const progressPercent = hasProgress ? Math.max(0, Math.min(100, video.progressPercent)) : null;
   return (
     <div className="vd-active-work-row">
       <VideoThumbnail duration={video.durationLabel} />
@@ -55,9 +57,18 @@ function ActiveWork({ video, isFa, onOpen }) {
       <div className="vd-active-progress">
         <div className="vd-active-progress-head">
           <span>{video.stage}</span>
-          <span>{isFa ? "در حال انجام" : "In progress"}</span>
+          <span>{hasProgress ? `${progressPercent.toLocaleString(isFa ? "fa-IR" : "en-US")}%` : (isFa ? "در حال انجام" : "In progress")}</span>
         </div>
-        <div className="vd-meter is-indeterminate" role="progressbar" aria-label={video.stage}><span /></div>
+        <div
+          className={`vd-meter${hasProgress ? "" : " is-indeterminate"}`}
+          role="progressbar"
+          aria-label={video.stage}
+          aria-valuemin={hasProgress ? 0 : undefined}
+          aria-valuemax={hasProgress ? 100 : undefined}
+          aria-valuenow={hasProgress ? progressPercent : undefined}
+        >
+          <span style={hasProgress ? { width: `${progressPercent}%` } : undefined} />
+        </div>
       </div>
       <button className="vd-secondary vd-dashboard-detail" onClick={() => onOpen(video.id)}>
         {isFa ? "مشاهده جزئیات" : "View details"}
@@ -79,7 +90,7 @@ function RecentVideoRow({ video, isFa, statusCopy, onOpen, onRetry }) {
         <h3 dir="auto">{video.title}</h3>
         <p>{video.status === "Failed" && video.failure ? video.failure : video.stage}</p>
       </div>
-      <span className={`vd-status is-${video.status.toLowerCase()}`}>{statusCopy[video.status]}</span>
+      <span className={`vd-status is-${video.status.toLowerCase()}`}>{video.displayStatus || statusCopy[video.status]}</span>
       <time dateTime={video.raw.created_at}>{video.relativeCreated || video.created}</time>
       <button className="vd-open" onClick={() => video.status === "Failed" ? onRetry(video) : onOpen(video.id)}>{actionLabel}</button>
     </article>

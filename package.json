@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "NODE_ENV=development vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "lint": "node scripts/lint-source.mjs",
-    "test": "node scripts/test-auth-foundation.mjs && node scripts/test-video-foundation.mjs",
+    "test": "node scripts/test-auth-foundation.mjs && node scripts/test-video-foundation.mjs && node scripts/test-dashboard-preview.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

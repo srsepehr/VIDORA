@@ -8427,7 +8427,7 @@ const sidebarGroups = [
   },
 ];
 
-function VidoraDashboard({ session }) {
+function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   const { lang } = window.useLang();
   const t = dashboardCopy[lang] || dashboardCopy.fa;
   const isFa = lang === "fa";
@@ -8440,6 +8440,7 @@ function VidoraDashboard({ session }) {
     return match ? match[1] : "";
   };
   const getInitialView = () => {
+    if (previewMode) return "dashboard";
     if (getVideoDetailId()) return "video-detail";
     const segment = window.location.hash.replace(/^#\/(?:dashboard|panel)\/?/, "") || "dashboard";
     const view = dashboardViewAliases[segment] || segment;
@@ -8456,7 +8457,12 @@ function VidoraDashboard({ session }) {
   const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [toast, setToast] = React.useState("");
-  const [dashboardData, setDashboardData] = React.useState({
+  const [dashboardData, setDashboardData] = React.useState(() => previewData ? {
+    loading: false,
+    error: "",
+    videos: previewData.videos,
+    subscription: previewData.subscription,
+  } : {
     loading: true,
     error: "",
     videos: [],
@@ -8464,6 +8470,7 @@ function VidoraDashboard({ session }) {
   });
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     let alive = true;
     setDashboardData((state) => ({ ...state, loading: true, error: "" }));
     Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
@@ -8478,28 +8485,40 @@ function VidoraDashboard({ session }) {
     return () => {
       alive = false;
     };
-  }, [session]);
+  }, [previewMode, session]);
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     const onHashChange = () => {
       setActiveView(getInitialView());
       setVideoDetailId(getVideoDetailId());
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  }, [previewMode]);
 
   const selectView = (view) => {
     if (!dashboardViews.has(view)) return;
+    if (previewMode && (view === "new-video" || view === "video-detail")) {
+      showToast(isFa ? "این اقدام در پیش‌نمایش توسعه به سرور ارسال نمی‌شود." : "This action is disabled in the development preview.");
+      return;
+    }
     setActiveView(view);
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
     setMobileNavOpen(false);
+    if (previewMode) return;
     const segment = dashboardRouteSegments[view] || view;
     window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
   };
 
   const signOut = async () => {
+    if (previewMode) {
+      setLogoutConfirm(false);
+      setProfileMenuOpen(false);
+      showToast(isFa ? "خروج در پیش‌نمایش توسعه غیرفعال است." : "Sign out is disabled in the development preview.");
+      return;
+    }
     await signOutUser();
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
@@ -8512,6 +8531,10 @@ function VidoraDashboard({ session }) {
   };
 
   const openVideoDetail = (videoId) => {
+    if (previewMode) {
+      showToast(isFa ? "جزئیات ویدیو در پیش‌نمایش به API متصل نمی‌شود." : "Video details do not call the API in preview mode.");
+      return;
+    }
     window.location.hash = `#/dashboard/videos/${videoId}`;
   };
   const userVideoRows = React.useMemo(() => (
@@ -8527,6 +8550,7 @@ function VidoraDashboard({ session }) {
       const relativeCreated = Math.abs(ageInDays) < 1
         ? (isFa ? "امروز" : "Today")
         : new Intl.RelativeTimeFormat(isFa ? "fa-IR" : "en-US", { numeric: "auto" }).format(ageInDays, "day");
+      const preview = video.preview || null;
       return {
         id: video.id,
         raw: video,
@@ -8539,6 +8563,11 @@ function VidoraDashboard({ session }) {
         durationLabel,
         relativeCreated,
         sourceType,
+        action: preview?.action,
+        displayStatus: preview ? (isFa ? preview.displayStatusFa : preview.displayStatusEn) : "",
+        format: preview?.format || "",
+        progressPercent: preview?.progressPercent,
+        resolution: preview?.resolution || "",
       };
     })
   ), [dashboardData.videos, isFa]);
@@ -8548,7 +8577,7 @@ function VidoraDashboard({ session }) {
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
-  const processedCount = dashboardData.videos.filter((video) => video.status === "completed").length;
+  const processedCount = previewData?.processedCount ?? dashboardData.videos.filter((video) => video.status === "completed").length;
 
   const renderHeader = () => {
     const detailTitles = isFa
@@ -8566,6 +8595,10 @@ function VidoraDashboard({ session }) {
   };
 
   const retryVideoRow = (video) => {
+    if (previewMode) {
+      showToast(isFa ? "تلاش مجدد در پیش‌نمایش به صف پردازش ارسال نمی‌شود." : "Retry does not enqueue work in preview mode.");
+      return;
+    }
     retryVideoProcessing(session, video.id)
       .then(() => {
         showToast(t.toast.retryQueued);
@@ -8597,6 +8630,11 @@ function VidoraDashboard({ session }) {
   );
 
   const reloadDashboardData = (silent = false) => {
+    if (previewMode) {
+      setDashboardData({ loading: false, error: "", videos: previewData.videos, subscription: previewData.subscription });
+      if (!silent) showToast(isFa ? "داده‌های نمونه دوباره بارگذاری شد." : "Fixture data reloaded.");
+      return;
+    }
     if (!silent) setDashboardData((state) => ({ ...state, loading: true, error: "" }));
     Promise.all([fetchUserVideos(session), fetchActiveSubscription(session)])
       .then(([videos, subscription]) => setDashboardData({ loading: false, error: "", videos, subscription }))
@@ -8608,12 +8646,13 @@ function VidoraDashboard({ session }) {
   };
 
   React.useEffect(() => {
+    if (previewMode) return undefined;
     const hasActive = dashboardData.videos.some((video) => isActiveVideoStatus(video.status));
     if (!hasActive) return undefined;
     const timer = window.setInterval(() => reloadDashboardData(true), 15000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardData.videos]);
+  }, [dashboardData.videos, previewMode]);
 
   const renderIntakePanel = () => (
     <TranslationIntakePanel
@@ -8631,6 +8670,10 @@ function VidoraDashboard({ session }) {
     const target = deleteTarget;
     if (!target) return;
     setDeleteTarget(null);
+    if (previewMode) {
+      showToast(isFa ? "حذف نمونه نمایشی به سرور ارسال نشد." : "The fixture was not deleted or sent to a server.");
+      return;
+    }
     deleteVideo(session, target)
       .then(() => {
         showToast(isFa ? "ویدیو حذف شد." : "Video deleted.");
@@ -8822,7 +8865,7 @@ function VidoraDashboard({ session }) {
           <div className="vd-profile-menu" role="menu">
             <button role="menuitem" onClick={() => selectView("profile")}>{t.profileMenu.account}</button>
             <button role="menuitem" onClick={() => selectView("settings")}>{t.profileMenu.settings}</button>
-            <button role="menuitem" onClick={() => { setProfileMenuOpen(false); window.location.hash = "#/"; }}>{t.profileMenu.backToWebsite}</button>
+            <button role="menuitem" onClick={() => { setProfileMenuOpen(false); if (previewMode) window.location.assign("/"); else window.location.hash = "#/"; }}>{t.profileMenu.backToWebsite}</button>
             <button role="menuitem" className="is-danger" onClick={() => setLogoutConfirm(true)}>{t.profileMenu.logout}</button>
           </div>
         ) : null}
@@ -9201,6 +9244,21 @@ function ProtectedDashboard({ returnTo }) {
   return <VidoraDashboard session={authState.session} />;
 }
 
+const DashboardPreview = __VIDORA_DASHBOARD_PREVIEW_ENABLED__ ? React.lazy(async () => {
+  const { dashboardPreviewFixture } = await import("./components/dashboard/dashboard-preview-fixtures");
+  return {
+    default: function DashboardPreviewRoute() {
+      return (
+        <VidoraDashboard
+          session={dashboardPreviewFixture.session}
+          previewData={dashboardPreviewFixture}
+          previewMode
+        />
+      );
+    },
+  };
+}) : null;
+
 function useHashRoute() {
   const [hash, setHash] = React.useState(() => window.location.hash);
   React.useEffect(() => {
@@ -9218,6 +9276,9 @@ function Page() {
   if (hash.startsWith("#/library")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
   if (hash.startsWith("#/search")) return <SearchPage />;
+  if (__VIDORA_DASHBOARD_PREVIEW_ENABLED__ && path === "/dev/dashboard-preview" && DashboardPreview) {
+    return <React.Suspense fallback={<AuthLoadingScreen />}><DashboardPreview /></React.Suspense>;
+  }
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <ProtectedDashboard returnTo={getCurrentInternalPath()} />;
   if (hash.startsWith("#/login")) return <LoginPage />;
   if (hash.startsWith("#/signup")) return <SignupPage />;
