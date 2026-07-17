@@ -180,6 +180,7 @@
   },
   "watch": {
     "back": "Library",
+    "breadcrumbLabel": "Video breadcrumb",
     "about": "About this video",
     "chapters": "Chapters",
     "includes": "Includes",
@@ -196,6 +197,20 @@
     "loginToSave": "Sign in to save videos.",
     "savedToast": "Added to your list",
     "unsavedToast": "Removed from your list",
-    "similar": "Related videos"
+    "similar": "Related videos",
+    "share": "Share",
+    "shareCopied": "Video link copied",
+    "shareFailed": "Unable to share this video",
+    "assistantTitle": "Ask this video",
+    "beta": "Beta",
+    "assistantSubtitle": "This assistant answers only from this video's content.",
+    "assistantEmpty": "Ask a question to receive an answer grounded in this video.",
+    "assistantPromptSummary": "Summarize “{title}” in a few sentences",
+    "assistantPromptIdea": "What is the most important idea in this video?",
+    "assistantPromptChallenges": "What main challenges does the video discuss?",
+    "assistantPromptActions": "What actions can I take from this video?",
+    "assistantPlaceholder": "Write your question...",
+    "assistantSend": "Send question",
+    "assistantUnavailable": "The assistant is not connected to this video's processed transcript yet, so it will not generate an answer."
   }
 }

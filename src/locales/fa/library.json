@@ -180,6 +180,7 @@
   },
   "watch": {
     "back": "کتابخانه",
+    "breadcrumbLabel": "مسیر صفحه ویدیو",
     "about": "درباره این ویدیو",
     "chapters": "فصل‌ها",
     "includes": "شامل",
@@ -196,6 +197,20 @@
     "loginToSave": "برای ذخیره ویدیوها وارد شوید.",
     "savedToast": "به فهرست شما اضافه شد",
     "unsavedToast": "از فهرست شما حذف شد",
-    "similar": "ویدیوهای مرتبط"
+    "similar": "ویدیوهای مرتبط",
+    "share": "اشتراک‌گذاری",
+    "shareCopied": "پیوند ویدیو کپی شد",
+    "shareFailed": "اشتراک‌گذاری ممکن نشد",
+    "assistantTitle": "از این ویدیو بپرس",
+    "beta": "Beta",
+    "assistantSubtitle": "این دستیار فقط بر اساس محتوای همین ویدیو پاسخ می‌دهد.",
+    "assistantEmpty": "سؤالی بپرسید تا پاسخی مرتبط با همین ویدیو دریافت کنید.",
+    "assistantPromptSummary": "ویدیوی «{title}» را در چند جمله خلاصه کن",
+    "assistantPromptIdea": "مهم‌ترین ایده این ویدیو چیست؟",
+    "assistantPromptChallenges": "چالش‌های اصلی مطرح‌شده چه بودند؟",
+    "assistantPromptActions": "چه اقدام‌هایی از این ویدیو می‌توانم انجام دهم؟",
+    "assistantPlaceholder": "سؤال خود را بنویسید...",
+    "assistantSend": "ارسال پرسش",
+    "assistantUnavailable": "دستیار این نسخه هنوز به متن پردازش‌شده این ویدیو متصل نیست؛ پاسخی ساخته نمی‌شود."
   }
 }

@@ -19,7 +19,6 @@ import {
   Clock3,
   Code2,
   Cpu,
-  FileText,
   FlaskConical,
   Folder,
   Globe2,
@@ -31,11 +30,14 @@ import {
   Lock,
   LogOut,
   Menu as MenuIcon,
+  MessageSquare,
   Package,
   Play,
   Rocket,
   Search,
+  Send,
   Settings,
+  Share2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -218,12 +220,6 @@ const GENERIC_DESC = {
   fa: "در این ویدیوی آموزشی، مفاهیم کلیدی با زیرنویس فارسی، خلاصه هوشمند و نکات کاربردی ارائه می‌شود.",
   en: "In this learning video, the key ideas come with Persian subtitles, a smart summary, and practical takeaways.",
 };
-
-const CHAPTERS = [
-  { frac: 0.04, fa: "شروع و معرفی", en: "Introduction" },
-  { frac: 0.38, fa: "ایده‌های اصلی", en: "Core ideas" },
-  { frac: 0.74, fa: "جمع‌بندی و قدم بعدی", en: "Wrap-up & next steps" },
-];
 
 function searchVideos(query) {
   const q = query.trim().toLowerCase();
@@ -441,12 +437,7 @@ const CSS = `
 .lib-gate svg{color:var(--mut)}
 .lib-watch-title{font-size:clamp(22px,2.4vw,32px);font-weight:800;letter-spacing:-.01em;line-height:1.25}
 .lib-watch-meta{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px;font-weight:600;margin-top:10px;flex-wrap:wrap}
-.lib-watch-cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:34px;margin-top:26px;align-items:start}
-.lib-watch-desc{color:#cfcfd6;font-size:14.5px;line-height:1.95}
-.lib-inc{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:13px}
-.lib-inc svg{color:#d6d6dd}
 .lib-pillbadge{height:24px;padding-inline:10px;border-radius:999px;border:1px solid rgba(255,255,255,.3);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;color:#fff}
-.lib-ts{color:#fff;font-weight:750;font-size:11.5px;font-variant-numeric:tabular-nums}
 
 @media(prefers-reduced-motion:reduce){.lib-root *{transition:none!important;animation:none!important}}
 
@@ -456,7 +447,6 @@ const CSS = `
   .lib-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .lib-hero-box{max-width:60%}
   .lib-banner-box{max-width:70%}
-  .lib-watch-cols{grid-template-columns:1fr}
   .lib-cw-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lib-cats{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
@@ -596,31 +586,59 @@ const CSS = `
 .is-library .lib-arrow.is-left{left:-20px;right:auto}
 .is-library .lib-arrow.is-right{right:-20px;left:auto}
 
-.is-library .lib-watch{padding-block:28px 72px}
-.is-library .lib-watch .lib-back{color:#666;margin-bottom:22px}
-.is-library .lib-watch .lib-back:hover{color:#111}
-.is-library .lib-watch-intro{display:grid;gap:10px;margin-bottom:24px;max-width:900px}
-.is-library .lib-watch-title{font-size:clamp(27px,3vw,40px);line-height:1.3;letter-spacing:0;color:#111}
-.is-library .lib-watch-meta{margin-top:0;color:#666;font-size:12.5px}
-.is-library .lib-watch-meta .lib-pillbadge{height:25px;border-color:#d4d4d4;background:#f5f5f5;color:#222}
-.is-library .lib-player{max-height:none;border:0;border-radius:14px;background:#0b0b0d}
-.is-library .lib-player-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1);opacity:.58}
-.is-library .lib-player::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.24);pointer-events:none}
+.is-library .lib-watch{padding-block:24px 58px}
+.is-library .lib-watch-breadcrumb{display:flex;align-items:center;gap:9px;margin-bottom:22px;color:#777;font-size:12px;font-weight:600}
+.is-library .lib-watch-breadcrumb a:hover{color:#111}.is-library .lib-watch-breadcrumb svg{flex:none}
+.is-library .lib-watch-grid{display:grid;grid-template-columns:minmax(0,42fr) minmax(0,58fr);grid-template-areas:"assistant video";gap:24px;align-items:stretch;direction:ltr}
+.is-library .lib-watch-main{grid-area:video;min-width:0;direction:rtl}
+.is-library .lib-watch-grid>.lib-watch-assistant{grid-area:assistant;direction:rtl}
+.lib-root.is-library[dir="ltr"] .lib-watch-main,.lib-root.is-library[dir="ltr"] .lib-watch-grid>.lib-watch-assistant{direction:ltr}
+.is-library .lib-player{max-height:none;border:0;border-radius:12px;background:#0b0b0d}
+.is-library .lib-player-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1);opacity:.78}
+.is-library .lib-player::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.16);pointer-events:none}
 .is-library .lib-player-center,.is-library .lib-gate{z-index:2}
 .is-library .lib-playbtn{width:62px;height:62px;box-shadow:none}
-.is-library .lib-gate{color:#fff;background:rgba(8,8,10,.76)}
-.is-library .lib-watch-note{margin-top:12px;border:1px solid #ddd;border-radius:9px;background:#f7f7f7;color:#555;font-size:12.5px;padding:11px 13px;line-height:1.75}
+.is-library .lib-gate{color:#fff;background:rgba(8,8,10,.66)}
+.is-library .lib-watch-note{margin-top:10px;border:1px solid #ddd;border-radius:8px;background:#f7f7f7;color:#555;font-size:12.5px;padding:10px 13px;line-height:1.75}
 .is-library .lib-watch-note a{color:#111;font-weight:750;text-decoration:underline;text-underline-offset:3px}
-.is-library .lib-watch-cols{grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:42px;margin-top:38px;padding-top:34px;border-top:1px solid #e3e3e3}
-.is-library .lib-watch-copy h2,.is-library .lib-watch-aside h2{font-size:18px;line-height:1.5;color:#111;margin-bottom:12px}
-.is-library .lib-watch-desc{color:#4f4f4f;font-size:14px;line-height:2}
-.is-library .lib-watch-aside{display:grid;gap:28px}
-.is-library .lib-watch-section{display:grid;gap:10px}
-.is-library .lib-watch-section+.lib-watch-section{padding-top:24px;border-top:1px solid #e5e5e5}
-.is-library .lib-inc{color:#666;font-size:12.5px}
-.is-library .lib-inc svg{color:#333}
-.is-library .lib-ts{color:#111;min-width:42px}
-.is-library .lib-watch-related{margin-top:72px;padding-top:48px;border-top:1px solid #e3e3e3}
+.is-library .lib-watch-info{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:start;padding-block:18px 16px}
+.is-library .lib-watch-copy{display:grid;gap:11px;max-width:820px}
+.is-library .lib-watch-title{font-size:clamp(25px,2.5vw,34px);line-height:1.28;letter-spacing:0;color:#111}
+.is-library .lib-watch-meta{margin-top:0;color:#6b6b6b;font-size:12.5px}
+.is-library .lib-watch-meta .lib-pillbadge{height:24px;border-color:#d4d4d4;background:#f5f5f5;color:#222}
+.is-library .lib-watch-actions{display:flex;align-items:flex-start;gap:8px;padding-top:2px}
+.is-library .lib-watch-action{width:64px;display:grid;justify-items:center;gap:7px;color:#555;font-size:11px}
+.is-library .lib-watch-action span:first-child{width:38px;height:38px;border:1px solid #ddd;border-radius:8px;display:grid;place-items:center;color:#111}
+.is-library .lib-watch-action:hover span:first-child{border-color:#999;background:#f7f7f7}
+.is-library .lib-watch-about,.is-library .lib-watch-assistant{border:1px solid #e0e0e0;border-radius:10px;background:#fff;padding:22px}
+.is-library .lib-watch-about h2,.is-library .lib-watch-assistant h2{font-size:18px;line-height:1.5;color:#111}
+.is-library .lib-watch-about p{margin-top:14px;color:#444;font-size:14px;line-height:2;white-space:pre-line}
+.is-library .lib-watch-assistant{display:grid;grid-template-rows:auto auto auto minmax(120px,1fr) auto;gap:13px;min-width:0;min-height:0}
+.is-library .lib-watch-assistant-head{display:flex;align-items:center;gap:9px}
+.is-library .lib-watch-beta{height:20px;padding-inline:7px;border:1px solid #ccc;border-radius:999px;color:#555;font-size:10px;font-weight:750;display:inline-flex;align-items:center}
+.is-library .lib-watch-assistant-sub{color:#777;font-size:11.5px;line-height:1.7}
+.is-library .lib-watch-prompts{display:grid;gap:7px}
+.is-library .lib-watch-prompts button{min-height:36px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;color:#333;font-size:11.5px;line-height:1.55;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.is-library .lib-watch-prompts button:hover{border-color:#999;background:#fafafa}
+.is-library .lib-watch-prompts button:focus-visible{outline:2px solid #111;outline-offset:2px}
+.is-library .lib-watch-chat{display:grid;align-content:start;gap:7px;min-height:0;overflow-y:auto;padding:16px 2px;border-top:1px solid #e8e8e8}
+.is-library .lib-watch-empty{align-self:stretch;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;color:#888;font-size:11.5px;line-height:1.7;padding:20px}
+.is-library .lib-watch-empty svg{color:#d3d3d3}
+.is-library .lib-watch-message{padding:8px 10px;border-radius:8px;font-size:11.5px;line-height:1.7}
+.is-library .lib-watch-message.is-user{margin-inline-start:24px;background:#111;color:#fff}
+.is-library .lib-watch-message.is-status{margin-inline-end:24px;border:1px solid #ddd;background:#f7f7f7;color:#555}
+.is-library .lib-watch-question{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:7px;margin-top:2px}
+.is-library .lib-watch-question input{height:40px;min-width:0;border:1px solid #ddd;border-radius:8px;background:#fff;padding-inline:11px;outline:none;color:#111;font-size:11.5px}
+.is-library .lib-watch-question input:focus{border-color:#777}
+.is-library .lib-watch-question button{width:38px;height:40px;border-radius:8px;background:#111;color:#fff;display:grid;place-items:center}
+.is-library .lib-watch-question button:disabled{opacity:.4;cursor:not-allowed}
+.is-library .lib-watch-related{margin-top:40px}
+.is-library .lib-watch-related .lib-sec-head{align-items:center}
+.is-library .lib-watch-related .lib-sec-title{font-size:20px}
+.is-library .lib-watch-footer{border-top:1px solid #e2e2e2;background:#fff;color:#111;padding-block:25px 30px}
+.is-library .lib-watch-footer-in{display:grid;grid-template-columns:minmax(190px,1fr) auto;gap:30px;align-items:end;direction:ltr}
+.is-library .lib-watch-footer-brand{display:grid;justify-items:start;gap:7px;text-align:left}.is-library .lib-watch-footer-brand strong{font-size:16px;letter-spacing:.15em}.is-library .lib-watch-footer-brand p{color:#777;font-size:11px;line-height:1.7}
+.is-library .lib-watch-footer-links{display:flex;gap:28px;align-items:center;direction:rtl}.is-library .lib-watch-footer-links a{font-size:11.5px;color:#555}.is-library .lib-watch-footer-links a:hover{color:#111}
 
 .is-library .lib-cw-card{background:#fff;border-color:#ddd;color:#111}
 .is-library .lib-cw-card:hover{background:#f7f7f7;border-color:#aaa}
@@ -659,6 +677,8 @@ const CSS = `
   .is-library .lib-row{grid-auto-columns:calc((100% - 18px)/2)}
   .is-library .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .is-library .lib-trust-item{padding-inline:22px}
+  .is-library .lib-watch-grid{grid-template-columns:1fr;grid-template-areas:"video" "assistant";gap:18px}
+  .is-library .lib-watch-assistant{min-height:440px}
 }
 @media(max-width:760px){
   .is-library .lib-wrap,.is-library .lib-hero-shell{padding-inline:16px}
@@ -680,8 +700,11 @@ const CSS = `
   .is-library .lib-chips{width:100%;justify-content:flex-start}.is-library .lib-select{width:100%}
   .is-library .lib-row{grid-auto-columns:84%;gap:13px}
   .is-library .lib-arrow{display:none}
-  .is-library .lib-watch{padding-block:20px 52px}.is-library .lib-watch-intro{margin-bottom:18px}.is-library .lib-watch-title{font-size:25px}.is-library .lib-player{border-radius:10px}
-  .is-library .lib-watch-cols{grid-template-columns:1fr;gap:30px;margin-top:28px;padding-top:27px}.is-library .lib-watch-related{margin-top:52px;padding-top:36px}
+  .is-library .lib-watch{padding-block:18px 42px}.is-library .lib-watch-breadcrumb{margin-bottom:14px}.is-library .lib-player{border-radius:9px}
+  .is-library .lib-watch-grid{gap:14px}.is-library .lib-watch-info{grid-template-columns:1fr;gap:18px;padding-block:22px}.is-library .lib-watch-title{font-size:25px}.is-library .lib-watch-actions{padding-top:0}
+  .is-library .lib-watch-about,.is-library .lib-watch-assistant{padding:17px}.is-library .lib-watch-assistant{min-height:420px}
+  .is-library .lib-watch-related{margin-top:30px}.is-library .lib-watch-footer{padding-block:22px 26px}.is-library .lib-watch-footer-in{grid-template-columns:1fr;gap:20px;align-items:start}
+  .is-library .lib-watch-footer-links{gap:18px;flex-wrap:wrap}
   .is-library .lib-trust-in{grid-template-columns:1fr;padding-block:12px}
   .is-library .lib-trust-item{padding:24px 10px}.is-library .lib-trust-item+ .lib-trust-item{border-inline-start:0;border-top:1px solid #303030}
   .is-library .lib-footer-in{grid-template-columns:1fr;justify-items:start}.is-library .lib-footer-links{justify-content:flex-start;gap:18px;flex-wrap:wrap}.is-library .lib-footer-rights{text-align:start}
@@ -1822,8 +1845,99 @@ function SearchPageInner() {
 // Watch page (#/watch/:slug)
 // ---------------------------------------------------------------------------
 
+function WatchAssistant({ video }) {
+  const { t, title } = useLib();
+  const [question, setQuestion] = React.useState("");
+  const [messages, setMessages] = React.useState([]);
+  const prompts = [
+    t("watch.assistantPromptSummary", { title: title(video) }),
+    t("watch.assistantPromptIdea"),
+    t("watch.assistantPromptChallenges"),
+    t("watch.assistantPromptActions"),
+  ];
+
+  const submitQuestion = (rawQuestion) => {
+    const value = rawQuestion.trim();
+    if (!value) return;
+    setMessages((current) => [
+      ...current,
+      { role: "user", text: value },
+      { role: "status", text: t("watch.assistantUnavailable") },
+    ]);
+    setQuestion("");
+  };
+
+  return (
+    <aside className="lib-watch-assistant" aria-labelledby="watch-assistant-title">
+      <div className="lib-watch-assistant-head">
+        <h2 id="watch-assistant-title">{t("watch.assistantTitle")}</h2>
+        <span className="lib-watch-beta">{t("watch.beta")}</span>
+      </div>
+      <p className="lib-watch-assistant-sub">{t("watch.assistantSubtitle")}</p>
+      <div className="lib-watch-prompts">
+        {prompts.map((prompt) => (
+          <button type="button" key={prompt} onClick={() => submitQuestion(prompt)}>
+            <span>{prompt}</span>
+            <MessageSquare size={13} aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+      <div className="lib-watch-chat" aria-live="polite">
+        {messages.length ? (
+          messages.map((message, index) => (
+            <div className={`lib-watch-message is-${message.role}`} key={`${message.role}-${index}`}>
+              {message.text}
+            </div>
+          ))
+        ) : (
+          <div className="lib-watch-empty">
+            <MessageSquare size={42} strokeWidth={1.4} aria-hidden="true" />
+            <p>{t("watch.assistantEmpty")}</p>
+          </div>
+        )}
+      </div>
+      <form
+        className="lib-watch-question"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitQuestion(question);
+        }}
+      >
+        <input
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder={t("watch.assistantPlaceholder")}
+          aria-label={t("watch.assistantPlaceholder")}
+        />
+        <button type="submit" disabled={!question.trim()} aria-label={t("watch.assistantSend")}>
+          <Send size={17} aria-hidden="true" />
+        </button>
+      </form>
+    </aside>
+  );
+}
+
+function WatchFooter() {
+  const { t } = useLib();
+  return (
+    <footer className="lib-watch-footer">
+      <div className="lib-wrap lib-watch-footer-in">
+        <div className="lib-watch-footer-brand">
+          <strong>VIDORA</strong>
+          <p>{t("footer.tagline")}<br />{t("footer.rights")}</p>
+        </div>
+        <nav className="lib-watch-footer-links" aria-label={t("libraryPage.footer.about")}>
+          <a href="#/">{t("libraryPage.footer.about")}</a>
+          <a href="#/">{t("libraryPage.footer.privacy")}</a>
+          <a href="#/dashboard/support">{t("libraryPage.footer.contact")}</a>
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
 function WatchPageInner() {
-  const { t, lang, rtl, viewer, title, desc, catName } = useLib();
+  const { t, lang, rtl, viewer, title, desc, catName, showToast } = useLib();
   const slug = window.location.hash.replace(/^#\/watch\//, "").split("?")[0];
   const video = bySlug(slug);
   const [playing, setPlaying] = React.useState(false);
@@ -1839,103 +1953,113 @@ function WatchPageInner() {
 
   const canWatchFull = video.access === "free";
   const canPreview = canWatchFull || video.access === "preview";
-  const durationSec = video.durationMin * 60;
-  const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const group = LIBRARY_GROUPS.find((item) => item.categories.includes(video.category));
+  const breadcrumbCategory = group ? t(`libraryPage.groups.${group.key}.title`) : catName(video.category);
   const similar = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category)
     .concat(VIDEOS.filter((v) => v.slug !== video.slug && v.category !== video.category))
     .slice(0, 8);
   const gateCta = viewer === "guest" ? { label: t("watch.guestCta"), href: loginHashFor(`/watch/${video.slug}`) } : { label: t("watch.memberCta"), href: "#/dashboard/subscription" };
   const gateMsg = viewer === "guest" ? t("watch.guestGate") : t("watch.memberGate");
+  const relatedHref = `#/library/all?category=${group?.key || video.category}`;
+
+  const shareVideo = async () => {
+    const shareData = { title: title(video), url: window.location.href };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(shareData.url);
+      showToast(t("watch.shareCopied"));
+    } catch (error) {
+      if (error?.name !== "AbortError") showToast(t("watch.shareFailed"));
+    }
+  };
 
   return (
     <>
       <LibraryHeader reference />
       <main className="lib-wrap lib-watch" aria-labelledby="watch-title">
-        <a className="lib-back" href="#/library">
-          {rtl ? <ArrowRight size={14} /> : <ArrowLeft size={14} />} {t("watch.back")}
-        </a>
+        <nav className="lib-watch-breadcrumb" aria-label={t("watch.breadcrumbLabel")}>
+          <a href="#/library">{t("watch.back")}</a>
+          {rtl ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+          <span>{breadcrumbCategory}</span>
+          {rtl ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+          <span>{title(video)}</span>
+        </nav>
 
-        <header className="lib-watch-intro">
-          <h1 className="lib-watch-title" id="watch-title">{title(video)}</h1>
-          <div className="lib-watch-meta">
-            <span>{catName(video.category)}</span>
-            <span>·</span>
-            <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            <span>·</span>
-            <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
-          </div>
-        </header>
-
-        <div className="lib-player">
-          <img className="lib-player-poster" src={`${BASE()}${imageOf(video)}`} alt="" />
-          {playing ? (
-            <div className="lib-player-center">
-              <span className="lib-pillbadge">{t("watch.playing")}</span>
-            </div>
-          ) : canPreview ? (
-            <div className="lib-player-center">
-              <button className="lib-playbtn" onClick={() => setPlaying(true)} aria-label={canWatchFull ? t("hero.watch") : t("watch.playPreview")}>
-                <Play size={28} style={{ marginInlineStart: 3 }} />
-              </button>
-            </div>
-          ) : null}
-          {!canWatchFull && !canPreview ? (
-            <div className="lib-gate">
-              <Lock size={30} />
-              <p>{gateMsg}</p>
-              <a className="lib-btn is-primary" href={gateCta.href}>
-                {gateCta.label}
-              </a>
-            </div>
-          ) : null}
-        </div>
-        {canPreview && !canWatchFull ? (
-          <div className="lib-watch-note">
-            {t("watch.previewNote")}{" "}
-            <a href={gateCta.href}>{gateCta.label}</a>
-          </div>
-        ) : null}
-
-        <div className="lib-watch-cols">
-          <section className="lib-watch-copy" aria-labelledby="watch-about-title">
-            <h2 id="watch-about-title">{t("watch.about")}</h2>
-            <p className="lib-watch-desc">{desc(video)}</p>
-          </section>
-          <aside className="lib-watch-aside">
-            <section className="lib-watch-section" aria-labelledby="watch-chapters-title">
-              <h2 id="watch-chapters-title">{t("watch.chapters")}</h2>
-              {CHAPTERS.map((ch) => (
-                <div className="lib-inc" key={ch.en}>
-                  <span className="lib-ts" dir="ltr">
-                    {clock(Math.round(durationSec * ch.frac))}
-                  </span>
-                  <span>{lang === "fa" ? ch.fa : ch.en}</span>
+        <div className="lib-watch-grid">
+          <div className="lib-watch-main">
+            <div className="lib-player">
+              <img className="lib-player-poster" src={`${BASE()}${imageOf(video)}`} alt="" />
+              {playing ? (
+                <div className="lib-player-center">
+                  <span className="lib-pillbadge">{t("watch.playing")}</span>
                 </div>
-              ))}
+              ) : canPreview ? (
+                <div className="lib-player-center">
+                  <button className="lib-playbtn" onClick={() => setPlaying(true)} aria-label={canWatchFull ? t("hero.watch") : t("watch.playPreview")}>
+                    <Play size={28} style={{ marginInlineStart: 3 }} />
+                  </button>
+                </div>
+              ) : null}
+              {!canWatchFull && !canPreview ? (
+                <div className="lib-gate">
+                  <Lock size={30} />
+                  <p>{gateMsg}</p>
+                  <a className="lib-btn is-primary" href={gateCta.href}>
+                    {gateCta.label}
+                  </a>
+                </div>
+              ) : null}
+            </div>
+            {canPreview && !canWatchFull ? (
+              <div className="lib-watch-note">
+                {t("watch.previewNote")}{" "}
+                <a href={gateCta.href}>{gateCta.label}</a>
+              </div>
+            ) : null}
+
+            <section className="lib-watch-info">
+              <div className="lib-watch-copy">
+                <h1 className="lib-watch-title" id="watch-title">{title(video)}</h1>
+                <div className="lib-watch-meta">
+                  <span>{catName(video.category)}</span>
+                  <span>·</span>
+                  <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
+                  <span>·</span>
+                  <span className="lib-pillbadge">{t(`access.${video.access}`)}</span>
+                </div>
+              </div>
+              <div className="lib-watch-actions">
+                <button className="lib-watch-action" type="button" onClick={shareVideo}>
+                  <span><Share2 size={18} aria-hidden="true" /></span>
+                  <span>{t("watch.share")}</span>
+                </button>
+              </div>
             </section>
-            <section className="lib-watch-section" aria-labelledby="watch-includes-title">
-              <h2 id="watch-includes-title">{t("watch.includes")}</h2>
-              <div className="lib-inc">
-                <FileText size={15} /> {t("watch.subtitles")}
-              </div>
-              <div className="lib-inc">
-                <FileText size={15} /> {t("watch.transcript")}
-              </div>
-              <div className="lib-inc">
-                <Sparkles size={15} /> {t("watch.summary")}
-              </div>
+
+            <section className="lib-watch-about" aria-labelledby="watch-about-title">
+              <h2 id="watch-about-title">{t("watch.about")}</h2>
+              <p>{desc(video)}</p>
             </section>
-          </aside>
+          </div>
+          <WatchAssistant key={video.slug} video={video} />
         </div>
 
         <section className="lib-watch-related" aria-label={t("watch.similar")}>
           <div className="lib-sec-head">
             <h2 className="lib-sec-title">{t("watch.similar")}</h2>
+            <span className="lib-sec-spacer" />
+            <a className="lib-view-all" href={relatedHref}>
+              {t("libraryPage.viewAll")} {rtl ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
+            </a>
           </div>
           <VideoCarousel videos={similar} loading={false} landscape ariaLabel={t("watch.similar")} />
         </section>
       </main>
-      <LibraryFooter />
+      <WatchFooter />
     </>
   );
 }
