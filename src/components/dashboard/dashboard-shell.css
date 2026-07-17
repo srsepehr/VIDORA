@@ -13,6 +13,10 @@
   color: var(--dashboard-ink);
 }
 
+.vd-dashboard-redesign *,
+.vd-dashboard-redesign *::before,
+.vd-dashboard-redesign *::after { box-sizing: border-box; }
+
 .vd-dashboard-redesign .vd-shell,
 .vd-dashboard-redesign.is-fa .vd-shell {
   width: 100%;
@@ -208,7 +212,7 @@
   background: #f6f6f5;
   color: #181818;
 }
-.vd-summary-label { margin: 4px 0 0; color: #555; font-size: 12px; }
+.vd-summary-label { margin: 4px 0 0; padding-inline-start: 48px; color: #555; font-size: 12px; }
 .vd-summary-value {
   display: block;
   margin-top: 27px;
@@ -267,6 +271,7 @@
 .vd-dashboard-thumb.is-compact { width: 112px; height: 57px; border-radius: 9px; }
 .vd-processing-badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #f1f1ef; color: #666; font-size: 10px; }
 .vd-active-work-copy h3 { margin: 8px 0 0; font-size: 14px; font-weight: 720; line-height: 1.45; unicode-bidi: plaintext; }
+.vd-dashboard-redesign.is-fa .vd-active-work-copy h3 { text-align: right; }
 .vd-active-work-copy p { margin: 6px 0 0; color: #777; font-size: 11px; }
 .vd-active-progress { min-width: 0; }
 .vd-active-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: #686868; font-size: 10.5px; }
@@ -303,6 +308,7 @@
 .vd-recent-row:first-child { border-top: 0; }
 .vd-recent-copy { min-width: 0; }
 .vd-recent-copy h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 690; unicode-bidi: plaintext; }
+.vd-dashboard-redesign.is-fa .vd-recent-copy h3 { text-align: right; }
 .vd-recent-copy p { margin: 5px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #777; font-size: 10.5px; }
 .vd-recent-row time { color: #777; font-size: 10.5px; }
 .vd-dashboard-redesign .vd-status { height: 25px; padding: 0 8px; background: #f3f3f1; font-size: 10px; color: #555; }
@@ -362,8 +368,8 @@
     justify-content: space-between;
   }
   .vd-mobile-wordmark { font-family: "Geist", sans-serif; font-size: 24px; font-weight: 780; letter-spacing: -.05em; }
-  .vd-mobile-menu-button,
-  .vd-sidebar-close { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--dashboard-line); border-radius: 10px; background: #fff; color: #111; cursor: pointer; }
+  .vd-dashboard-redesign .vd-mobile-menu-button,
+  .vd-dashboard-redesign .vd-sidebar-close { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--dashboard-line); border-radius: 10px; background: #fff; color: #111; cursor: pointer; }
   .vd-dashboard-redesign .vd-sidebar,
   .vd-dashboard-redesign.is-fa .vd-sidebar {
     position: fixed;
