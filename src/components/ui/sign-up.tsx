@@ -183,7 +183,7 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({
             </button>
 
             <p className="animate-element animate-delay-1000 text-center text-sm text-muted-foreground">
-              {t.alreadyHaveAccount} <a href="#" onClick={(e) => { e.preventDefault(); onSignIn?.(); }} className="text-zinc-900 dark:text-zinc-100 font-medium hover:underline transition-colors">{t.signIn}</a>
+              {t.alreadyHaveAccount} <button type="button" onClick={onSignIn} className="border-0 bg-transparent p-0 font-inherit cursor-pointer text-zinc-900 dark:text-zinc-100 font-medium hover:underline transition-colors">{t.signIn}</button>
             </p>
           </div>
         </div>

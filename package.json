@@ -8,15 +8,18 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "lint": "node scripts/lint-source.mjs",
-    "test": "node scripts/test-auth-foundation.mjs && node scripts/test-video-foundation.mjs && node scripts/test-dashboard-preview.mjs",
+    "test": "node scripts/test-auth-foundation.mjs && node scripts/test-video-foundation.mjs && node scripts/test-dashboard-preview.mjs && node scripts/test-subscription-flow.mjs && node scripts/test-design-system.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",
+    "motion": "^12.40.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"

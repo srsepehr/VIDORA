@@ -1,4 +1,6 @@
-const FALLBACK_RETURN_TO = "/dashboard";
+import { ROUTES } from "./routes";
+
+const FALLBACK_RETURN_TO = ROUTES.dashboard;
 
 function stripHashPrefix(value: string): string {
   return value.startsWith("#") ? value.slice(1) : value;
@@ -6,28 +8,47 @@ function stripHashPrefix(value: string): string {
 
 export function sanitizeReturnTo(raw: string | null | undefined, fallback = FALLBACK_RETURN_TO): string {
   if (!raw) return fallback;
-  let decoded = raw;
-  try {
-    decoded = decodeURIComponent(raw);
-  } catch {
-    decoded = raw;
+  let decoded = raw.trim();
+  for (let pass = 0; pass < 3; pass += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    } catch {
+      return fallback;
+    }
   }
   decoded = stripHashPrefix(decoded.trim());
 
-  if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\") || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) {
+  if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded) || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) {
     return fallback;
   }
 
-  const [path, query = ""] = decoded.split("?");
+  const [path, query = ""] = decoded.split("?", 2);
   const safePaths = [
-    /^\/dashboard(\/(new-translation|videos|saved|subscription|support|settings))?$/,
+    /^\/dashboard(\/(new-translation|videos(?:\/[0-9a-f-]{36})?|saved|subscription|support|settings|profile))?$/,
     /^\/library(\/category\/[a-z0-9-]+)?$/,
     /^\/watch\/[a-z0-9-]+$/,
+    /^\/subscriptions$/,
+    /^\/checkout$/,
+    /^\/search$/,
     /^\/$/,
   ];
 
   if (!safePaths.some((pattern) => pattern.test(path))) return fallback;
-  return query ? `${path}?${query}` : path;
+  if (!query) return path;
+
+  const input = new URLSearchParams(query);
+  const output = new URLSearchParams();
+  const allowed = path === "/search" ? new Set(["q"]) : path === "/subscriptions" || path === "/checkout" ? new Set(["plan"]) : new Set<string>();
+  for (const [key, value] of input.entries()) {
+    if (!allowed.has(key)) return fallback;
+    if (key === "plan" && !/^[a-z0-9][a-z0-9-]{0,63}$/.test(value)) return fallback;
+    if (key === "q" && (value.length > 160 || /(?:javascript:|https?:|\/\/|\\)/i.test(value))) return fallback;
+    output.append(key, value);
+  }
+  const safeQuery = output.toString();
+  return safeQuery ? `${path}?${safeQuery}` : path;
 }
 
 export function getReturnToFromHash(fallback = FALLBACK_RETURN_TO): string {
