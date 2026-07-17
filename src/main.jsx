@@ -7785,7 +7785,7 @@ function MenuToggleIcon({ open, size = 20, duration = 300 }) {
   );
 }
 
-function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light" } = {}) {
+function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light", auth = null, layoutDirection = null } = {}) {
   const { Button, IconButton } = window.VidoraDesignSystem_0f84f2;
   const { d } = window.useLang();
   const [open, setOpen] = React.useState(false);
@@ -7818,6 +7818,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
     { label: d.nav.pricing },
   ];
   const links = navItems || defaultLinks;
+  const authAction = auth || { label: d.login, onClick: () => { window.location.hash = "#/login"; } };
   const headerBg = dark
     ? open || floating || scrolled ? "rgba(8,8,10,0.86)" : "rgba(8,8,10,0.78)"
     : open ? "rgba(255,255,255,0.92)" : floating ? "rgba(255,255,255,0.6)" : "transparent";
@@ -7852,6 +7853,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
       }}
     >
       <nav
+        dir={layoutDirection || undefined}
         style={{
           display: "flex",
           height: floating ? 48 : 56,
@@ -7892,7 +7894,11 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
                   e.preventDefault();
                   item.onClick?.();
                 }}
-                style={dark ? { color: headerMuted } : undefined}
+                style={{
+                  ...(dark ? { color: headerMuted } : {}),
+                  ...(item.active ? { color: headerInk, borderRadius: 0, boxShadow: `inset 0 -1px 0 ${headerInk}` } : {}),
+                  ...(item.style || {}),
+                }}
               >
                 {item.label}
               </Button>
@@ -7908,7 +7914,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
               />
             ) : null}
             <div style={{ width: 1, height: 24, background: dark ? "rgba(255,255,255,.14)" : "var(--border)", margin: "0 4px" }} />
-            <Button variant="secondary" onClick={() => { window.location.hash = "#/login"; }}>{d.login}</Button>
+            <Button variant="secondary" onClick={authAction.onClick}>{authAction.label}</Button>
             {mode === "landing" ? <Button variant="primary" onClick={() => { window.location.hash = "#/signup"; }}>{d.startFree}</Button> : null}
           </div>
         ) : (
@@ -7983,8 +7989,8 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
             ))}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Button variant="secondary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/login"; }}>{d.login}</Button>
-            <Button variant="primary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/signup"; }}>{d.startFree}</Button>
+            <Button variant="secondary" fullWidth onClick={() => { setOpen(false); authAction.onClick?.(); }}>{authAction.label}</Button>
+            {mode === "landing" ? <Button variant="primary" fullWidth onClick={() => { setOpen(false); window.location.hash = "#/signup"; }}>{d.startFree}</Button> : null}
           </div>
         </div>
       ) : null}

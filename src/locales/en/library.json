@@ -9,6 +9,81 @@
     "menu": "Menu",
     "close": "Close"
   },
+  "libraryPage": {
+    "header": {
+      "library": "Library",
+      "subscription": "Get a subscription",
+      "login": "Log in / Sign up"
+    },
+    "profile": {
+      "menuLabel": "Account menu",
+      "dashboard": "Dashboard",
+      "saved": "Saved videos",
+      "account": "My profile",
+      "settings": "Settings",
+      "logout": "Log out"
+    },
+    "hero": {
+      "eyebrow": "Featured",
+      "watch": "Watch video"
+    },
+    "search": {
+      "placeholder": "What topic or video are you looking for?",
+      "filters": "Filters",
+      "filterTitle": "Video category"
+    },
+    "categoriesTitle": "Main categories",
+    "viewAll": "View all",
+    "groups": {
+      "ai": {
+        "title": "AI and new tools",
+        "short": "Artificial intelligence",
+        "description": "Practical lessons, analysis, and tools from the world of AI"
+      },
+      "product": {
+        "title": "Product building and programming",
+        "short": "Product building",
+        "description": "From idea to product: programming, design, and launching a startup"
+      },
+      "language": {
+        "title": "Language learning with video",
+        "short": "Language learning",
+        "description": "Build conversation, listening, and vocabulary skills with real video"
+      },
+      "business": {
+        "title": "Business and personal growth",
+        "short": "Business and growth",
+        "description": "Management, productivity, finance, and professional growth skills"
+      }
+    },
+    "sort": {
+      "label": "Sort videos",
+      "popular": "Sort: Most popular",
+      "newest": "Sort: Newest",
+      "shortest": "Sort: Shortest",
+      "longest": "Sort: Longest"
+    },
+    "trust": {
+      "label": "Why Vidora",
+      "support": {
+        "title": "Support when you need it",
+        "description": "Our support team is ready to help with questions and problems."
+      },
+      "secure": {
+        "title": "Secure and trusted",
+        "description": "Your privacy and information security are a priority throughout Vidora."
+      },
+      "global": {
+        "title": "Global learning",
+        "description": "We make valuable video knowledge from around the world available in Persian."
+      }
+    },
+    "footer": {
+      "about": "About us",
+      "contact": "Contact us",
+      "privacy": "Terms and privacy"
+    }
+  },
   "hero": {
     "label": "Featured Learning Video",
     "watch": "Watch",
@@ -62,6 +137,7 @@
   },
   "allVideos": {
     "title": "All Videos",
+    "backToLibrary": "Back to library",
     "loadMore": "Load More",
     "emptyCategory": "No videos in this category yet.",
     "error": "We couldn't load the videos.",
@@ -104,6 +180,7 @@
   },
   "watch": {
     "back": "Library",
+    "breadcrumbLabel": "Video breadcrumb",
     "about": "About this video",
     "chapters": "Chapters",
     "includes": "Includes",
@@ -120,6 +197,20 @@
     "loginToSave": "Sign in to save videos.",
     "savedToast": "Added to your list",
     "unsavedToast": "Removed from your list",
-    "similar": "Similar Videos"
+    "similar": "Related videos",
+    "share": "Share",
+    "shareCopied": "Video link copied",
+    "shareFailed": "Unable to share this video",
+    "assistantTitle": "Ask this video",
+    "beta": "Beta",
+    "assistantSubtitle": "This assistant answers only from this video's content.",
+    "assistantEmpty": "Ask a question to receive an answer grounded in this video.",
+    "assistantPromptSummary": "Summarize “{title}” in a few sentences",
+    "assistantPromptIdea": "What is the most important idea in this video?",
+    "assistantPromptChallenges": "What main challenges does the video discuss?",
+    "assistantPromptActions": "What actions can I take from this video?",
+    "assistantPlaceholder": "Write your question...",
+    "assistantSend": "Send question",
+    "assistantUnavailable": "The assistant is not connected to this video's processed transcript yet, so it will not generate an answer."
   }
 }
