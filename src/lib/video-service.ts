@@ -4,6 +4,7 @@
 import { AppError, logAppError, toAppError } from "./app-error";
 import { fetchWithAuth, getValidAuthSession, type AuthSession } from "./auth";
 import { getAccessPolicy } from "./access-policy";
+import { trackEvent } from "./analytics";
 import { getBrowserEnv } from "./env";
 import { extensionOf, getVideoUploadConfig, normalizeFilenameForDisplay } from "./video-config";
 import { videoStorage, type UploadProgress } from "./video-storage";
@@ -249,6 +250,7 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
       });
     }
     validateVideoFile(file);
+    trackEvent("video_upload_started", { source_type: "upload", size_bytes: file.size });
 
     callbacks.onPhase("creating");
     const displayName = normalizeFilenameForDisplay(file.name);
@@ -297,6 +299,7 @@ export function startVideoUpload(session: AuthSession, file: File, callbacks: Up
 
     callbacks.onPhase("queueing");
     await jobDispatcher.enqueueVideoProcessing({ session: activeSession, videoId: video.id });
+    trackEvent("video_upload_completed", { video_id: video.id, source_type: "upload" });
 
     callbacks.onPhase("done");
     return { ...video, storage_key: target.storageKey, status: "queued" as const };
@@ -345,6 +348,7 @@ export async function submitVideoUrl(session: AuthSession, rawUrl: string, owner
     status: "created",
   });
   await jobDispatcher.enqueueVideoProcessing({ session, videoId: video.id });
+  if (result.sourceType === "youtube") trackEvent("youtube_link_submitted", { video_id: video.id, source_type: "youtube" });
   return { ...video, status: "queued" as const };
 }
 

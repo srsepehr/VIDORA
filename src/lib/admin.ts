@@ -431,6 +431,15 @@ export const adminApi = {
       p_user_agent: input.userAgent,
     }),
 
+  setUserStatus: (session: AuthSession, input: { userId: string; status: "active" | "suspended"; reason: string; requestId: string; userAgent: string }) =>
+    rpc<AdminMutationResult>(session, "admin_set_user_status", {
+      p_user_id: input.userId,
+      p_status: input.status,
+      p_reason: input.reason,
+      p_request_id: input.requestId,
+      p_user_agent: input.userAgent,
+    }),
+
   retryJob: (session: AuthSession, input: { jobId: string; reason: string; requestId: string; userAgent: string }) =>
     rpc<AdminMutationResult>(session, "admin_retry_translation_job", {
       p_job_id: input.jobId,

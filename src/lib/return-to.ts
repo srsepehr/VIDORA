@@ -6,7 +6,7 @@ function stripHashPrefix(value: string): string {
   return value.startsWith("#") ? value.slice(1) : value;
 }
 
-export function sanitizeReturnTo(raw: string | null | undefined, fallback = FALLBACK_RETURN_TO): string {
+export function sanitizeReturnTo(raw: string | null | undefined, fallback: string = FALLBACK_RETURN_TO): string {
   if (!raw) return fallback;
   let decoded = raw.trim();
   for (let pass = 0; pass < 3; pass += 1) {
@@ -41,7 +41,7 @@ export function sanitizeReturnTo(raw: string | null | undefined, fallback = FALL
 
   const input = new URLSearchParams(query);
   const output = new URLSearchParams();
-  const allowed = path === "/search" ? new Set(["q"]) : path === "/subscriptions" || path === "/checkout" ? new Set(["plan"]) : new Set<string>();
+  const allowed = path === "/search" || path === "/admin/users" ? new Set(["q"]) : path === "/subscriptions" || path === "/checkout" ? new Set(["plan"]) : new Set<string>();
   for (const [key, value] of input.entries()) {
     if (!allowed.has(key)) return fallback;
     if (key === "plan" && !/^[a-z0-9][a-z0-9-]{0,63}$/.test(value)) return fallback;

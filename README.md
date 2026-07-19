@@ -35,3 +35,10 @@ npm run build
 ```
 
 The deployable files are generated in `dist/`.
+
+## Internal admin operations
+
+The protected Persian admin area lives at `#/admin`. It requires an active
+server-side admin membership and never relies on route hiding for authorization.
+Architecture, permissions, migration, bootstrap, deployment, and limitations are
+documented in [`docs/admin-operations.md`](docs/admin-operations.md).

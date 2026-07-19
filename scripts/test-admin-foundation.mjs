@@ -11,6 +11,10 @@ const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607190
 const adminClient = fs.readFileSync(path.join(root, "src/lib/admin.ts"), "utf8");
 const analytics = fs.readFileSync(path.join(root, "src/lib/analytics.ts"), "utf8");
 const review = fs.readFileSync(path.join(root, "src/video-review.jsx"), "utf8");
+const adminApp = fs.readFileSync(path.join(root, "src/admin/AdminApp.tsx"), "utf8");
+const protectedAdmin = fs.readFileSync(path.join(root, "src/admin/ProtectedAdmin.tsx"), "utf8");
+const adminCss = fs.readFileSync(path.join(root, "src/admin/admin.css"), "utf8");
+const mainSource = fs.readFileSync(path.join(root, "src/main.jsx"), "utf8");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vidora-admin-tests-"));
 
 function compileTs(source, targetName) {
@@ -83,6 +87,8 @@ test("audit records cannot be edited or deleted", () => {
 test("analytics is bounded and playback progress ignores seek jumps", () => {
   assert.match(migration, /octet_length\(coalesce\(p_properties/);
   assert.match(migration, /on conflict \(event_id\) do nothing/);
+  assert.match(migration, /v_progress := case when v_duration > 0 then/);
+  assert.match(migration, /EVENT_VIDEO_DENIED/);
   assert.match(analytics, /delta > 0 && delta <= 4/);
   assert.match(analytics, /Math\.floor\(\(this\.watchedSeconds \/ duration\) \* 20\) \* 5/);
   assert.match(review, /onPlay=\{\(event\) => playbackTracker\.play/);
@@ -94,3 +100,53 @@ test("last super administrator is protected", () => {
   assert.match(migration, /count\(\*\) from public\.admin_memberships where role='super_admin' and status='active'/);
 });
 
+test("trusted lifecycle transitions emit typed analytics events", () => {
+  assert.match(migration, /profiles_record_signup_event/);
+  assert.match(migration, /video_jobs_record_lifecycle_event/);
+  assert.match(migration, /payment_records_record_lifecycle_event/);
+  assert.match(migration, /'translation_requested'/);
+  assert.match(migration, /'payment_succeeded'/);
+});
+
+test("account suspension is server-authorized and audited", () => {
+  assert.match(migration, /admin_set_user_status/);
+  assert.match(migration, /admin_require_permission\('users\.suspend'\)/);
+  assert.match(migration, /'user\.status\.change'/);
+  assert.match(migration, /SELF_SUSPENSION_DENIED/);
+  assert.match(adminClient, /admin_set_user_status/);
+});
+
+test("admin route is lazy, authenticated and server-authorized", () => {
+  assert.match(mainSource, /React\.lazy\(async \(\) => \{\s*const module = await import\("\.\/admin\/ProtectedAdmin"\)/);
+  assert.match(protectedAdmin, /restoreAuthSession\(\)/);
+  assert.match(protectedAdmin, /fetchAdminContext\(session/);
+  assert.match(protectedAdmin, /HTTP 403/);
+  assert.doesNotMatch(protectedAdmin, /preview|fixture|localStorage/i);
+});
+
+test("admin shell covers core operations and permission-aware navigation", () => {
+  for (const route of ["users", "subscriptions", "payments", "videos", "analytics/videos", "analytics/funnels", "translation-jobs", "system", "audit-log", "team", "settings"]) {
+    assert.match(adminApp, new RegExp(`#\\/admin\\/${route.replace("/", "\\/")}`));
+  }
+  assert.match(adminApp, /hasAdminPermission\(context, item\.permission\)/);
+  assert.match(adminApp, /routePermission\.find/);
+  assert.match(adminApp, /if \(!hasAdminPermission\(context, required\)\) return <RouteDenied/);
+  assert.match(adminApp, /canSearchUsers \?/);
+  assert.match(adminApp, /ConfirmationDialog/);
+  assert.match(adminApp, /دلیل الزامی/);
+});
+
+test("limited admin roles cannot read unneeded private content or raw PII", () => {
+  assert.match(migration, /when v_role = 'content_manager' then 'library'/);
+  assert.match(migration, /when v_can_read_pii then p\.email/);
+  assert.match(migration, /left\(p\.email, 1\) \|\| '•••'/);
+});
+
+test("admin visual system is Persian RTL, monochrome and responsive from the right", () => {
+  assert.match(adminApp, /className="adm-root lang-fa" dir="rtl"/);
+  assert.match(adminCss, /\.adm-sidebar\{position:fixed[^}]*inset:0 0 0 auto/);
+  assert.match(adminCss, /@media\(max-width:960px\)/);
+  assert.match(adminCss, /transform:translateX\(105%\)/);
+  assert.doesNotMatch(adminCss, /gradient\(/i);
+  assert.doesNotMatch(adminCss, /purple|violet|#[a-f0-9]{0,2}(?:00ff|800080)/i);
+});

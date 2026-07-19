@@ -60,7 +60,7 @@ import { isSubscriptionActive } from "./lib/subscription-access";
 import { fetchPublicPlans, formatPlanPrice } from "./lib/plans";
 import { paymentAdapter, PaymentNotConfiguredError } from "./lib/payment";
 import { ROUTES } from "./lib/routes";
-import { trackEvent } from "./lib/analytics";
+import { initializeAnalytics, trackEvent } from "./lib/analytics";
 import { deleteVideo, retryVideoProcessing } from "./lib/video-service";
 import { TranslationIntakePanel, VideoProcessingDetail, isActiveVideoStatus, statusLabel } from "./video-workflow.jsx";
 import { DashboardHome } from "./components/dashboard/dashboard-home.jsx";
@@ -9320,7 +9320,9 @@ async function completeAuthNavigation(session, authIntent) {
   else consumeAuthIntent();
   const destination = isPlanCheckout
     ? `${ROUTES.checkout}?plan=${encodeURIComponent(authIntent.planSlug)}`
-    : authIntent.intent === "general-entry" ? ROUTES.dashboard : sanitizeReturnTo(authIntent.returnTo, ROUTES.dashboard);
+    : authIntent.intent === "general-entry" && authIntent.returnTo === ROUTES.dashboard
+      ? ROUTES.dashboard
+      : sanitizeReturnTo(authIntent.returnTo, ROUTES.dashboard);
   window.location.hash = toHash(destination);
 }
 
@@ -9344,6 +9346,7 @@ function LoginPage() {
     setFieldErrors({});
     try {
       const session = await signInWithPassword(String(data.email || ""), String(data.password || ""));
+      trackEvent("user_logged_in", { method: "password" });
       await completeAuthNavigation(session, authIntent);
     } catch (error) {
       const appError = toAppError(error);
@@ -9485,7 +9488,7 @@ function SubscriptionPlansPage() {
   const { lang } = window.useLang();
   const isFa = lang === "fa";
   const state = usePublicPlansPageState();
-  React.useEffect(() => { window.scrollTo(0, 0); trackEvent("subscription_plans_viewed", { source: "public" }); }, []);
+  React.useEffect(() => { window.scrollTo(0, 0); trackEvent("subscription_plans_viewed", { source: "public" }); trackEvent("pricing_viewed", { source: "public" }); }, []);
   const selectPlan = (plan) => {
     const priorIntent = readAuthIntent();
     const returnTo = priorIntent?.intent === "buy-subscription" ? priorIntent.returnTo : ROUTES.dashboard;
@@ -9584,9 +9587,20 @@ function useHashRoute() {
   return hash;
 }
 
+const ProtectedAdmin = React.lazy(async () => {
+  const module = await import("./admin/ProtectedAdmin");
+  return { default: module.ProtectedAdmin };
+});
+
 function Page() {
   const hash = useHashRoute();
   const path = window.location.pathname;
+  React.useEffect(() => {
+    if (!hash || hash === "#/" || hash === "#") trackEvent("landing_viewed", { source: "router" });
+    else if (hash.startsWith("#/library")) trackEvent("library_viewed", { source: "router" });
+    else if (hash.startsWith("#/watch/")) trackEvent("video_detail_viewed", { video_id: hash.replace(/^#\/watch\//, "").split("?")[0] });
+    else if (hash.startsWith("#/dashboard/new-translation")) trackEvent("upload_page_viewed", { source: "dashboard" });
+  }, [hash]);
   if (import.meta.env.DEV && (hash.startsWith("#/dev/auth-diagnostics") || path === "/dev/auth-diagnostics")) return <AuthDiagnostics />;
   if (hash.startsWith("#/library")) return <LibraryPage />;
   if (hash.startsWith("#/watch/")) return <WatchPage />;
@@ -9594,6 +9608,7 @@ function Page() {
   if (__VIDORA_DASHBOARD_PREVIEW_ENABLED__ && path === "/dev/dashboard-preview" && DashboardPreview) {
     return <React.Suspense fallback={<AuthLoadingScreen />}><DashboardPreview /></React.Suspense>;
   }
+  if (hash.startsWith("#/admin")) return <React.Suspense fallback={<AuthLoadingScreen message="در حال بارگذاری پنل مدیریت…" />}><ProtectedAdmin returnTo={getCurrentInternalPath()} /></React.Suspense>;
   if (hash.startsWith("#/subscriptions")) return <SubscriptionPlansPage />;
   if (hash.startsWith("#/checkout")) return <CheckoutEntryPage />;
   if (hash.startsWith("#/dashboard") || hash.startsWith("#/panel")) return <ProtectedDashboard returnTo={getCurrentInternalPath()} />;
@@ -9602,6 +9617,7 @@ function Page() {
   if (path === "/dashboard" || path === "/panel" || path.endsWith("/dashboard")) {
     return <ProtectedDashboard returnTo="/dashboard" />;
   }
+  if (path === "/admin" || path.endsWith("/admin")) return <React.Suspense fallback={<AuthLoadingScreen message="در حال بارگذاری پنل مدیریت…" />}><ProtectedAdmin returnTo="/admin" /></React.Suspense>;
   return (
     <React.Fragment>
       <EditorialHeader />
@@ -9614,5 +9630,6 @@ function Page() {
   );
 }
 
+initializeAnalytics();
 window.applyVidoraLang(window.__vidoraLang || "fa");
 createRoot(document.getElementById("root")).render(<Page />);

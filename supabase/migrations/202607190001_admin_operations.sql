@@ -475,7 +475,22 @@ begin
   v_position := nullif(p_properties->>'position_seconds', '')::numeric;
   v_duration := nullif(p_properties->>'duration_seconds', '')::numeric;
   v_watched := nullif(p_properties->>'watched_seconds', '')::numeric;
-  v_progress := nullif(p_properties->>'progress_percent', '')::numeric;
+  -- Playback progress is derived server-side from bounded watched time rather
+  -- than trusting a caller-provided percentage.
+  v_duration := greatest(coalesce(v_duration, 0), 0);
+  v_watched := least(greatest(coalesce(v_watched, 0), 0), v_duration);
+  v_progress := case when v_duration > 0 then least(100, (v_watched / v_duration) * 100) else 0 end;
+
+  -- A known private upload can only receive events from its owner. Library
+  -- identifiers and non-video events continue through the normal path.
+  if v_video_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+     and exists (
+       select 1 from public.videos private_video
+       where private_video.id = v_video_id::uuid
+         and (v_user_id is null or private_video.user_id <> v_user_id)
+     ) then
+    raise exception 'EVENT_VIDEO_DENIED' using errcode = 'P0205';
+  end if;
 
   insert into public.product_events (
     event_id, event_name, occurred_at, user_id, anonymous_id, session_id, page, referrer,
@@ -501,7 +516,7 @@ begin
       subtitle_activated, summary_opened, subscription_status, acquisition_source, device_class
     ) values (
       v_playback_id, v_user_id, p_anonymous_id, v_video_id, p_session_id, p_occurred_at, p_occurred_at,
-      greatest(v_duration, 0), greatest(coalesce(v_watched, 0), 0), greatest(least(coalesce(v_progress, 0), 100), 0),
+      v_duration, v_watched, v_progress,
       p_event_name = 'video_completed' and coalesce(v_progress, 0) >= 90,
       p_event_name = 'subtitle_enabled', p_event_name = 'summary_opened',
       nullif(p_properties->>'subscription_status', ''), nullif(p_properties->>'acquisition_source', ''), p_device_class
@@ -519,6 +534,77 @@ begin
   return true;
 end;
 $$;
+
+-- Lifecycle events produced by trusted database transitions. These do not rely
+-- on a browser tab remaining open and therefore make operational funnels honest.
+create or replace function public.record_profile_signup_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.product_events(event_id,event_name,occurred_at,user_id,session_id,page,device_class,properties)
+  values(gen_random_uuid(),'user_signed_up',new.created_at,new.id,gen_random_uuid(),'/signup','unknown','{}'::jsonb)
+  on conflict(event_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_record_signup_event on public.profiles;
+create trigger profiles_record_signup_event after insert on public.profiles
+for each row execute function public.record_profile_signup_event();
+
+create or replace function public.record_video_job_lifecycle_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_event_name text;
+begin
+  if tg_op='INSERT' then v_event_name:='translation_requested';
+  elsif new.status='completed' and old.status is distinct from new.status then v_event_name:='translation_completed';
+  elsif new.status='failed' and old.status is distinct from new.status then v_event_name:='translation_failed';
+  else return new;
+  end if;
+  insert into public.product_events(event_id,event_name,occurred_at,user_id,session_id,page,device_class,video_id,processing_job_id,request_correlation_id,properties)
+  values(gen_random_uuid(),v_event_name,coalesce(new.finished_at,new.created_at,now()),new.user_id,gen_random_uuid(),'/worker','unknown',new.video_id::text,new.id,new.correlation_id,
+    jsonb_build_object('video_id',new.video_id,'processing_job_id',new.id,'stage',new.stage,'status',new.status))
+  on conflict(event_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists video_jobs_record_lifecycle_event on public.video_jobs;
+create trigger video_jobs_record_lifecycle_event after insert or update of status on public.video_jobs
+for each row execute function public.record_video_job_lifecycle_event();
+
+create or replace function public.record_payment_lifecycle_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_event_name text;
+begin
+  if new.status='succeeded' and (tg_op='INSERT' or old.status is distinct from new.status) then v_event_name:='payment_succeeded';
+  elsif new.status='failed' and (tg_op='INSERT' or old.status is distinct from new.status) then v_event_name:='payment_failed';
+  else return new;
+  end if;
+  insert into public.product_events(event_id,event_name,occurred_at,user_id,session_id,page,device_class,properties)
+  values(gen_random_uuid(),v_event_name,coalesce(new.settled_at,new.created_at),new.user_id,gen_random_uuid(),'/payment-webhook','unknown',
+    jsonb_build_object('payment_id',new.id,'status',new.status,'currency',new.currency))
+  on conflict(event_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists payment_records_record_lifecycle_event on public.payment_records;
+create trigger payment_records_record_lifecycle_event after insert or update of status on public.payment_records
+for each row execute function public.record_payment_lifecycle_event();
 
 create or replace function public.admin_list_users(
   p_search text default null,
@@ -710,8 +796,10 @@ declare
   v_per integer := least(greatest(coalesce(p_per_page, 25), 1), 100);
   v_total bigint;
   v_items jsonb;
+  v_can_read_pii boolean;
 begin
   perform public.admin_require_permission('subscriptions.read');
+  v_can_read_pii := public.admin_has_permission('users.pii.read');
   select count(*) into v_total from public.subscriptions s join public.profiles p on p.id = s.user_id
   where (p_status is null or s.status::text = p_status)
     and (coalesce(btrim(p_search), '') = '' or lower(p.email) like '%' || lower(btrim(p_search)) || '%'
@@ -719,7 +807,10 @@ begin
 
   select coalesce(jsonb_agg(row_json order by sort_at desc), '[]'::jsonb) into v_items from (
     select s.created_at as sort_at, jsonb_build_object(
-      'id', s.id, 'userId', s.user_id, 'displayName', p.display_name, 'email', p.email,
+      'id', s.id, 'userId', s.user_id, 'displayName', p.display_name,
+      'email', case when v_can_read_pii then p.email
+        when p.email is null then null
+        else left(p.email, 1) || '•••' || substring(p.email from '@.*$') end,
       'planId', plan.id, 'planNameFa', plan.name_fa, 'planSlug', plan.slug, 'status', s.status,
       'startsAt', s.starts_at, 'endsAt', s.ends_at,
       'remainingDays', case when s.ends_at is null then null else greatest(ceil(extract(epoch from (s.ends_at - now())) / 86400.0), 0)::integer end,
@@ -753,12 +844,17 @@ declare
   v_per integer := least(greatest(coalesce(p_per_page, 25), 1), 100);
   v_total bigint;
   v_items jsonb;
+  v_can_read_pii boolean;
 begin
   perform public.admin_require_permission('payments.read');
+  v_can_read_pii := public.admin_has_permission('users.pii.read');
   select count(*) into v_total from public.payment_records where p_status is null or status::text = p_status;
   select coalesce(jsonb_agg(row_json order by sort_at desc), '[]'::jsonb) into v_items from (
     select pr.created_at as sort_at, jsonb_build_object(
-      'id', pr.id, 'userId', pr.user_id, 'displayName', p.display_name, 'email', p.email,
+      'id', pr.id, 'userId', pr.user_id, 'displayName', p.display_name,
+      'email', case when v_can_read_pii then p.email
+        when p.email is null then null
+        else left(p.email, 1) || '•••' || substring(p.email from '@.*$') end,
       'subscriptionId', pr.subscription_id, 'provider', pr.provider,
       'providerReference', pr.provider_reference, 'status', pr.status,
       'amount', pr.amount, 'currency', pr.currency, 'discountAmount', pr.discount_amount,
@@ -829,8 +925,13 @@ declare
   v_per integer := least(greatest(coalesce(p_per_page, 25), 1), 100);
   v_total bigint;
   v_items jsonb;
+  v_role public.admin_role;
+  v_kind text;
 begin
-  perform public.admin_require_permission('videos.read');
+  v_role := public.admin_require_permission('videos.read');
+  -- Content managers operate on the public library only. Private user uploads
+  -- remain visible solely to roles with an operational need.
+  v_kind := case when v_role = 'content_manager' then 'library' else coalesce(p_kind, 'all') end;
   with rows as (
     select v.id::text as id, 'user'::text as kind, v.user_id, p.display_name as owner_name,
       coalesce(v.title, v.original_filename) as title, v.source_type::text as source_type,
@@ -843,7 +944,7 @@ begin
       lv.is_published, lv.is_featured, lv.duration_seconds, lv.created_at, lv.updated_at
     from public.library_videos lv join public.library_categories lc on lc.id = lv.category_id
   ) select count(*) into v_total from rows
-    where (p_kind = 'all' or kind = p_kind) and (p_status is null or status = p_status);
+    where (v_kind = 'all' or kind = v_kind) and (p_status is null or status = p_status);
 
   with rows as (
     select v.id::text as id, 'user'::text as kind, v.user_id, p.display_name as owner_name,
@@ -857,7 +958,7 @@ begin
       lv.is_published, lv.is_featured, lv.duration_seconds, lv.created_at, lv.updated_at
     from public.library_videos lv join public.library_categories lc on lc.id = lv.category_id
   ), paged as (
-    select * from rows where (p_kind = 'all' or kind = p_kind) and (p_status is null or status = p_status)
+    select * from rows where (v_kind = 'all' or kind = v_kind) and (p_status is null or status = p_status)
     order by created_at desc offset (v_page - 1) * v_per limit v_per
   )
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -1005,7 +1106,7 @@ begin
       'videoCompletions', (select count(*) from public.product_events e where e.event_name='video_completed' and e.occurred_at >= day and e.occurred_at < day + interval '1 day'),
       'translationRequests', (select count(*) from public.video_jobs j where j.created_at >= day and j.created_at < day + interval '1 day'),
       'translationFailures', (select count(*) from public.video_jobs j where j.status='failed' and j.created_at >= day and j.created_at < day + interval '1 day')
-    ) order by day) from generate_series(date_trunc('day', p_from), p_to - interval '1 second', interval '1 day') day), '[]'::jsonb),
+    ) order by day) from generate_series(date_trunc('day', p_from), p_to - interval '1 second', interval '1 day') as series(day)), '[]'::jsonb),
     'incidents', coalesce((select jsonb_agg(jsonb_build_object('id',id,'title',title,'status',status,'severity',severity,'startedAt',started_at) order by started_at desc) from public.admin_incidents where status <> 'resolved'), '[]'::jsonb),
     'recentAudit', case when public.admin_has_permission('audit.read') then coalesce((select jsonb_agg(row_data order by created_at desc) from (
       select created_at, jsonb_build_object('id',id,'actorUserId',actor_user_id,'actorRole',actor_role,
@@ -1050,7 +1151,7 @@ begin
     'uniqueViewers', (select count(distinct coalesce(s.user_id::text, s.anonymous_id::text)) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
     'totalWatchSeconds', (select floor(coalesce(sum(s.watched_seconds),0)) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
     'averageWatchSeconds', (select round(avg(s.watched_seconds),2) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
-    'medianWatchSeconds', (select round(percentile_cont(0.5) within group(order by s.watched_seconds)::numeric,2) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
+    'medianWatchSeconds', (select round((percentile_cont(0.5) within group(order by s.watched_seconds))::numeric,2) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
     'completionRate', (select round(100.0*count(*) filter(where s.completed)/nullif(count(*),0),2) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
     'rewatchRate', (select round(100.0*count(*) filter(where views>1)/nullif(count(*),0),2) from (select coalesce(s.user_id::text,s.anonymous_id::text) viewer,count(*) views from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id) group by viewer) viewers),
     'subtitleActivationRate', (select round(100.0*count(*) filter(where s.subtitle_activated)/nullif(count(*),0),2) from public.video_playback_sessions s where s.started_at>=p_from and s.started_at<p_to and (p_video_id is null or s.video_id=p_video_id)),
@@ -1203,6 +1304,46 @@ begin
 end;
 $$;
 
+create or replace function public.admin_set_user_status(
+  p_user_id uuid, p_status public.account_status, p_reason text, p_request_id uuid, p_user_agent text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role public.admin_role;
+  v_before public.profiles;
+  v_after public.profiles;
+  v_audit_id uuid;
+begin
+  v_role:=public.admin_require_permission('users.suspend');
+  if p_user_id=auth.uid() then
+    v_audit_id:=public.admin_write_audit(v_role,'user.status.change','user',p_user_id::text,null,null,p_reason,p_request_id,p_user_agent,false,'SELF_SUSPENSION_DENIED');
+    return jsonb_build_object('ok',false,'code','SELF_SUSPENSION_DENIED','messageFa','مدیر نمی‌تواند حساب فعال خود را از همین نشست تعلیق کند.','auditId',v_audit_id);
+  end if;
+  if p_request_id is null or length(btrim(coalesce(p_reason,'')))<5 then raise exception 'ADMIN_REASON_REQUIRED'; end if;
+  begin
+    select * into v_before from public.profiles where id=p_user_id for update;
+    if v_before.id is null then raise exception 'USER_NOT_FOUND'; end if;
+    update public.profiles set account_status=p_status,
+      suspended_at=case when p_status='suspended' then now() else null end
+    where id=p_user_id returning * into v_after;
+  exception when others then
+    v_audit_id:=public.admin_write_audit(v_role,'user.status.change','user',p_user_id::text,
+      case when v_before.id is null then null else jsonb_build_object('status',v_before.account_status) end,null,
+      p_reason,p_request_id,p_user_agent,false,sqlerrm);
+    return jsonb_build_object('ok',false,'code','USER_STATUS_FAILED','messageFa','وضعیت حساب تغییر نکرد.','auditId',v_audit_id);
+  end;
+  v_audit_id:=public.admin_write_audit(v_role,'user.status.change','user',p_user_id::text,
+    jsonb_build_object('status',v_before.account_status),jsonb_build_object('status',v_after.account_status),
+    p_reason,p_request_id,p_user_agent,true,null);
+  return jsonb_build_object('ok',true,'code','OK','messageFa',case when p_status='suspended' then 'حساب کاربر تعلیق شد.' else 'حساب کاربر دوباره فعال شد.' end,
+    'auditId',v_audit_id,'entity',jsonb_build_object('userId',p_user_id,'status',p_status));
+end;
+$$;
+
 create or replace function public.admin_retry_translation_job(
   p_job_id uuid, p_reason text, p_request_id uuid, p_user_agent text default null
 )
@@ -1321,6 +1462,7 @@ revoke all on function public.admin_get_video_analytics(text,timestamptz,timesta
 revoke all on function public.admin_get_funnel(text,timestamptz,timestamptz) from public, anon;
 revoke all on function public.admin_get_system_health(timestamptz,timestamptz) from public, anon;
 revoke all on function public.admin_adjust_subscription_days(uuid,integer,text,uuid,text) from public, anon;
+revoke all on function public.admin_set_user_status(uuid,public.account_status,text,uuid,text) from public, anon;
 revoke all on function public.admin_retry_translation_job(uuid,text,uuid,text) from public, anon;
 revoke all on function public.admin_set_library_video_publication(uuid,boolean,text,uuid,text) from public, anon;
 revoke all on function public.admin_set_team_member(uuid,public.admin_role,public.admin_membership_status,text,uuid,text) from public, anon;
@@ -1339,6 +1481,7 @@ grant execute on function public.admin_get_video_analytics(text,timestamptz,time
 grant execute on function public.admin_get_funnel(text,timestamptz,timestamptz) to authenticated;
 grant execute on function public.admin_get_system_health(timestamptz,timestamptz) to authenticated;
 grant execute on function public.admin_adjust_subscription_days(uuid,integer,text,uuid,text) to authenticated;
+grant execute on function public.admin_set_user_status(uuid,public.account_status,text,uuid,text) to authenticated;
 grant execute on function public.admin_retry_translation_job(uuid,text,uuid,text) to authenticated;
 grant execute on function public.admin_set_library_video_publication(uuid,boolean,text,uuid,text) to authenticated;
 grant execute on function public.admin_set_team_member(uuid,public.admin_role,public.admin_membership_status,text,uuid,text) to authenticated;

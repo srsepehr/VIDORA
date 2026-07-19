@@ -35,6 +35,7 @@ compileTs("src/lib/access-policy.ts", "access-policy.mjs");
 compileTs("src/lib/video-config.ts", "video-config.mjs");
 compileTs("src/lib/video-sources.ts", "video-sources.mjs");
 compileTs("src/lib/video-storage.ts", "video-storage.mjs");
+fs.writeFileSync(path.join(tmp, "analytics.mjs"), "export function trackEvent() {}\n");
 compileTs("src/lib/video-service.ts", "video-service.mjs");
 compileTs("src/lib/transcript-review.ts", "transcript-review.mjs");
 compileTs("src/lib/subtitle-review.ts", "subtitle-review.mjs");
