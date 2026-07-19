@@ -5,6 +5,7 @@ export const ROUTES = {
   library: "/library",
   subscriptions: "/subscriptions",
   checkout: "/checkout",
+  admin: "/admin",
   dashboard: "/dashboard",
   addVideo: "/dashboard/new-translation",
   myVideos: "/dashboard/videos",

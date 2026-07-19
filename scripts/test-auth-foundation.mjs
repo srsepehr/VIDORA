@@ -82,7 +82,7 @@ test("returnTo sanitizer allows internal routes and rejects external routes", ()
   assert.equal(returnTo.sanitizeReturnTo("/watch/future-of-ai"), "/watch/future-of-ai");
   assert.equal(returnTo.sanitizeReturnTo("https://evil.example/dashboard"), "/dashboard");
   assert.equal(returnTo.sanitizeReturnTo("//evil.example"), "/dashboard");
-  assert.equal(returnTo.sanitizeReturnTo("/admin"), "/dashboard");
+  assert.equal(returnTo.sanitizeReturnTo("/admin"), "/admin");
 });
 
 test("hash login returnTo rejects external destinations", () => {

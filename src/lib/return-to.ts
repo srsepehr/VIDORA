@@ -26,6 +26,7 @@ export function sanitizeReturnTo(raw: string | null | undefined, fallback = FALL
 
   const [path, query = ""] = decoded.split("?", 2);
   const safePaths = [
+    /^\/admin(?:\/(?:users(?:\/[0-9a-f-]{36})?|subscriptions|payments|videos(?:\/[0-9a-f-]{36})?|analytics\/videos|analytics\/funnels|translation-jobs|system|audit-log|team|settings))?$/,
     /^\/dashboard(\/(new-translation|videos(?:\/[0-9a-f-]{36})?|saved|subscription|support|settings|profile))?$/,
     /^\/library(\/category\/[a-z0-9-]+)?$/,
     /^\/watch\/[a-z0-9-]+$/,

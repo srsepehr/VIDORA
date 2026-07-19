@@ -24,6 +24,7 @@ import { logAppError, toAppError } from "./lib/app-error";
 import { formatFileSize } from "./lib/video-config";
 import { videoStorage } from "./lib/video-storage";
 import { deleteVideo } from "./lib/video-service";
+import { PlaybackAnalyticsTracker } from "./lib/analytics";
 import {
   buildTranscriptCopy,
   fetchTranscriptSegments,
@@ -162,6 +163,10 @@ function ReviewState({ icon, title, text, actionLabel, onAction, busy = false })
 }
 
 export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDeleted }) {
+  const playbackTracker = React.useMemo(
+    () => new PlaybackAnalyticsTracker(video.id, { subscription_status: "authenticated", source: "private-video-review" }),
+    [video.id],
+  );
   const [transcriptState, setTranscriptState] = React.useState({ loading: true, error: "", report: null });
   const [mediaState, setMediaState] = React.useState({ loading: true, url: "", error: "" });
   const [mode, setMode] = React.useState(() => {
@@ -440,12 +445,13 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
   const handleTimeUpdate = React.useCallback(() => {
     const player = videoRef.current;
     if (!player) return;
+    playbackTracker.timeUpdate(player);
     const timeMs = player.currentTime * 1000;
     const nextIndex = findActiveSegmentIndex(segments, timeMs);
     setActiveIndex((current) => current === nextIndex ? current : nextIndex);
     const nextChapter = activeChapterIndex(insightState.chapters, timeMs);
     setActiveChapter((current) => current === nextChapter ? current : nextChapter);
-  }, [segments, insightState.chapters]);
+  }, [segments, insightState.chapters, playbackTracker]);
 
   const seekToMs = React.useCallback((milliseconds) => {
     const player = videoRef.current;
@@ -492,6 +498,7 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
       messages: [...previous.messages, { id: "pending-" + requestId, role: "user", content: question,
         not_in_video: false, request_id: requestId, created_at: new Date().toISOString(), citations: [] }] }));
     try {
+      if (videoRef.current) playbackTracker.auxiliary("video_chat_message_sent", videoRef.current);
       await askVideoQuestion(session, video.id, question, requestId);
       const messages = await fetchVideoChatHistory(session, video.id);
       setChatState({ loading: false, messages, error: "", sending: false });
@@ -501,7 +508,14 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
       setChatState((previous) => ({ ...previous, sending: false, error: appError.messageFa,
         messages: previous.messages.filter((message) => message.id !== "pending-" + requestId) }));
     }
-  }, [chatState.sending, session, video.id]);
+  }, [chatState.sending, session, video.id, playbackTracker]);
+
+  React.useEffect(() => {
+    const player = videoRef.current;
+    if (!player) return;
+    if (tab === "summary") playbackTracker.auxiliary("summary_opened", player);
+    if (tab === "chat") playbackTracker.auxiliary("video_chat_opened", player);
+  }, [tab, playbackTracker]);
 
   React.useEffect(() => {
     if (tab === "chat" && !chatState.loading) chatEndRef.current?.scrollIntoView({ block: "nearest" });
@@ -643,9 +657,10 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
     setSubtitlesOn((previous) => {
       const next = !previous;
       applySubtitleMode(next);
+      if (videoRef.current) playbackTracker.auxiliary(next ? "subtitle_enabled" : "subtitle_disabled", videoRef.current);
       return next;
     });
-  }, [applySubtitleMode]);
+  }, [applySubtitleMode, playbackTracker]);
 
   const downloadSubtitle = React.useCallback(async (artifact) => {
     try {
@@ -754,6 +769,9 @@ export function ProcessedVideoReview({ session, video, job, isFa, onBack, onDele
                 controls
                 preload="metadata"
                 playsInline
+                onPlay={(event) => playbackTracker.play(event.currentTarget)}
+                onPause={(event) => playbackTracker.pause(event.currentTarget)}
+                onEnded={(event) => playbackTracker.ended(event.currentTarget)}
                 onTimeUpdate={handleTimeUpdate}
                 onError={handleMediaError}
                 onLoadedMetadata={handleLoadedMetadata}
