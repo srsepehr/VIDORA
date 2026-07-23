@@ -1,9 +1,6 @@
-'use client';
-
 import React from 'react';
-import type { ComponentProps, ReactNode } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import { Globe2, Headphones, ShieldCheck } from 'lucide-react';
+import './footer-section.css';
 
 export interface VidoraFooterProps {
   locale?: 'fa' | 'en';
@@ -11,20 +8,36 @@ export interface VidoraFooterProps {
 
 const footerCopy = {
   fa: {
+    homeLabel: 'بازگشت به صفحه اصلی Vidora',
+    benefitsLabel: 'مزایای ویدورا',
+    navLabel: 'پیوندهای پایانی',
     benefits: [
-      [Globe2, 'یادگیری جهانی', 'بهترین محتوای آموزشی دنیا را به زبان فارسی در اختیار شما قرار می‌دهیم.'],
-      [ShieldCheck, 'امن و قابل اعتماد', 'حریم خصوصی شما برای ما اهمیت دارد و اطلاعاتتان امن و محفوظ است.'],
-      [Headphones, 'پشتیبانی همیشه در دسترس', 'هر سؤالی دارید، تیم ما آماده کمک و راهنمایی شماست.'],
+      [Headphones, 'پشتیبانی همیشه در دسترس', 'برای پرسش‌ها و مشکلات، تیم پشتیبانی آماده راهنمایی شماست.'],
+      [ShieldCheck, 'امن و قابل اعتماد', 'حریم خصوصی و امنیت اطلاعات شما در تمام بخش‌های Vidora در اولویت است.'],
+      [Globe2, 'یادگیری جهانی', 'محتوای ارزشمند ویدیوهای جهان را با زبان فارسی در اختیار شما قرار می‌دهیم.'],
     ] as const,
-    links: ['قوانین و مقررات', 'درباره ما', 'تماس با ما'],
+    links: [
+      ['درباره ما', '#/'],
+      ['تماس با ما', '#/dashboard/support'],
+      ['قوانین و حریم خصوصی', '#/'],
+    ] as const,
+    rights: '© ۲۰۲۶ ویدورا. همه حقوق محفوظ است.',
   },
   en: {
+    homeLabel: 'Back to the Vidora homepage',
+    benefitsLabel: 'Vidora benefits',
+    navLabel: 'Footer links',
     benefits: [
-      [Globe2, 'Global learning', "The world's best educational content, made understandable in Persian."],
-      [ShieldCheck, 'Safe and reliable', 'Your privacy matters, and your information remains protected.'],
-      [Headphones, 'Support within reach', 'Our team is ready to help whenever you have a question.'],
+      [Headphones, 'Support within reach', 'Our support team is ready to guide you through questions and problems.'],
+      [ShieldCheck, 'Safe and reliable', 'Your privacy and information security are a priority throughout Vidora.'],
+      [Globe2, 'Global learning', 'We make valuable video knowledge from around the world available in Persian.'],
     ] as const,
-    links: ['Terms', 'About', 'Contact'],
+    links: [
+      ['About us', '#/'],
+      ['Contact us', '#/dashboard/support'],
+      ['Terms and privacy', '#/'],
+    ] as const,
+    rights: '© 2026 Vidora. All rights reserved.',
   },
 };
 
@@ -33,64 +46,29 @@ export function VidoraFooter({ locale = 'fa' }: VidoraFooterProps) {
   const rtl = locale === 'fa';
 
   return (
-    <footer dir={rtl ? 'rtl' : 'ltr'} className="w-full bg-zinc-950 text-white">
-      <div className="mx-auto w-full max-w-[1280px] px-6 md:px-10 lg:px-12">
-        <div className="grid gap-0 border-b border-white/10 py-7 md:grid-cols-3 md:py-8">
-          {copy.benefits.map(([Icon, title, body], index) => (
-            <AnimatedContainer
-              key={title}
-              delay={0.08 + index * 0.08}
-              className="flex items-start gap-3 border-white/10 py-4 first:pt-0 last:pb-0 max-md:[&+&]:border-t md:px-8 md:py-1 md:first:ps-0 md:last:pe-0 md:[&+&]:border-s"
-            >
-              <Icon className="mt-0.5 size-6 shrink-0" strokeWidth={1.45} />
-              <div>
-                <h3 className="m-0 text-sm font-bold text-white">{title}</h3>
-                <p className="mt-1.5 max-w-72 text-xs leading-6 text-zinc-400">{body}</p>
-              </div>
-            </AnimatedContainer>
-          ))}
-        </div>
-
-        <div className="flex justify-center py-6 md:py-7">
-          <AnimatedContainer delay={0.16} className="w-full">
-            <div aria-label={rtl ? 'اطلاعات پایانی' : 'Footer information'}>
-              <ul className="m-0 flex list-none flex-wrap items-center justify-center gap-x-6 gap-y-3 p-0 text-xs text-zinc-400 sm:gap-x-8">
-                {copy.links.map((link) => (
-                  <li key={link}>
-                    <span>{link}</span>
-                  </li>
-                ))}
-              </ul>
+    <footer className="vidora-public-footer" dir={rtl ? 'rtl' : 'ltr'}>
+      <section className="vidora-public-footer__benefits" aria-label={copy.benefitsLabel}>
+        {copy.benefits.map(([Icon, title, body]) => (
+          <div className="vidora-public-footer__benefit" key={title}>
+            <Icon size={34} strokeWidth={1.5} aria-hidden="true" />
+            <div>
+              <h3>{title}</h3>
+              <p>{body}</p>
             </div>
-          </AnimatedContainer>
-        </div>
+          </div>
+        ))}
+      </section>
+      <div className="vidora-public-footer__lower">
+        <a className="vidora-public-footer__wordmark vidora-wordmark-link" href="#/" aria-label={copy.homeLabel}>
+          VIDORA
+        </a>
+        <nav className="vidora-public-footer__nav" aria-label={copy.navLabel}>
+          {copy.links.map(([label, href]) => (
+            <a key={label} href={href}>{label}</a>
+          ))}
+        </nav>
+        <p className="vidora-public-footer__rights">{copy.rights}</p>
       </div>
     </footer>
-  );
-}
-
-type ViewAnimationProps = {
-  delay?: number;
-  className?: ComponentProps<typeof motion.div>['className'];
-  children: ReactNode;
-};
-
-function AnimatedContainer({ className, delay = 0.1, children }: ViewAnimationProps) {
-  const shouldReduceMotion = useReducedMotion();
-
-  if (shouldReduceMotion) {
-    return <div className={className}>{children}</div>;
-  }
-
-  return (
-    <motion.div
-      initial={{ filter: 'blur(4px)', translateY: -8, opacity: 0 }}
-      whileInView={{ filter: 'blur(0px)', translateY: 0, opacity: 1 }}
-      viewport={{ once: true, margin: '-40px' }}
-      transition={{ delay, duration: 0.7 }}
-      className={className}
-    >
-      {children}
-    </motion.div>
   );
 }

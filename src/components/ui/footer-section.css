@@ -1,0 +1,144 @@
+.vidora-public-footer {
+  width: 100%;
+  background: #0d0d0f;
+  color: #fff;
+}
+
+.vidora-public-footer__benefits {
+  display: grid;
+  width: 100%;
+  max-width: 1320px;
+  min-height: 158px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  margin: 0 auto;
+  padding: 28px 46px;
+  box-sizing: border-box;
+}
+
+.vidora-public-footer__benefit {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 15px;
+  padding-inline: 38px;
+}
+
+.vidora-public-footer__benefit + .vidora-public-footer__benefit {
+  border-inline-start: 1px solid #373737;
+}
+
+.vidora-public-footer__benefit svg {
+  margin-top: 3px;
+}
+
+.vidora-public-footer__benefit h3 {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.vidora-public-footer__benefit p {
+  max-width: 290px;
+  margin: 7px 0 0;
+  color: #aaa;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.vidora-public-footer__lower {
+  display: grid;
+  width: 100%;
+  max-width: 1320px;
+  min-height: 82px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 30px;
+  margin: 0 auto;
+  padding: 24px 46px 30px;
+  border-top: 1px solid #303033;
+  box-sizing: border-box;
+}
+
+.vidora-public-footer__wordmark {
+  color: #fff;
+  font-family: "Geist", var(--font-sans);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.vidora-public-footer__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+}
+
+.vidora-public-footer__nav a {
+  border-radius: 3px;
+  color: #ddd;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 160ms var(--ease-out);
+}
+
+.vidora-public-footer__nav a:hover {
+  color: #fff;
+}
+
+.vidora-public-footer__nav a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 5px;
+}
+
+.vidora-public-footer__rights {
+  margin: 0;
+  color: #777;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: end;
+}
+
+@media (max-width: 760px) {
+  .vidora-public-footer__benefits {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    padding: 12px 20px;
+  }
+
+  .vidora-public-footer__benefit {
+    width: 100%;
+    padding: 24px 0;
+  }
+
+  .vidora-public-footer__benefit + .vidora-public-footer__benefit {
+    border-inline-start: 0;
+    border-top: 1px solid #303033;
+  }
+
+  .vidora-public-footer__lower {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 18px;
+    min-height: 0;
+    padding: 28px 20px 32px;
+  }
+
+  .vidora-public-footer__nav {
+    justify-content: flex-start;
+    gap: 14px 22px;
+    flex-wrap: wrap;
+  }
+
+  .vidora-public-footer__rights {
+    text-align: start;
+  }
+}
