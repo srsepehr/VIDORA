@@ -19,7 +19,6 @@ import {
   Library,
   Menu,
   MessageCircle,
-  MoreHorizontal,
   ChevronDown,
   Lock,
   Search,
@@ -8748,6 +8747,7 @@ const dashboardViewAliases = {
   "new-translation": "new-video",
   watchlist: "saved",
   notes: "saved",
+  favorites: "saved",
   usage: "subscription",
   billing: "subscription",
 };
@@ -8756,18 +8756,23 @@ const dashboardRouteSegments = {
   library: "videos",
 };
 
+// The saved workspace is reachable from two sidebar entries (favourites and
+// saved). `segment` keeps their hash routes — and therefore their active
+// states — distinct while both render the existing saved view.
 const sidebarGroups = [
   {
     labelKey: "primary",
+    hideLabel: true,
     items: [
       { icon: Home, labelKey: "dashboard", view: "dashboard" },
       { icon: CirclePlus, labelKey: "newTranslation", view: "new-video" },
       { icon: Video, labelKey: "myVideos", view: "library" },
+      { icon: Heart, labelKey: "favorites", view: "saved", segment: "favorites" },
       { icon: BookOpen, labelKey: "publicLibrary", externalHash: "#/library" },
     ],
   },
   {
-    labelKey: "saved",
+    labelKey: "quick",
     items: [
       { icon: Bookmark, labelKey: "saved", view: "saved" },
       { icon: Crown, labelKey: "subscription", view: "subscription" },
@@ -8781,6 +8786,10 @@ const sidebarGroups = [
   },
 ];
 
+const sidebarSegmentOverrides = new Set(
+  sidebarGroups.flatMap((group) => group.items.map((item) => item.segment).filter(Boolean)),
+);
+
 function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   const { lang } = window.useLang();
   const t = dashboardCopy[lang] || dashboardCopy.fa;
@@ -8793,14 +8802,17 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
     const match = /^#\/(?:dashboard|panel)\/videos\/([0-9a-fA-F-]{8,})/.exec(window.location.hash);
     return match ? match[1] : "";
   };
+  const getHashSegment = () => window.location.hash.replace(/^#\/(?:dashboard|panel)\/?/, "") || "dashboard";
   const getInitialView = () => {
     if (previewMode) return "dashboard";
     if (getVideoDetailId()) return "video-detail";
-    const segment = window.location.hash.replace(/^#\/(?:dashboard|panel)\/?/, "") || "dashboard";
+    const segment = getHashSegment();
     const view = dashboardViewAliases[segment] || segment;
     return dashboardViews.has(view) ? view : "dashboard";
   };
+  const getInitialSegment = () => (previewMode ? "dashboard" : getHashSegment());
   const [activeView, setActiveView] = React.useState(getInitialView);
+  const [activeSegment, setActiveSegment] = React.useState(getInitialSegment);
   const [videoDetailId, setVideoDetailId] = React.useState(getVideoDetailId);
   const [deleteTarget, setDeleteTarget] = React.useState(null);
   const [videoFilter, setVideoFilter] = React.useState("All");
@@ -8847,24 +8859,26 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
     if (previewMode) return undefined;
     const onHashChange = () => {
       setActiveView(getInitialView());
+      setActiveSegment(getInitialSegment());
       setVideoDetailId(getVideoDetailId());
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [previewMode]);
 
-  const selectView = (view) => {
+  const selectView = (view, navSegment = "") => {
     if (!dashboardViews.has(view)) return;
     if (previewMode && (view === "new-video" || view === "video-detail")) {
       showToast(isFa ? "این اقدام در پیش‌نمایش توسعه به سرور ارسال نمی‌شود." : "This action is disabled in the development preview.");
       return;
     }
+    const segment = navSegment || dashboardRouteSegments[view] || view;
     setActiveView(view);
+    setActiveSegment(segment);
     setLogoutConfirm(false);
     setProfileMenuOpen(false);
     setMobileNavOpen(false);
     if (previewMode) return;
-    const segment = dashboardRouteSegments[view] || view;
     window.location.hash = view === "dashboard" ? "#/dashboard" : `#/dashboard/${segment}`;
   };
 
@@ -8933,7 +8947,6 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const usagePercent = includedMinutes > 0 ? Math.min(100, Math.round((usedMinutes / includedMinutes) * 100)) : 0;
   const planName = activeSubscription?.plans?.name_fa || (isFa ? "بدون اشتراک فعال" : "No active subscription");
-  const processedCount = previewData?.processedCount ?? dashboardData.videos.filter((video) => video.status === "completed").length;
 
   React.useEffect(() => {
     if (dashboardData.loading || activeSubscription || activeView !== "dashboard") return;
@@ -8971,6 +8984,8 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
   };
 
   const renderHeader = () => {
+    // The dashboard renders its own welcome header inside DashboardHome.
+    if (activeView === "dashboard") return null;
     const detailTitles = isFa
       ? ["وضعیت پردازش ویدیو", "وضعیت هر مرحله از پردازش در همین صفحه به‌روزرسانی می‌شود."]
       : ["Video processing status", "Every stage updates on this page as processing advances."];
@@ -9111,6 +9126,11 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
     return <div className="vd-video-list">{rows.map(renderVideoRow)}</div>;
   };
 
+  const openProcessingVideos = () => {
+    setVideoFilter("Processing");
+    selectView("library");
+  };
+
   const renderDashboard = () => (
     <DashboardHome
       isFa={isFa}
@@ -9118,14 +9138,12 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
       loading={dashboardData.loading}
       error={dashboardData.error}
       videos={userVideoRows}
-      planName={planName}
-      includedMinutes={includedMinutes}
-      remainingMinutes={remainingMinutes}
-      usagePercent={usagePercent}
-      processedCount={processedCount}
+      userName={profileName}
       onOpenVideo={openVideoDetail}
       onRetryVideo={retryVideoRow}
       onSelectView={selectView}
+      onOpenGuide={() => selectView("support")}
+      onOpenProcessing={openProcessingVideos}
       onReload={() => reloadDashboardData()}
     />
   );
@@ -9224,18 +9242,27 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
 
   const renderSidebarItem = (item) => {
     const ItemIcon = item.icon;
-    const isActive = item.view === activeView;
+    const isActive = item.segment
+      ? activeSegment === item.segment
+      : item.view === activeView && !sidebarSegmentOverrides.has(activeSegment);
     const onClick = () => {
       if (item.externalHash) {
         window.location.hash = item.externalHash;
         return;
       }
-      selectView(item.view);
+      selectView(item.view, item.segment);
     };
-    const count = item.labelKey === "myVideos" && !dashboardData.loading && !dashboardData.error ? String(userVideoRows.length) : item.count;
+    const count = item.labelKey === "myVideos" && !dashboardData.loading && !dashboardData.error && userVideoRows.length
+      ? String(userVideoRows.length)
+      : item.count;
     return (
-      <button className={`vd-nav-item ${isActive ? "is-active" : ""}`} key={item.labelKey} onClick={onClick}>
-        <ItemIcon size={18} strokeWidth={1.8} />
+      <button
+        className={`vd-nav-item ${isActive ? "is-active" : ""}`}
+        key={item.labelKey}
+        onClick={onClick}
+        aria-current={isActive ? "page" : undefined}
+      >
+        <ItemIcon size={18} strokeWidth={1.7} />
         <span>{t.nav[item.labelKey]}</span>
         {count ? <span className="vd-count">{count}</span> : null}
       </button>
@@ -9246,9 +9273,14 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
     <aside className={`vd-sidebar${mobileNavOpen ? " is-open" : ""}`} dir={isFa ? "rtl" : "ltr"} aria-label={isFa ? "ناوبری داشبورد" : "Dashboard navigation"}>
       <button className="vd-sidebar-close" aria-label={isFa ? "بستن منو" : "Close menu"} onClick={() => setMobileNavOpen(false)}><X size={18} /></button>
       <div className="vd-sidebar-brand" aria-label="Vidora">vidora</div>
-      <div>
-        {sidebarGroups.map((group) => <section className="vd-section" key={group.labelKey}><p className="vd-label">{t.sections[group.labelKey]}</p><div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div></section>)}
-      </div>
+      <nav className="vd-sidebar-nav" aria-label={isFa ? "بخش‌های داشبورد" : "Dashboard sections"}>
+        {sidebarGroups.map((group) => (
+          <section className="vd-section" key={group.labelKey} aria-label={t.sections[group.labelKey]}>
+            {group.hideLabel ? null : <p className="vd-label">{t.sections[group.labelKey]}</p>}
+            <div className="vd-nav-list">{group.items.map(renderSidebarItem)}</div>
+          </section>
+        ))}
+      </nav>
       <div className="vd-profile-menu-wrap">
         {profileMenuOpen ? (
           <div className="vd-profile-menu" role="menu">
@@ -9258,10 +9290,16 @@ function VidoraDashboard({ session, previewData = null, previewMode = false }) {
             <button role="menuitem" className="is-danger" onClick={() => setLogoutConfirm(true)}>{t.profileMenu.logout}</button>
           </div>
         ) : null}
-        <button className="vd-user vd-sidebar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-expanded={profileMenuOpen}>
-          <div className="vd-avatar">{profileInitial}</div>
+        <button
+          className="vd-user vd-sidebar-profile"
+          onClick={() => setProfileMenuOpen((value) => !value)}
+          aria-expanded={profileMenuOpen}
+          aria-haspopup="menu"
+          aria-label={isFa ? "منوی حساب کاربری" : "Account menu"}
+        >
+          <div className="vd-avatar" aria-hidden="true">{profileInitial}</div>
           <div><h2>{profileName}</h2><p className="vd-technical-text">{profileEmail}</p></div>
-          <MoreHorizontal size={17} />
+          <ChevronDown size={16} aria-hidden="true" />
         </button>
       </div>
     </aside>

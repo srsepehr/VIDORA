@@ -10,6 +10,7 @@
   "sections": {
     "primary": "اصلی",
     "saved": "ذخیره‌شده‌ها",
+    "quick": "دسترسی سریع",
     "account": "حساب",
     "help": "پشتیبانی"
   },
@@ -18,8 +19,9 @@
     "vidoraLibrary": "کتابخانه Vidora",
     "newTranslation": "ترجمه جدید",
     "myVideos": "ویدیوهای من",
+    "favorites": "علاقه‌مندی‌ها",
     "publicLibrary": "کتابخانه",
-    "saved": "ذخیره‌شده",
+    "saved": "ذخیره‌شده‌ها",
     "subscription": "اشتراک",
     "support": "پشتیبانی",
     "logout": "خروج"

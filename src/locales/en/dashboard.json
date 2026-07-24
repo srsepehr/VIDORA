@@ -10,6 +10,7 @@
   "sections": {
     "primary": "PRIMARY",
     "saved": "SAVED",
+    "quick": "QUICK ACCESS",
     "account": "ACCOUNT",
     "help": "SUPPORT"
   },
@@ -18,6 +19,7 @@
     "vidoraLibrary": "Vidora Library",
     "newTranslation": "New Translation",
     "myVideos": "My Videos",
+    "favorites": "Favourites",
     "publicLibrary": "Library",
     "saved": "Saved",
     "subscription": "Subscription",
