@@ -107,16 +107,27 @@
   text-align: end;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
+  .vidora-public-footer {
+    position: relative;
+    left: 50%;
+    width: 100vw;
+    margin-left: -50vw;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   .vidora-public-footer__benefits {
     min-height: 0;
     grid-template-columns: 1fr;
-    padding: 12px 20px;
+    padding: 0;
   }
 
   .vidora-public-footer__benefit {
     width: 100%;
-    padding: 24px 0;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 16px;
+    padding: 32px 20px;
+    box-sizing: border-box;
   }
 
   .vidora-public-footer__benefit + .vidora-public-footer__benefit {
@@ -124,21 +135,97 @@
     border-top: 1px solid #303033;
   }
 
+  .vidora-public-footer__benefit:nth-child(1) {
+    order: 3;
+  }
+
+  .vidora-public-footer__benefit:nth-child(2) {
+    order: 2;
+  }
+
+  .vidora-public-footer__benefit:nth-child(3) {
+    order: 1;
+  }
+
+  .vidora-public-footer__benefit svg {
+    width: 36px;
+    height: 36px;
+    margin-top: 2px;
+  }
+
+  .vidora-public-footer__benefit h3 {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.75;
+  }
+
+  .vidora-public-footer__benefit p {
+    max-width: 32rem;
+    margin-top: 6px;
+    color: #a1a1aa;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.8;
+  }
+
   .vidora-public-footer__lower {
     grid-template-columns: 1fr;
-    justify-items: start;
-    gap: 18px;
+    justify-items: center;
+    gap: 0;
     min-height: 0;
-    padding: 28px 20px 32px;
+    padding: 0;
   }
 
   .vidora-public-footer__nav {
-    justify-content: flex-start;
-    gap: 14px 22px;
-    flex-wrap: wrap;
+    order: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    padding: 24px 0;
+  }
+
+  .vidora-public-footer__nav a {
+    position: relative;
+    display: flex;
+    width: 180px;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    color: #d4d4d8;
+    font-size: 13px;
+    font-weight: 400;
+  }
+
+  .vidora-public-footer__nav a + a::before {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 96px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    content: "";
+    transform: translateX(-50%);
+  }
+
+  .vidora-public-footer__wordmark {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    padding: 32px 20px 0;
+    border-top: 1px solid #303033;
+    box-sizing: border-box;
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
   }
 
   .vidora-public-footer__rights {
-    text-align: start;
+    order: 3;
+    margin: 16px 0 32px;
+    color: #71717a;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.8;
+    text-align: center;
   }
 }

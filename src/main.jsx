@@ -5814,6 +5814,19 @@ function LandingAddVideoSection() {
     <section className="landing-add" dir={rtl ? "rtl" : "ltr"}>
       <style>{`
         .landing-add{background:#050505;color:#fff}.landing-add-in{max-width:1280px;margin:auto;padding:46px 48px 32px}.landing-add-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.landing-process-step{position:relative;display:grid;min-width:0;grid-template-rows:40px auto auto;align-content:start;justify-items:start;padding:0 28px}.landing-process-step+.landing-process-step{border-inline-start:1px solid rgba(255,255,255,.15)}.landing-process-icon{display:grid;width:40px;height:40px;place-items:center;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:#151515;color:#fff}.landing-process-step h3{margin:15px 0 0;font-size:16px;line-height:1.55}.landing-process-step p{width:100%;margin:7px 0 0;color:#a1a1aa;font-size:11.5px;line-height:1.85}.landing-add-action-wrap{display:flex;justify-content:center;margin-top:20px}@media(min-width:1200px){.landing-process-step p{white-space:nowrap}}@media(max-width:900px){.landing-process-step{padding-inline:22px}}@media(max-width:820px){.landing-add-in{padding:38px 32px 32px}.landing-add-grid{grid-template-columns:1fr}.landing-process-step{grid-template-rows:40px auto auto;padding:26px 0}.landing-process-step:first-child{padding-top:0}.landing-process-step+.landing-process-step{border-inline-start:0;border-top:1px solid rgba(255,255,255,.13)}.landing-process-step p{max-width:520px;font-size:12px;white-space:normal}.landing-add-action-wrap{margin-top:22px}.landing-add-action-wrap>button{width:100%;max-width:320px}}@media(max-width:600px){.landing-add-in{padding-inline:20px}}
+        @media(max-width:767px){
+          .landing-add{box-sizing:border-box;background:#fff;padding:0 16px;color:#fff}
+          .landing-add-in{max-width:560px;padding:0}
+          .landing-add-grid{overflow:hidden;grid-template-columns:1fr;border:1px solid #242426;border-radius:22px;background:#0b0b0c}
+          .landing-process-step{direction:rtl;min-height:0;grid-template:"icon title" auto "icon body" auto / 52px minmax(0,1fr);column-gap:16px;row-gap:5px;align-items:start;justify-items:stretch;padding:24px 22px}
+          .landing-process-step:first-child{padding-top:24px}
+          .landing-process-step+.landing-process-step{border-top:1px solid #2e2e30;border-inline-start:0}
+          .landing-process-icon{grid-area:icon;width:50px;height:50px;border-color:#343438;border-radius:13px;background:#111113}
+          .landing-process-icon svg{width:24px;height:24px}
+          .landing-process-step h3{grid-area:title;margin:0;color:#fff;font-size:16px;font-weight:800;line-height:1.75;text-align:right}
+          .landing-process-step p{grid-area:body;max-width:none;margin:0;color:#a1a1aa;font-size:12.5px;line-height:1.9;text-align:right;white-space:normal}
+          .landing-add-action-wrap{display:none}
+        }
       `}</style>
       <div className="landing-add-in">
         <div className="landing-add-grid">{steps.map(([title, body, StepIcon]) => <ProcessStep key={title} title={title} body={body} icon={StepIcon} />)}</div>
@@ -5825,7 +5838,7 @@ function LandingAddVideoSection() {
 
 function LandingCategoryCard({ item, rtl }) {
   const CategoryIcon = item.icon;
-  return <a className="landing-category-card vidora-interactive-card" href={`#/library?topic=${item.topic}`}>
+  return <a className="landing-category-card vidora-interactive-card" data-topic={item.topic} href={`#/library?topic=${item.topic}`}>
     <span className="landing-category-media vidora-interactive-media"><img src={landingAsset(item.image)} alt={item.alt} width="600" height="400" loading="lazy" style={{ objectPosition: item.position }} /></span>
     <span className="landing-category-badge"><CategoryIcon size={18} strokeWidth={1.7} /></span>
     <span className="landing-category-content"><strong>{item.title}</strong><span className="landing-category-desc">{item.desc}</span><span className="landing-category-link vidora-interactive-affordance">{rtl ? "مشاهده دسته‌بندی" : "View category"}</span></span>
@@ -5850,6 +5863,34 @@ function LandingCategories() {
     <section className="landing-categories" dir={rtl ? "rtl" : "ltr"}>
       <style>{`
         .landing-categories{background:#fff;color:#111}.landing-categories-in{max-width:1280px;margin:auto;padding:52px 48px 58px}.landing-centered-heading{text-align:center;margin-bottom:26px}.landing-centered-heading h2{margin:0;font-size:24px;font-weight:800;line-height:1.4}.landing-centered-heading>span{display:block;width:34px;height:1.5px;margin:10px auto 0;background:#18181b}.landing-category-heading{margin-bottom:28px;text-align:center}.landing-category-heading h2{margin:0;font-size:25px;font-weight:800;line-height:1.45}.landing-category-heading p{margin:5px 0 0;color:#71717a;font-size:12.5px;line-height:1.7}.landing-category-heading span{display:block;width:34px;height:1.5px;margin:11px auto 0;background:#18181b}.landing-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:18px}.landing-category-card{display:flex;height:100%;min-width:0;overflow:hidden;flex-direction:column;padding:0;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-align:inherit;text-decoration:none;cursor:pointer}.landing-category-media{display:block;aspect-ratio:2/1;overflow:hidden;background:#e4e4e7}.landing-category-media img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1)}.landing-category-badge{position:relative;z-index:1;display:grid;width:36px;height:36px;flex:none;place-items:center;align-self:flex-start;margin-top:-18px;margin-inline-start:16px;border-radius:7px;background:#090909;color:#fff}.landing-category-content{display:flex;min-height:116px;flex:1;flex-direction:column;margin-top:-18px;padding:22px 18px 14px}.landing-category-content strong{min-height:22px;font-size:14px;line-height:1.55}.landing-category-desc{display:-webkit-box;min-height:40px;margin-top:5px;overflow:hidden;color:#52525b;font-size:11.5px;line-height:1.75;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-category-link{margin-top:8px}@media(max-width:1100px){.landing-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.landing-category-media{aspect-ratio:2.15/1}}@media(max-width:600px){.landing-categories-in{padding:46px 20px 50px}.landing-category-grid{grid-template-columns:1fr}.landing-category-media{aspect-ratio:2.05/1}.landing-category-content{min-height:112px}}
+        @media(max-width:767px){
+          .landing-categories-in{max-width:560px;padding:48px 16px 54px}
+          .landing-category-heading{margin-bottom:28px}
+          .landing-category-heading h2{font-size:23px;line-height:1.65}
+          .landing-category-heading p{margin-top:6px;font-size:12.5px}
+          .landing-category-heading span{width:32px;height:2px;margin-top:13px}
+          .landing-category-grid{grid-template-columns:1fr;gap:14px}
+          .landing-category-card{border-color:#dedee2;border-radius:15px;box-shadow:none}
+          .landing-category-card[data-topic="startups"]{order:1}
+          .landing-category-card[data-topic="language"]{order:2}
+          .landing-category-card[data-topic="product"]{order:3}
+          .landing-category-card[data-topic="ai"]{order:4}
+          .landing-category-media{aspect-ratio:1.65/1}
+          .landing-category-badge{position:absolute;inset-inline-start:18px;top:calc(61% - 20px);width:40px;height:40px;margin:0;border-radius:10px}
+          .landing-category-content{min-height:0;margin:0;padding:20px 18px 18px;direction:rtl;text-align:right}
+          .landing-category-content strong{min-height:0;font-size:16px;line-height:1.7}
+          .landing-category-desc{min-height:0;margin-top:4px;font-size:12.5px;line-height:1.8;-webkit-line-clamp:2}
+          .landing-category-link{display:inline-flex;width:max-content;min-height:36px;box-sizing:border-box;align-items:center;justify-content:center;margin-top:14px;padding:0 16px;border:1px solid #d4d4d8;border-radius:999px;color:#3f3f46;font-size:11.5px;font-weight:700;white-space:nowrap}
+        }
+        @media(min-width:440px) and (max-width:767px){
+          .landing-category-card{display:grid;grid-template-columns:40% minmax(0,1fr);min-height:132px;direction:ltr}
+          .landing-category-media{grid-column:1;grid-row:1;aspect-ratio:auto;height:100%}
+          .landing-category-badge{left:calc(40% - 20px);right:auto;top:calc(50% - 20px)}
+          .landing-category-content{grid-column:2;grid-row:1;justify-content:center;padding:18px 22px 16px 28px}
+          .landing-category-content strong{font-size:15.5px}
+          .landing-category-desc{font-size:11.5px}
+          .landing-category-link{min-height:34px;margin-top:10px;padding-inline:15px;font-size:11px}
+        }
       `}</style>
       <div className="landing-categories-in">
         <div className="landing-category-heading"><h2>{rtl ? "از موضوع مورد علاقه‌تان شروع کنید" : "Start with a topic you love"}</h2><p>{rtl ? "دسته‌بندی‌های محبوب ویدورا" : "Popular Vidora categories"}</p><span aria-hidden="true" /></div>
@@ -5883,7 +5924,7 @@ function LandingSelectedVideos() {
   return (
     <section className="landing-selected" dir={rtl ? "rtl" : "ltr"}>
       <style>{`
-        .landing-selected{background:#fff;color:#111}.landing-selected-in{position:relative;max-width:1280px;margin:auto;padding:0 48px 70px}.landing-video-rail{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}.landing-video-rail::-webkit-scrollbar{display:none}.landing-video{flex:0 0 calc((100% - 36px)/3);min-width:0;overflow:hidden;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-decoration:none;scroll-snap-align:start}.landing-video:hover{border-color:#a1a1aa}.landing-video-visual{position:relative;display:block;aspect-ratio:16/8.8;overflow:hidden;background:#111}.landing-video-visual img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1)}.landing-video-duration{position:absolute;inset-inline-start:10px;bottom:9px;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.85);color:#fff;font-size:10.5px}.landing-video-content{display:block;padding:14px 16px 15px}.landing-video-content strong{display:-webkit-box;min-height:44px;overflow:hidden;font-size:14.5px;line-height:1.55;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-video-meta{display:flex;align-items:center;gap:8px;margin-top:9px;color:#71717a;font-size:10.5px}.landing-video-meta i{font-style:normal;color:#a1a1aa}.landing-carousel-arrow{position:absolute;top:calc(50% - 8px);left:6px;z-index:2;display:grid;width:34px;height:34px;place-items:center;border:1px solid #dedee2;border-radius:999px;background:#fff;color:#18181b;cursor:pointer}.landing-carousel-arrow:disabled{cursor:default;opacity:.42}.landing-selected-action{display:flex;justify-content:center;margin-top:26px}@media(max-width:900px){.landing-video{flex-basis:calc((100% - 18px)/2)}}@media(max-width:760px){.landing-selected-in{padding:0 20px 56px}.landing-video{flex-basis:84%}.landing-carousel-arrow{display:none}.landing-selected-action>button{width:100%;max-width:320px}}
+        .landing-selected{background:#fff;color:#111}.landing-selected-in{position:relative;max-width:1280px;margin:auto;padding:0 48px 70px}.landing-video-rail{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}.landing-video-rail::-webkit-scrollbar{display:none}.landing-video{flex:0 0 calc((100% - 36px)/3);min-width:0;overflow:hidden;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-decoration:none;scroll-snap-align:start}.landing-video:hover{border-color:#a1a1aa}.landing-video-visual{position:relative;display:block;aspect-ratio:16/8.8;overflow:hidden;background:#111}.landing-video-visual img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1)}.landing-video-duration{position:absolute;inset-inline-start:10px;bottom:9px;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.85);color:#fff;font-size:10.5px}.landing-video-content{display:block;padding:14px 16px 15px}.landing-video-content strong{display:-webkit-box;min-height:44px;overflow:hidden;font-size:14.5px;line-height:1.55;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-video-meta{display:flex;align-items:center;gap:8px;margin-top:9px;color:#71717a;font-size:10.5px}.landing-video-meta i{font-style:normal;color:#a1a1aa}.landing-carousel-arrow{position:absolute;top:calc(50% - 8px);left:6px;z-index:2;display:grid;width:34px;height:34px;place-items:center;border:1px solid #dedee2;border-radius:999px;background:#fff;color:#18181b;cursor:pointer}.landing-carousel-arrow:disabled{cursor:default;opacity:.42}.landing-selected-action{display:flex;justify-content:center;margin-top:26px}@media(max-width:900px){.landing-video{flex-basis:calc((100% - 18px)/2)}}@media(max-width:767px){.landing-selected-in{overflow:hidden;padding:0 16px 54px}.landing-centered-heading{margin-bottom:22px}.landing-video-rail{gap:12px;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}.landing-video{flex:0 0 clamp(270px,82vw,360px);border-radius:7px}.landing-video-content{padding:10px 12px 11px}.landing-video-content strong{min-height:0;font-size:13px;line-height:1.6}.landing-video-meta{gap:6px;margin-top:6px;font-size:9.5px}.landing-video-duration{inset-inline-start:7px;bottom:7px;padding:2px 5px;font-size:9px}.landing-carousel-arrow{display:none}.landing-selected-action{margin-top:22px}.landing-selected-action>button{width:min(100%,286px);min-width:0}}@media(max-width:340px){.landing-selected-in{padding-inline:14px}.landing-video{flex-basis:clamp(264px,85vw,280px)}}
       `}</style>
       <div className="landing-selected-in">
         <LandingSectionHeading>{rtl ? "ویدیوهای منتخب" : "Featured videos"}</LandingSectionHeading>
@@ -7938,7 +7979,7 @@ function MenuToggleIcon({ open, size = 20, duration = 300 }) {
   );
 }
 
-function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light", auth = null, layoutDirection = null } = {}) {
+function EditorialHeader({ mode = "landing", navItems = null, search = null, tone = "light", auth = null, layoutDirection = null, mobileFloating = false } = {}) {
   const { Button, IconButton } = window.VidoraDesignSystem_0f84f2;
   const { d, lang } = window.useLang();
   const [open, setOpen] = React.useState(false);
@@ -7998,7 +8039,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
   }, [profileOpen]);
 
   const isMobile = vw < 768;
-  const floating = scrolled && !open && !isMobile;
+  const floating = scrolled && !open && (!isMobile || mobileFloating);
   const dark = tone === "dark";
   const searchOpen = Boolean(search?.open);
   const defaultLinks = [
@@ -8073,7 +8114,10 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
 
   return (
     <header
+      className="landing-header"
       data-screen-label="Header"
+      data-floating={floating ? "true" : "false"}
+      data-mobile-redesign={mobileFloating ? "true" : "false"}
       style={{
         position: "sticky",
         top: floating ? 16 : 0,
@@ -8092,7 +8136,35 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
         transition: "max-width 260ms var(--ease-standard), top 260ms var(--ease-standard), background 200ms var(--ease-standard), box-shadow 200ms var(--ease-standard), border-radius 260ms var(--ease-standard), border-color 200ms var(--ease-standard)",
       }}
     >
+      <style>{`
+        @media(max-width:767px){
+          .landing-header[data-mobile-redesign="true"]{top:0!important;height:78px;max-width:none!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+          .landing-header[data-mobile-redesign="true"] .landing-header-nav{height:78px!important;max-width:100%;margin:0 auto;padding:0 24px!important;border:1px solid transparent;border-radius:0;background:#fff;transition:width 260ms var(--ease-standard),max-width 260ms var(--ease-standard),height 260ms var(--ease-standard),margin 260ms var(--ease-standard),padding 260ms var(--ease-standard),background 200ms var(--ease-standard),box-shadow 200ms var(--ease-standard),border-radius 260ms var(--ease-standard),border-color 200ms var(--ease-standard)}
+          .landing-header[data-mobile-redesign="true"] .vidora-wordmark-link{font-size:20px!important;letter-spacing:.19em!important}
+          .landing-header[data-mobile-redesign="true"] .landing-header-menu{margin-inline-end:-8px}
+          .landing-header[data-mobile-redesign="true"] .landing-header-menu button{width:48px!important;height:48px!important;border-color:transparent!important;background:transparent!important;box-shadow:none!important}
+          .landing-header[data-mobile-redesign="true"] .landing-header-menu svg{width:26px!important;height:26px!important}
+          .landing-header[data-mobile-redesign="true"] .landing-mobile-menu{top:78px!important;border-top:0!important;padding:20px 24px 24px!important}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-nav{width:calc(100% - 24px);height:56px!important;margin:max(10px,env(safe-area-inset-top)) auto 0;padding:0 12px!important;border-color:var(--border);border-radius:16px;background:rgba(255,255,255,.92);box-shadow:var(--shadow-sm);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .vidora-wordmark-link{font-size:17px!important;letter-spacing:.17em!important}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-menu{margin-inline-end:-4px}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-menu button{width:44px!important;height:44px!important}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-menu svg{width:23px!important;height:23px!important}
+          @media(prefers-reduced-motion:reduce){
+            .landing-header[data-mobile-redesign="true"],.landing-header[data-mobile-redesign="true"] .landing-header-nav,.landing-header[data-mobile-redesign="true"] .vidora-wordmark-link,.landing-header[data-mobile-redesign="true"] .landing-header-menu svg{transition:none!important}
+          }
+        }
+        @media(max-width:359px){
+          .landing-header[data-mobile-redesign="true"]{height:70px}
+          .landing-header[data-mobile-redesign="true"] .landing-header-nav{height:70px!important;padding-inline:18px!important}
+          .landing-header[data-mobile-redesign="true"] .vidora-wordmark-link{font-size:18px!important}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-nav{width:calc(100% - 20px);height:52px!important;margin-top:max(8px,env(safe-area-inset-top));padding-inline:10px!important;border-radius:15px}
+          .landing-header[data-mobile-redesign="true"][data-floating="true"] .landing-header-menu button{width:42px!important;height:42px!important}
+          .landing-header[data-mobile-redesign="true"] .landing-mobile-menu{top:70px!important}
+        }
+      `}</style>
       <nav
+        className="landing-header-nav"
         dir={layoutDirection || undefined}
         style={{
           display: "flex",
@@ -8160,7 +8232,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
             )}
           </div>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="landing-header-menu" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {mode === "library" && search ? (
               <IconButton
                 variant="secondary"
@@ -8174,7 +8246,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
               variant="secondary"
               label={open ? "Close menu" : "Open menu"}
               onClick={() => setOpen((v) => !v)}
-              icon={<MenuToggleIcon open={open} size={20} duration={300} />}
+              icon={mobileFloating ? (open ? <X size={24} strokeWidth={1.8} /> : <Menu size={26} strokeWidth={1.8} />) : <MenuToggleIcon open={open} size={20} duration={300} />}
               style={dark ? { color: headerInk, borderColor: "rgba(255,255,255,.18)", background: "transparent" } : undefined}
             />
           </div>
@@ -8205,6 +8277,7 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
 
       {isMobile ? (
         <div
+          className="landing-mobile-menu"
           style={{
             position: "fixed",
             insetInlineStart: 0,
@@ -8250,7 +8323,8 @@ window.EditorialHeader = EditorialHeader;
 // per-block dir. Premium B&W, DS Button, tokens only.
 
 function MockupPlaceholder() {
-  const mockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-transparent-crisp.png`;
+  const desktopMockupSrc = `${import.meta.env.BASE_URL}images/vidora-macbook-transparent-crisp.png`;
+  const mobileMockupSrc = `${import.meta.env.BASE_URL}images/vidora-iphone-mobile-mockup-transparent-v2.png`;
 
   return (
     <div
@@ -8265,7 +8339,8 @@ function MockupPlaceholder() {
       }}
     >
       <img
-        src={mockupSrc}
+        className="vh-desktop-mockup"
+        src={desktopMockupSrc}
         alt="Vidora video learning interface with Persian subtitles, summary and key takeaways"
         width={1375}
         height={827}
@@ -8280,6 +8355,15 @@ function MockupPlaceholder() {
           // (box-shadow would draw a rectangle around the whole image box)
           filter: "drop-shadow(0 26px 38px rgba(0,0,0,0.30))",
         }}
+      />
+      <img
+        className="vh-mobile-mockup"
+        src={mobileMockupSrc}
+        alt="رابط موبایل ویدورا با زیرنویس فارسی، خلاصه و نکات کلیدی"
+        width={885}
+        height={1777}
+        loading="eager"
+        decoding="sync"
       />
     </div>
   );
@@ -8353,6 +8437,7 @@ function EditorialHero() {
     .vh-value+.vh-value{margin-inline-start:14px;padding-inline-start:14px;border-inline-start:1px solid #d4d4d8;}
     .vh-value svg{flex:none;color:#3f3f46;}
     .vh-value span{font-size:11px;font-weight:550;line-height:1.6;}
+    .vh-mobile-mockup{display:none;}
     @media (max-width:1020px){
       .vh-wrap{padding-inline:32px;}
       .vh-grid{grid-template-columns:minmax(300px,.85fr) minmax(400px,1.15fr);gap:24px;min-height:430px;}
@@ -8372,25 +8457,65 @@ function EditorialHero() {
       .vh-values{display:grid;grid-template-columns:1fr;gap:9px;}
       .vh-value+.vh-value{margin-inline-start:0;padding-inline-start:0;border-inline-start:0;}
     }
+    @media (max-width:767px){
+      .vh-wrap{max-width:560px;padding:20px 16px 34px;overflow:hidden;}
+      .vh-grid{grid-template-columns:1fr;gap:0;min-height:0;}
+      .vh-left{display:contents;}
+      .vh-title{order:1;width:100%;max-width:none!important;box-sizing:border-box;margin:0!important;padding-inline:4px;text-align:right;font-size:clamp(26px,8vw,34px)!important;line-height:1.55!important;}
+      .vh-copy{order:2;width:100%;max-width:none!important;box-sizing:border-box;margin:13px 0 0!important;padding-inline:4px;color:#52525b!important;font-size:13px!important;line-height:2!important;text-align:right!important;}
+      .vh-right{order:3;width:100%;justify-content:center;margin-top:22px;}
+      .vh-right .vh-mockup{width:min(82vw,350px);aspect-ratio:885/1777;transform:none;}
+      .vh-desktop-mockup{display:none!important;}
+      .vh-mobile-mockup{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 18px 24px rgba(0,0,0,.20));}
+      .vh-values{order:4;display:grid;width:100%;grid-template-columns:1fr;gap:11px;margin-top:23px;padding-inline:4px;box-sizing:border-box;}
+      .vh-value{direction:rtl;justify-content:flex-start;gap:8px;color:#27272a;white-space:normal;}
+      .vh-value+.vh-value{margin-inline-start:0;padding-inline-start:0;border-inline-start:0;}
+      .vh-value svg{width:18px;height:18px;color:#18181b;}
+      .vh-value span{font-size:14px;font-weight:600;line-height:1.7;}
+      .vh-cta{order:5;width:100%;margin:24px 0 0;justify-content:center;}
+      .vh-main-cta{width:min(100%,340px);height:58px;box-shadow:0 10px 20px rgba(0,0,0,.10);}
+      .vh-main-cta.is-rtl>span:last-child{font-size:0;}
+      .vh-main-cta.is-rtl>span:last-child::after{content:"ورود به کتابخانه";font-size:14px;}
+    }
+    @media (min-width:440px) and (max-width:767px){
+      .vh-wrap{max-width:none;padding:36px 24px 42px;}
+      .vh-grid{grid-template-columns:minmax(0,1.05fr) minmax(205px,.95fr);gap:18px;align-items:center;}
+      .vh-left{display:grid;grid-column:1;grid-row:1;}
+      .vh-title{font-size:clamp(24px,4.8vw,34px)!important;line-height:1.55!important;padding:0;}
+      .vh-copy{display:block;margin-top:18px!important;padding:0;font-size:12.5px!important;line-height:2!important;overflow:visible;}
+      .vh-right{grid-column:2;grid-row:1;width:auto;margin:0;align-self:center;}
+      .vh-right .vh-mockup{width:min(100%,330px);}
+      .vh-values{display:grid;width:100%;grid-template-columns:1fr;gap:10px;margin-top:23px;padding:0;}
+      .vh-value span{font-size:13.5px;}
+      .vh-cta{width:100%;margin-top:23px;justify-content:flex-start;}
+      .vh-main-cta{width:min(100%,330px);min-width:0;}
+    }
+    @media(max-width:359px){
+      .vh-wrap{padding:16px 14px 30px;}
+      .vh-title{font-size:25px!important;}
+      .vh-copy{font-size:12.5px!important;}
+      .vh-right .vh-mockup{width:min(80vw,286px);}
+      .vh-value span{font-size:13px;}
+    }
   `;
 
   return (
-    <section data-screen-label="Hero" style={{ background: "var(--ed-paper)" }}>
+    <section className="landing-mobile-hero" data-screen-label="Hero" style={{ background: "var(--ed-paper)" }}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="vh-wrap">
         <div className="vh-grid">
           <div className="vh-left" dir={rtl ? "rtl" : "ltr"} style={{ textAlign: align }}>
-            <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "clamp(32px,3.1vw,40px)", lineHeight: 1.38, letterSpacing: 0, color: "var(--ed-ink)", maxWidth: 430, marginInlineEnd: "auto" }}>
+            <h1 className="vh-title" style={{ margin: 0, fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "clamp(32px,3.1vw,40px)", lineHeight: 1.38, letterSpacing: 0, color: "var(--ed-ink)", maxWidth: 430, marginInlineEnd: "auto" }}>
               {d.heroTitle.map((l, i) => (<React.Fragment key={i}>{i > 0 ? <br /> : null}{l}</React.Fragment>))}
             </h1>
-            <p style={{ margin: "20px 0 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: 2, color: "#3f3f46", maxWidth: 430, textAlign: rtl ? "right" : "left", marginInlineEnd: "auto", textWrap: "pretty" }}>
+            <p className="vh-copy" style={{ margin: "20px 0 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: 2, color: "#3f3f46", maxWidth: 430, textAlign: rtl ? "right" : "left", marginInlineEnd: "auto", textWrap: "pretty" }}>
               {d.heroSubNew}
             </p>
             <div className="vh-cta">
               <MotionButton rtl={rtl} onClick={() => {
                 trackEvent("landing_primary_cta_clicked", { authenticated: Boolean(getCachedSession()), intent: "general-entry" });
                 window.location.hash = getCachedSession() ? "#/dashboard" : buildAuthHash({ intent: "general-entry", returnTo: ROUTES.dashboard });
-              }} label={rtl ? "شروع با Vidora" : "Start with Vidora"} />
+              }} className={`vh-main-cta ${rtl ? "is-rtl" : "is-ltr"}`} aria-label={rtl ? "ورود به کتابخانه" : "Start with Vidora"} label={rtl ? "شروع با Vidora" : "Start with Vidora"} />
             </div>
             <div className="vh-values">
               {valueItems.map((label) => <div className="vh-value" key={label}><CheckCircle2 size={13} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span></div>)}
@@ -9615,7 +9740,7 @@ function Page() {
   }
   return (
     <React.Fragment>
-      <EditorialHeader />
+      <EditorialHeader mobileFloating />
       <EditorialHero />
       <LandingAddVideoSection />
       <LandingCategories />
