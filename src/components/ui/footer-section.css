@@ -110,9 +110,11 @@
 @media (max-width: 767px) {
   .vidora-public-footer {
     position: relative;
-    left: 50%;
-    width: 100vw;
-    margin-left: -50vw;
+    left: auto;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    box-sizing: border-box;
     padding-bottom: env(safe-area-inset-bottom);
   }
 

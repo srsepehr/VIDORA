@@ -5901,17 +5901,17 @@ function LandingCategories() {
 }
 
 function FeaturedVideoCard({ video }) {
+  const imageSrc = /^(?:https?:)?\/\//.test(video.image) || video.image.startsWith("/") ? video.image : landingAsset(video.image);
   return <a className="landing-video vidora-interactive-card" href={`#/watch/${video.slug}`}>
-    <span className="landing-video-visual vidora-interactive-media"><img src={landingAsset(video.image)} alt={video.alt} width="800" height="450" loading="lazy" style={{ objectPosition: video.position }} /><span className="landing-video-duration" dir="ltr">{video.duration}</span></span>
-    <span className="landing-video-content"><strong>{video.title}</strong><span className="landing-video-meta"><span dir="ltr">{video.speaker}</span><i aria-hidden="true">•</i><span>{video.meta}</span></span></span>
+    <span className="landing-video-visual vidora-interactive-media"><img src={imageSrc} alt={video.alt} width="800" height="450" loading="lazy" style={{ objectPosition: video.position }} /><span className="landing-video-duration" dir="ltr">{video.duration}</span></span>
+    <span className="landing-video-content"><strong>{video.title}</strong>{video.speaker || video.meta ? <span className="landing-video-meta">{video.speaker ? <span dir="ltr">{video.speaker}</span> : null}{video.speaker && video.meta ? <i aria-hidden="true">•</i> : null}{video.meta ? <span>{video.meta}</span> : null}</span> : null}</span>
   </a>;
 }
 
-function LandingSelectedVideos() {
+function LandingSelectedVideos({ videos: suppliedVideos = null, heading = null, showAction = true } = {}) {
   const { lang } = window.useLang();
   const rtl = lang === "fa";
-  const railRef = React.useRef(null);
-  const videos = rtl ? [
+  const defaultVideos = rtl ? [
     { title: "عادت‌های کوچک، تغییرات بزرگ", speaker: "Sam Altman", meta: "زیرنویس فارسی", duration: "28:31", image: "featured-video-3.jpg", alt: "پرتره سیاه و سفید سم آلتمن", position: "50% 36%", slug: "sam-altman-talk" },
     { title: "چطور در ۳۰ روز عادت جدید بسازیم", speaker: "Steve Jobs", meta: "زیرنویس فارسی", duration: "19:12", image: "featured-video-2.jpg", alt: "استیو جابز در حال سخنرانی", position: "54% 43%", slug: "product-builders" },
     { title: "آینده هوش مصنوعی و تأثیر آن بر انسان", speaker: "Elon Musk", meta: "زیرنویس فارسی", duration: "23:47", image: "featured-video-1.jpg", alt: "ایلان ماسک در یک گفت‌وگو", position: "50% 50%", slug: "future-of-ai" },
@@ -5920,6 +5920,9 @@ function LandingSelectedVideos() {
     { title: "How to build a new habit in 30 days", speaker: "Steve Jobs", meta: "Persian subtitles", duration: "19:12", image: "featured-video-2.jpg", alt: "Steve Jobs speaking on stage", position: "54% 43%", slug: "product-builders" },
     { title: "Artificial intelligence and its impact on humanity", speaker: "Elon Musk", meta: "Persian subtitles", duration: "23:47", image: "featured-video-1.jpg", alt: "Elon Musk in conversation", position: "50% 50%", slug: "future-of-ai" },
   ];
+  const videos = suppliedVideos || defaultVideos;
+  const railRef = React.useRef(null);
+  if (videos.length === 0) return null;
   const scroll = (direction) => railRef.current?.scrollBy({ left: direction * Math.max(280, railRef.current.clientWidth * .72), behavior: "smooth" });
   return (
     <section className="landing-selected" dir={rtl ? "rtl" : "ltr"}>
@@ -5927,10 +5930,10 @@ function LandingSelectedVideos() {
         .landing-selected{background:#fff;color:#111}.landing-selected-in{position:relative;max-width:1280px;margin:auto;padding:0 48px 70px}.landing-video-rail{display:flex;gap:18px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}.landing-video-rail::-webkit-scrollbar{display:none}.landing-video{flex:0 0 calc((100% - 36px)/3);min-width:0;overflow:hidden;border:1px solid #dedee2;border-radius:8px;background:#fff;color:#18181b;text-decoration:none;scroll-snap-align:start}.landing-video:hover{border-color:#a1a1aa}.landing-video-visual{position:relative;display:block;aspect-ratio:16/8.8;overflow:hidden;background:#111}.landing-video-visual img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1)}.landing-video-duration{position:absolute;inset-inline-start:10px;bottom:9px;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.85);color:#fff;font-size:10.5px}.landing-video-content{display:block;padding:14px 16px 15px}.landing-video-content strong{display:-webkit-box;min-height:44px;overflow:hidden;font-size:14.5px;line-height:1.55;-webkit-line-clamp:2;-webkit-box-orient:vertical}.landing-video-meta{display:flex;align-items:center;gap:8px;margin-top:9px;color:#71717a;font-size:10.5px}.landing-video-meta i{font-style:normal;color:#a1a1aa}.landing-carousel-arrow{position:absolute;top:calc(50% - 8px);left:6px;z-index:2;display:grid;width:34px;height:34px;place-items:center;border:1px solid #dedee2;border-radius:999px;background:#fff;color:#18181b;cursor:pointer}.landing-carousel-arrow:disabled{cursor:default;opacity:.42}.landing-selected-action{display:flex;justify-content:center;margin-top:26px}@media(max-width:900px){.landing-video{flex-basis:calc((100% - 18px)/2)}}@media(max-width:767px){.landing-selected-in{overflow:hidden;padding:0 16px 54px}.landing-centered-heading{margin-bottom:22px}.landing-video-rail{gap:12px;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}.landing-video{flex:0 0 clamp(270px,82vw,360px);border-radius:7px}.landing-video-content{padding:10px 12px 11px}.landing-video-content strong{min-height:0;font-size:13px;line-height:1.6}.landing-video-meta{gap:6px;margin-top:6px;font-size:9.5px}.landing-video-duration{inset-inline-start:7px;bottom:7px;padding:2px 5px;font-size:9px}.landing-carousel-arrow{display:none}.landing-selected-action{margin-top:22px}.landing-selected-action>button{width:min(100%,286px);min-width:0}}@media(max-width:340px){.landing-selected-in{padding-inline:14px}.landing-video{flex-basis:clamp(264px,85vw,280px)}}
       `}</style>
       <div className="landing-selected-in">
-        <LandingSectionHeading>{rtl ? "ویدیوهای منتخب" : "Featured videos"}</LandingSectionHeading>
+        <LandingSectionHeading>{heading || (rtl ? "ویدیوهای منتخب" : "Featured videos")}</LandingSectionHeading>
         <button className="landing-carousel-arrow is-prev" aria-label={rtl ? "ویدیوهای قبلی" : "Previous videos"} onClick={() => scroll(-1)}><ArrowLeft size={17} /></button>
         <div className="landing-video-rail" ref={railRef} tabIndex="0" aria-label={rtl ? "ویدیوهای منتخب" : "Featured videos"} onKeyDown={(event) => { if (event.key === "ArrowLeft") scroll(-1); if (event.key === "ArrowRight") scroll(1); }}>{videos.map((video) => <FeaturedVideoCard key={video.slug} video={video} />)}</div>
-        <div className="landing-selected-action"><MotionButton rtl={rtl} onClick={() => { window.location.hash = "#/library"; }} label={rtl ? "مشاهده همه ویدیوها" : "View all videos"} /></div>
+        {showAction ? <div className="landing-selected-action"><MotionButton rtl={rtl} onClick={() => { window.location.hash = "#/library"; }} label={rtl ? "مشاهده همه ویدیوها" : "View all videos"} /></div> : null}
       </div>
     </section>
   );
@@ -8127,7 +8130,9 @@ function EditorialHeader({ mode = "landing", navItems = null, search = null, ton
         boxSizing: "border-box",
         maxWidth: floating ? 960 : 1280,
         borderRadius: floating ? "var(--radius-md)" : 0,
-        border: floating ? `1px solid ${borderColor}` : "1px solid transparent",
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderColor: floating ? borderColor : "transparent",
         borderBottomColor: (scrolled || open || dark) && !floating ? borderColor : (floating ? borderColor : "transparent"),
         background: headerBg,
         backdropFilter: floating || open || dark ? "blur(14px)" : "none",

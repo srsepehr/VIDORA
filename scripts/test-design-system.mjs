@@ -4,9 +4,11 @@ import test from 'node:test';
 
 const mainSource = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 const librarySource = readFileSync(new URL('../src/library.jsx', import.meta.url), 'utf8');
+const libraryDataSource = readFileSync(new URL('../src/lib/library-data.ts', import.meta.url), 'utf8');
 const motionButtonSource = readFileSync(new URL('../src/components/ui/motion-button.tsx', import.meta.url), 'utf8');
 const interactionSource = readFileSync(new URL('../src/components/ui/interactive-card.css', import.meta.url), 'utf8');
 const footerSource = readFileSync(new URL('../src/components/ui/footer-section.tsx', import.meta.url), 'utf8');
+const footerStyles = readFileSync(new URL('../src/components/ui/footer-section.css', import.meta.url), 'utf8');
 
 test('motion button is a reusable RTL-aware design-system control', () => {
   assert.match(motionButtonSource, /export interface MotionButtonProps/);
@@ -64,7 +66,7 @@ test('public headers use the landing header and link the wordmark home', () => {
   assert.match(mainSource, /className="vidora-wordmark-link"/);
   assert.match(mainSource, /aria-label=\{lang === "fa" \? "بازگشت به صفحه اصلی Vidora"/);
   assert.match(librarySource, /const Header = window\.EditorialHeader/);
-  assert.match(librarySource, /return Header \? <Header \/> : null/);
+  assert.match(librarySource, /return Header \? <Header layoutDirection="ltr" mobileFloating \/> : null/);
   assert.doesNotMatch(librarySource, /search=\{/);
   assert.doesNotMatch(librarySource, /<header className="lib-head">/);
 });
@@ -80,9 +82,25 @@ test('library hero and search retain their pre-change dimensions', () => {
 
 test('clickable cards share semantic links and the reusable interaction pattern', () => {
   assert.match(mainSource, /<a className="landing-category-card vidora-interactive-card"/);
-  assert.match(librarySource, /className="lib-cat-card vidora-interactive-card"/);
+  assert.match(librarySource, /const Categories = window\.LandingCategories/);
+  assert.match(librarySource, /return Categories \? <Categories \/> : null/);
   assert.match(interactionSource, /translateY\(var\(--vidora-card-lift\)\)/);
   assert.match(interactionSource, /scale\(1\.025\)/);
   assert.match(interactionSource, /prefers-reduced-motion: reduce/);
   assert.match(interactionSource, /focus-visible/);
+});
+
+test('library video sections use public metadata without mock fallbacks', () => {
+  assert.match(libraryDataSource, /library_video_metadata/);
+  assert.match(librarySource, /fetchPublishedLibraryVideos/);
+  assert.match(librarySource, /const SelectedVideos = window\.LandingSelectedVideos/);
+  assert.match(librarySource, /!videosLoading && visibleVideos\.length > 0/);
+  assert.doesNotMatch(librarySource, /const VIDEOS\s*=/);
+  assert.doesNotMatch(librarySource, /viewsK|progress:/);
+});
+
+test('mobile footer full bleed stays inside its containing block', () => {
+  assert.match(footerStyles, /@media \(max-width: 767px\)[\s\S]*?\.vidora-public-footer \{[\s\S]*?width: 100%;[\s\S]*?max-width: 100%;/);
+  assert.doesNotMatch(footerStyles, /width:\s*100vw/);
+  assert.doesNotMatch(footerStyles, /margin-left:\s*-50vw/);
 });

@@ -1,45 +1,28 @@
 // Vidora Library — public monochrome content-discovery page (#/library), the
 // dedicated watch route (#/watch/:slug), and the search route (#/search?q=).
-// Main page flow: Hero → Browse by Category → Trending → New on Vidora →
-// Continue Watching → Footer. All Videos is a dedicated #/library/all view.
-// Search and filters live below the featured Library banner.
-// Strictly black / white / neutral gray. All copy lives in
-// src/locales/{en,fa}/library.json; language follows the site-wide selector.
+// The public page reuses the homepage header, category, and video components;
+// all video surfaces are backed by published metadata and disappear when empty.
+// Strictly black / white / neutral gray. Language follows the site-wide selector.
 import React from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  BarChart3,
-  BrainCircuit,
-  Building2,
   ChevronLeft,
   ChevronRight,
-  Clock3,
-  Code2,
-  Cpu,
-  FlaskConical,
-  Folder,
-  Languages,
-  LayoutGrid,
-  ListVideo,
   Lock,
   MessageSquare,
-  Package,
   Play,
-  Rocket,
   Search,
   Send,
   Share2,
   SlidersHorizontal,
-  Sparkles,
-  TrendingUp,
-  User,
 } from "lucide-react";
 import enDict from "./locales/en/library.json";
 import faDict from "./locales/fa/library.json";
 import { getCachedSession, restoreAuthSession, subscribeAuthState } from "./lib/auth";
 import { buildAuthHash, createAuthIntent, persistAuthIntent } from "./lib/auth-intent";
 import { trackEvent } from "./lib/analytics";
+import { fetchPublishedLibraryVideos } from "./lib/library-data";
 import { canWatchLibraryVideo, resolveSubscriptionState } from "./lib/subscription-access";
 import { fetchActiveSubscription } from "./lib/user-data";
 import { VidoraFooter } from "./components/ui/footer-section";
@@ -90,135 +73,79 @@ function pushRecentSearch(q) {
 }
 
 // ---------------------------------------------------------------------------
-// Curated public seed content until a library CMS/API is connected.
+// Editorial banners remain local; every video record comes from the public
+// Supabase metadata view and is never filled with seed or fallback content.
 // ---------------------------------------------------------------------------
 
-const CAT_ICONS = {
-  ai: BrainCircuit,
-  startups: Rocket,
-  tech: Cpu,
-  product: Package,
-  companies: Building2,
-  founders: User,
-  science: FlaskConical,
-  language: Languages,
+const TOPICS = ["ai", "startups", "tech", "product", "companies", "founders", "science", "language"];
+const BROWSE_TOPICS = ["ai", "product", "language", "business"];
+
+const BASE = () => import.meta.env.BASE_URL;
+const BANNER_IMAGE = {
+  src: "images/library/library-banner-savant-ai.jpg",
+  position: "center 42%",
 };
-
-// rotating monochrome thumbnail gradients (kept dark & calm)
-const TONES = [
-  "linear-gradient(160deg,#26262c 0%,#101014 62%,#0a0a0d 100%)",
-  "linear-gradient(200deg,#1c1c22 0%,#0e0e12 55%,#131318 100%)",
-  "linear-gradient(150deg,#30303a 0%,#14141a 45%,#0a0a0d 100%)",
-  "linear-gradient(210deg,#222228 0%,#0c0c10 70%)",
-  "linear-gradient(140deg,#191920 0%,#26262e 40%,#0b0b0f 100%)",
-];
-
-const V = (slug, fa, en, category, type, durationMin, viewsK, access, addedAt, extra = {}) => ({
-  slug,
-  title: { fa, en },
-  category,
-  type,
-  durationMin,
-  viewsK,
-  access,
-  addedAt,
-  ...extra,
-});
-
-const VIDEOS = [
-  V("future-of-ai", "آینده هوش مصنوعی", "The Future of Artificial Intelligence", "ai", "documentary", 38, 112, "preview", "2026-07-04", {
-    featured: true,
+const HERO_BANNERS = [
+  {
+    key: "future-of-ai",
+    title: { fa: "آینده هوش مصنوعی", en: "The Future of Artificial Intelligence" },
     desc: {
       fa: "نگاهی روشن به ابزارهای جدید هوش مصنوعی، تغییرات بازار کار و مهارت‌هایی که امروز باید یاد بگیریم.",
       en: "A clear look at new AI tools, changes in the job market, and the skills worth learning today.",
     },
-  }),
-  V("sam-altman-talk", "گفت‌وگو با سم آلتمن", "A Conversation with Sam Altman", "ai", "interview", 55, 120, "subscription", "2026-07-02", {
-    featured: true,
+  },
+  {
+    key: "sam-altman-talk",
+    title: { fa: "گفت‌وگو با سم آلتمن", en: "A Conversation with Sam Altman" },
     desc: {
       fa: "گفت‌وگویی بلند درباره آینده مدل‌ها، محصول‌سازی با AI و مسیر پیش روی سازندگان.",
       en: "A long-form conversation about the future of models, building with AI, and the road ahead for builders.",
     },
-  }),
-  V("building-giants", "داستان ساخت شرکت‌های بزرگ", "How the Giants Were Built", "companies", "documentary", 55, 89, "subscription", "2026-06-28", {
-    featured: true,
+  },
+  {
+    key: "building-giants",
+    title: { fa: "داستان ساخت شرکت‌های بزرگ", en: "How the Giants Were Built" },
     desc: {
       fa: "از گاراژ تا غول فناوری؛ روایت تصمیم‌های کوچکی که شرکت‌های بزرگ را ساختند.",
       en: "From garage to giant — the small decisions that built the world's biggest companies.",
     },
-  }),
-  V("openai-history", "تاریخچه OpenAI", "The History of OpenAI", "companies", "documentary", 61, 154, "subscription", "2026-06-20", {
-    banner: true,
-    desc: {
-      fa: "مستندی درباره شکل‌گیری OpenAI؛ از آزمایشگاه پژوهشی تا تأثیرگذارترین شرکت هوش مصنوعی جهان.",
-      en: "A documentary on the making of OpenAI — from research lab to the world's most influential AI company.",
-    },
-  }),
-  V("how-ai-agents-work", "AI Agentها چگونه کار می‌کنند", "How AI Agents Work", "ai", "course", 24, 64, "free", "2026-07-06", { progress: 45 }),
-  V("startup-pricing", "استراتژی قیمت‌گذاری برای استارتاپ‌ها", "Pricing Strategy for Startups", "startups", "course", 42, 71, "subscription", "2026-07-05", { progress: 62 }),
-  V("founder-paths", "مسیر رشد بنیان‌گذاران", "The Founder's Growth Path", "founders", "biography", 47, 38, "preview", "2026-06-30"),
-  V("product-builders", "درس‌هایی از سازندگان محصول", "Lessons from Product Builders", "product", "interview", 33, 27, "free", "2026-06-26"),
-  V("ai-economics", "اقتصاد هوش مصنوعی", "The Economics of AI", "ai", "documentary", 29, 44, "subscription", "2026-06-24"),
-  V("successful-products", "چگونه محصولات موفق ساخته می‌شوند", "How Successful Products Are Made", "product", "course", 36, 52, "free", "2026-06-22"),
-  V("future-of-work", "آینده بازار کار", "The Future of Work", "startups", "documentary", 31, 76, "preview", "2026-06-18"),
-  V("entrepreneur-decisions", "زندگی و تصمیم‌های کارآفرینان بزرگ", "Decisions of Great Entrepreneurs", "founders", "biography", 58, 41, "subscription", "2026-06-15"),
-  V("english-with-video", "یادگیری زبان با ویدیوهای واقعی", "Learning Languages with Real Videos", "language", "course", 22, 33, "free", "2026-06-12"),
-  V("tech-trends", "روندهای فناوری ۲۰۲۶", "Tech Trends 2026", "tech", "news", 27, 58, "preview", "2026-06-10"),
-  V("world-economy", "مرور اقتصاد جهان", "World Economy Brief", "startups", "news", 18, 21, "free", "2026-06-08"),
-  V("design-thinking", "تفکر طراحی در عمل", "Design Thinking in Practice", "product", "course", 40, 30, "subscription", "2026-06-05"),
-  V("space-science", "علم فضا برای همه", "Space Science for Everyone", "science", "documentary", 44, 66, "preview", "2026-06-02", { progress: 15 }),
-  V("bootstrapping", "رشد بدون سرمایه‌گذار", "Growing Without Investors", "startups", "interview", 35, 25, "free", "2026-05-28"),
-  V("brand-story", "چگونه برند ساخته می‌شود", "How Brands Are Built", "startups", "course", 30, 19, "subscription", "2026-05-24"),
-  V("ai-in-schools", "هوش مصنوعی در آموزش", "AI in Education", "ai", "news", 26, 35, "free", "2026-05-20"),
+  },
 ];
-
-const HERO_SLUGS = ["future-of-ai", "sam-altman-talk", "building-giants"];
-const EDITORS_PICK_SLUG = "openai-history";
-const TOPICS = ["ai", "startups", "tech", "product", "companies", "founders", "science", "language"];
-const BROWSE_TOPICS = ["ai", "product", "language", "business"];
-const TYPES = ["course", "interview", "documentary", "news", "biography"];
-const NEWEST = [...VIDEOS].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 5);
-
-const bySlug = (slug) => VIDEOS.find((v) => v.slug === slug);
-const toneOf = (video) => TONES[VIDEOS.indexOf(video) % TONES.length];
-
-const BASE = () => import.meta.env.BASE_URL;
-const HERO_MEDIA = {
-  "future-of-ai": { src: "uploads/vidora_learning_woman_photo.jpg", position: "center 44%", flip: true },
-  "sam-altman-talk": { src: "uploads/vidora_hero_walking_man_background_1600x850.png", position: "center", flip: true },
-  "building-giants": { src: "uploads/vidora_hero_man_photo.png", position: "center top", flip: true },
-};
-const BANNER_IMAGE = "uploads/IMG_0766.JPG";
 
 const LIBRARY_GROUPS = [
-  { key: "ai", categories: ["ai", "tech", "science"], icon: BrainCircuit, image: "uploads/1.png" },
-  { key: "product", categories: ["product", "companies"], icon: Code2, image: "uploads/Screenshot 2026-07-06 at 10.54.39.png" },
-  { key: "language", categories: ["language"], icon: Languages, image: "uploads/vidora_learning_woman_photo.jpg" },
-  { key: "business", categories: ["startups", "founders"], icon: BarChart3, image: "uploads/vidora_hero_walking_man_background_1600x850.png" },
-];
-
-const VIDEO_VISUALS = [
-  "uploads/1.png",
-  "uploads/vidora_learning_woman_photo.jpg",
-  "uploads/vidora_hero_man_photo.png",
-  "uploads/Screenshot 2026-07-06 at 10.54.39.png",
-  "uploads/vidora_hero_walking_man_background_1600x850.png",
-  "uploads/IMG_0765.JPG",
+  { key: "ai", categories: ["ai", "tech", "science"] },
+  { key: "product", categories: ["product", "companies"] },
+  { key: "language", categories: ["language"] },
+  { key: "business", categories: ["startups", "founders"] },
 ];
 
 const groupFor = (key) => LIBRARY_GROUPS.find((group) => group.key === key);
 const matchesTopic = (video, key) => key === "all" || (groupFor(key)?.categories || [key]).includes(video.category);
-const imageOf = (video) => VIDEO_VISUALS[Math.max(0, VIDEOS.indexOf(video)) % VIDEO_VISUALS.length];
+const imageUrl = (source) => /^(?:https?:)?\/\//.test(source) || source.startsWith("/") ? source : `${BASE()}${source}`;
+const bySlug = (videos, slug) => videos.find((video) => video.slug === slug);
 
-const GENERIC_DESC = {
-  fa: "در این ویدیوی آموزشی، مفاهیم کلیدی با زیرنویس فارسی، خلاصه هوشمند و نکات کاربردی ارائه می‌شود.",
-  en: "In this learning video, the key ideas come with Persian subtitles, a smart summary, and practical takeaways.",
-};
+const normalizeLibraryVideo = (row) => ({
+  slug: row.id,
+  title: { fa: row.title_fa, en: row.title_fa },
+  desc: { fa: row.description_fa, en: row.description_fa },
+  category: row.category_slug,
+  categoryTitleFa: row.category_title_fa,
+  durationMin: Math.max(1, Math.ceil(row.duration_seconds / 60)),
+  durationSeconds: row.duration_seconds,
+  access: row.is_premium ? "subscription" : "free",
+  addedAt: row.created_at,
+  sortOrder: row.sort_order,
+  thumbnailUrl: imageUrl(row.thumbnail_url),
+});
 
-function searchVideos(query) {
+function searchVideos(videos, query) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return VIDEOS.filter((v) => v.title.fa.toLowerCase().includes(q) || v.title.en.toLowerCase().includes(q));
+  return videos.filter((video) => (
+    video.title.fa.toLowerCase().includes(q)
+    || video.title.en.toLowerCase().includes(q)
+    || video.desc.fa.toLowerCase().includes(q)
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -373,14 +300,6 @@ const CSS = `
 .lib-cw-sub{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--mut)}
 .lib-cw-resume{font-weight:750;color:#fff;display:inline-flex;align-items:center;gap:5px}
 
-/* browse by category */
-.lib-cats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-top:26px}
-.lib-cat-card{border:1px solid var(--line);border-radius:14px;background:var(--s1);padding:20px 16px;display:grid;gap:12px;justify-items:center;text-align:center;min-width:0}
-.lib-cat-card:hover{border-color:rgba(255,255,255,.32);background:var(--s2)}
-.lib-cat-icon{width:46px;height:46px;border-radius:999px;background:var(--s3);border:1px solid var(--line2);display:grid;place-items:center;color:#e6e6ec}
-.lib-cat-name{font-size:13px;font-weight:750;line-height:1.5}
-.lib-cat-count{font-size:11.5px;color:var(--mut2)}
-
 /* editor's pick (compact banner) */
 .lib-banner{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
 .lib-banner-media{position:absolute;inset:0;background-size:cover;background-position:center 30%;filter:grayscale(1)}
@@ -434,7 +353,6 @@ const CSS = `
   .lib-hero-box{max-width:60%}
   .lib-banner-box{max-width:70%}
   .lib-cw-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .lib-cats{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:760px){
   .lib-wrap{padding-inline:18px}
@@ -451,7 +369,6 @@ const CSS = `
   .lib-banner-in{min-height:0;padding:26px 18px}
   .lib-arrow{display:none}
   .lib-cw-grid{grid-template-columns:1fr}
-  .lib-cats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lib-controls-row .lib-select{flex:1}
   .lib-toasts{inset-inline:14px;bottom:14px}
 }
@@ -534,17 +451,6 @@ const CSS = `
 .is-library .lib-view-all{color:#111;font-size:12px;font-weight:700;white-space:nowrap}
 .is-library .lib-view-all:hover{text-decoration:underline;text-underline-offset:4px}
 .is-library .lib-view-all:focus-visible{outline:2px solid #111;outline-offset:5px;border-radius:2px}
-.is-library .lib-cats{grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:26px;margin-top:24px}
-.is-library .lib-cat-card{display:flex;height:100%;padding:0;border:1px solid #ddd;border-radius:10px;background:#fff;text-align:start;overflow:hidden;flex-direction:column}
-.is-library .lib-cat-card:hover{background:#fff;border-color:#aaa}
-.is-library .lib-cat-media{display:block;position:relative;aspect-ratio:2/1;background:#eee}
-.is-library .lib-cat-media img{width:100%;height:100%;display:block;object-fit:cover;filter:grayscale(1)}
-.is-library .lib-cat-icon{position:absolute;inset-inline-start:16px;bottom:-18px;width:42px;height:42px;border-radius:8px;background:#111;border:1px solid #111;color:#fff}
-.is-library .lib-cat-body{display:flex;min-height:130px;flex:1;flex-direction:column;gap:7px;padding:29px 18px 14px}
-.is-library .lib-cat-name{font-size:15px;color:#111}
-.is-library .lib-cat-desc{display:-webkit-box;min-height:44px;overflow:hidden;font-size:12.5px;color:#555;line-height:1.75;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.is-library .lib-cat-link{margin-top:auto}
-
 .is-library .lib-media-tools{display:flex;align-items:center;gap:10px;margin-top:22px}
 .is-library .lib-chips{margin-top:0;flex:1;justify-content:flex-start;gap:9px}
 .is-library .lib-chip{height:38px;color:#444;border-color:#ddd;background:#fff;padding-inline:18px;font-weight:500}
@@ -638,7 +544,6 @@ const CSS = `
 @media(max-width:1100px){
   .is-library .lib-wrap,.is-library .lib-hero-shell{padding-inline:28px}
   .is-library .lib-hero-in{padding-inline:60px}.is-library .lib-hero-box{max-width:58%}
-  .is-library .lib-cats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .is-library .lib-row{grid-auto-columns:calc((100% - 18px)/2)}
   .is-library .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .is-library .lib-watch-grid{grid-template-columns:1fr;grid-template-areas:"video" "assistant";gap:18px}
@@ -659,7 +564,6 @@ const CSS = `
   .is-library .lib-search-row{grid-template-columns:1fr auto;gap:10px;margin-top:20px}
   .is-library .lib-page-search{height:48px;padding-inline:10px}.is-library .lib-filter-btn{height:48px;min-width:48px;width:48px;padding:0;font-size:0}
   .is-library .lib-section{margin-top:48px}.is-library .lib-sec-title{font-size:21px}
-  .is-library .lib-cats{grid-template-columns:1fr;gap:16px}.is-library .lib-cat-media{aspect-ratio:2.05/1}
   .is-library .lib-media-tools{align-items:stretch;flex-direction:column-reverse}
   .is-library .lib-chips{width:100%;justify-content:flex-start}.is-library .lib-select{width:100%}
   .is-library .lib-row{grid-auto-columns:84%;gap:13px}
@@ -685,7 +589,18 @@ function LibraryProvider({ children, surface = "default" }) {
   const rtl = lang === "fa";
   const t = React.useMemo(() => makeT(lang), [lang]);
   const [access, setAccess] = React.useState({ loading: true, session: getCachedSession(), subscription: null });
+  const [libraryState, setLibraryState] = React.useState({ loading: true, videos: [] });
   const [toasts, setToasts] = React.useState([]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    fetchPublishedLibraryVideos(controller.signal)
+      .then((rows) => setLibraryState({ loading: false, videos: rows.map(normalizeLibraryVideo) }))
+      .catch((error) => {
+        if (error?.name !== "AbortError") setLibraryState({ loading: false, videos: [] });
+      });
+    return () => controller.abort();
+  }, []);
 
   React.useEffect(() => {
     let alive = true;
@@ -717,7 +632,7 @@ function LibraryProvider({ children, surface = "default" }) {
 
   const catName = (key) => t(`categories.${key}`);
   const title = (video) => video.title[lang] || video.title.en;
-  const desc = (video) => (video.desc ? video.desc[lang] || video.desc.en : GENERIC_DESC[lang] || GENERIC_DESC.en);
+  const desc = (video) => video.desc[lang] || video.desc.en;
 
   const subscriptionState = resolveSubscriptionState({
     loading: access.loading,
@@ -733,6 +648,8 @@ function LibraryProvider({ children, surface = "default" }) {
     session: access.session,
     subscription: access.subscription,
     subscriptionState,
+    videos: libraryState.videos,
+    videosLoading: libraryState.loading,
     showToast,
     catName,
     title,
@@ -756,13 +673,13 @@ function LibraryProvider({ children, surface = "default" }) {
 }
 
 // ---------------------------------------------------------------------------
-// Header — logo stays physically left; search expands in place with a live
-// results overlay (no page scrolling), recent searches, keyboard navigation.
+// Header — the homepage component is the single source of truth for layout,
+// floating behavior, menu interaction, and responsive presentation.
 // ---------------------------------------------------------------------------
 
 function LibraryHeader() {
   const Header = window.EditorialHeader;
-  return Header ? <Header /> : null;
+  return Header ? <Header layoutDirection="ltr" mobileFloating /> : null;
 }
 // ---------------------------------------------------------------------------
 // Primitives — one standard media card + one compact progress card
@@ -770,27 +687,16 @@ function LibraryHeader() {
 
 function VideoCard({ video, flag, landscape = false }) {
   const { t, lang, catName, title } = useLib();
-  const Icon = CAT_ICONS[video.category] || Sparkles;
-  const extra = flag || (video.progress ? t("card.watching") : video.viewsK >= 40 ? t("card.views", { count: fmtNum(lang, video.viewsK) }) : null);
   return (
     <a className={`lib-card vidora-interactive-card vidora-interactive-card--flat${landscape ? " is-landscape" : ""}`} href={`#/watch/${video.slug}`} aria-label={title(video)}>
       <span className="lib-thumb vidora-interactive-media">
-        {landscape ? <img className="lib-thumb-image" src={`${BASE()}${imageOf(video)}`} alt="" /> : (
-          <span className="lib-thumb-art" style={{ background: toneOf(video) }}>
-            <Icon size={72} strokeWidth={1.1} />
-          </span>
-        )}
+        <img className="lib-thumb-image" src={video.thumbnailUrl} alt={title(video)} />
         <span className="lib-thumb-shade" />
         <span className="lib-play-overlay">
           <span className="lib-play-circle">
             <Play size={19} style={{ marginInlineStart: 2 }} />
           </span>
         </span>
-        {video.progress ? (
-          <span className="lib-progress" dir="ltr">
-            <span style={{ width: `${video.progress}%` }} />
-          </span>
-        ) : null}
         {landscape ? <span className="lib-duration" dir="ltr">{video.durationMin}:00</span> : null}
       </span>
       <span className="lib-card-title">{title(video)}</span>
@@ -799,32 +705,7 @@ function VideoCard({ video, flag, landscape = false }) {
         <span>·</span>
         <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
       </span>
-      <span className="lib-card-extra">{extra || " "}</span>
-    </a>
-  );
-}
-
-function ContinueCard({ video }) {
-  const { t, lang, title } = useLib();
-  const Icon = CAT_ICONS[video.category] || Sparkles;
-  const remaining = Math.max(1, Math.round((video.durationMin * (100 - video.progress)) / 100));
-  return (
-    <a className="lib-cw-card vidora-interactive-card" href={`#/watch/${video.slug}`} aria-label={title(video)}>
-      <span className="lib-cw-thumb vidora-interactive-media" style={{ background: toneOf(video) }}>
-        <Icon size={24} strokeWidth={1.3} />
-      </span>
-      <span className="lib-cw-body">
-        <span className="lib-cw-title">{title(video)}</span>
-        <span className="lib-cw-meter" dir="ltr">
-          <span style={{ width: `${video.progress}%` }} />
-        </span>
-        <span className="lib-cw-sub">
-          <span>{t("continueWatching.remaining", { minutes: fmtNum(lang, remaining) })}</span>
-          <span className="lib-cw-resume">
-            <Play size={11} /> {t("continueWatching.resume")}
-          </span>
-        </span>
-      </span>
+      <span className="lib-card-extra">{flag || " "}</span>
     </a>
   );
 }
@@ -906,43 +787,19 @@ function VideoCarousel({ videos, loading, ariaLabel, flagFor, landscape = false 
   );
 }
 
-function CategoryChips({ active, onChange, keys, max = 6 }) {
-  const { t, catName } = useLib();
-  const [expanded, setExpanded] = React.useState(false);
-  const visible = expanded ? keys : keys.slice(0, max);
-  return (
-    <div className="lib-chips" role="tablist">
-      <button className={`lib-chip${active === "all" ? " is-active" : ""}`} role="tab" aria-selected={active === "all"} onClick={() => onChange("all")}>
-        {t("categories.all")}
-      </button>
-      {visible.map((key) => (
-        <button key={key} className={`lib-chip${active === key ? " is-active" : ""}`} role="tab" aria-selected={active === key} onClick={() => onChange(key)}>
-          {groupFor(key) ? t(`libraryPage.groups.${key}.short`) : catName(key)}
-        </button>
-      ))}
-      {!expanded && keys.length > max ? (
-        <button className="lib-chip" onClick={() => setExpanded(true)}>
-          {t("trending.more")} +
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Sections
 // ---------------------------------------------------------------------------
 
-function FeaturedHero({ loading }) {
-  const { t, lang, rtl, title, desc, catName } = useLib();
+function FeaturedHero() {
+  const { t, rtl, title, desc } = useLib();
   const [slide, setSlide] = React.useState(0);
   const [previousSlide, setPreviousSlide] = React.useState(null);
   const [transitionId, setTransitionId] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const transitionTimerRef = React.useRef(null);
-  const items = HERO_SLUGS.map(bySlug);
+  const items = HERO_BANNERS;
   const video = items[slide];
-  const media = HERO_MEDIA[video.slug];
   const selectSlide = React.useCallback((target) => {
     if (target === slide) return;
     window.clearTimeout(transitionTimerRef.current);
@@ -958,20 +815,6 @@ function FeaturedHero({ loading }) {
     return () => window.clearInterval(timer);
   }, [move, paused]);
   React.useEffect(() => () => window.clearTimeout(transitionTimerRef.current), []);
-  if (loading) {
-    return (
-      <div className="lib-hero-shell"><div className="lib-hero">
-        <div className="lib-hero-in">
-          <div className="lib-hero-box" style={{ width: "100%" }}>
-            <div className="lib-skel lib-skel-line" style={{ width: 130 }} />
-            <div className="lib-skel" style={{ height: 52, width: "78%" }} />
-            <div className="lib-skel lib-skel-line" style={{ width: "94%" }} />
-            <div className="lib-skel lib-skel-line" style={{ width: "60%" }} />
-          </div>
-        </div>
-      </div></div>
-    );
-  }
   return (
     <div className="lib-hero-shell">
       <section
@@ -983,57 +826,33 @@ function FeaturedHero({ loading }) {
       >
         {previousSlide !== null ? (
           <img
-            className={`lib-hero-media is-previous${HERO_MEDIA[items[previousSlide].slug].flip ? " is-flipped" : ""}`}
-            src={`${BASE()}${HERO_MEDIA[items[previousSlide].slug].src}`}
+            className="lib-hero-media is-previous"
+            src={`${BASE()}${BANNER_IMAGE.src}`}
             alt=""
             aria-hidden="true"
-            style={{ objectPosition: HERO_MEDIA[items[previousSlide].slug].position }}
+            style={{ objectPosition: BANNER_IMAGE.position }}
           />
         ) : null}
         <img
-          key={`${video.slug}-${transitionId}`}
-          className={`lib-hero-media is-current${previousSlide !== null ? " is-revealing" : ""}${media.flip ? " is-flipped" : ""}`}
-          src={`${BASE()}${media.src}`}
+          key={`${video.key}-${transitionId}`}
+          className={`lib-hero-media is-current${previousSlide !== null ? " is-revealing" : ""}`}
+          src={`${BASE()}${BANNER_IMAGE.src}`}
           alt={title(video)}
-          style={{ objectPosition: media.position }}
+          style={{ objectPosition: BANNER_IMAGE.position }}
         />
         {previousSlide !== null ? <span key={transitionId} className="lib-hero-glass-wave" aria-hidden="true" /> : null}
         <div className="lib-hero-shade" />
         <div className="lib-hero-in">
-          <div key={video.slug} className={`lib-hero-box${previousSlide !== null ? " is-revealing" : ""}`}>
+          <div key={video.key} className={`lib-hero-box${previousSlide !== null ? " is-revealing" : ""}`}>
             <p className="lib-hero-label">{t("libraryPage.hero.eyebrow")}</p>
             <h1 className="lib-hero-title">{title(video)}</h1>
             <p className="lib-hero-desc">{desc(video)}</p>
-            <div className="lib-hero-meta">
-              <Folder size={15} />
-              <span>{catName(video.category)}</span>
-              <span>·</span>
-              <Clock3 size={15} />
-              <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            </div>
-            <div className="lib-hero-cta">
-              <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
-                {t("libraryPage.hero.watch")} <Play size={17} />
-              </a>
-            </div>
           </div>
         </div>
         <button className="lib-hero-arrow is-prev" aria-label={t("trending.prev")} onClick={() => move(-1)}>{rtl ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}</button>
         <button className="lib-hero-arrow is-next" aria-label={t("trending.next")} onClick={() => move(1)}>{rtl ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}</button>
       </section>
     </div>
-  );
-}
-
-function ContinueWatching() {
-  const { t, viewer } = useLib();
-  const videos = VIDEOS.filter((video) => video.progress > 0 && video.progress < 100);
-  if (viewer === "guest" || videos.length === 0) return null;
-  return (
-    <section className="lib-section lib-wrap" aria-label={t("continueWatching.title")}>
-      <div className="lib-sec-head"><h2 className="lib-sec-title">{t("continueWatching.title")}</h2></div>
-      <div className="lib-cw-grid">{videos.map((video) => <ContinueCard key={video.slug} video={video} />)}</div>
-    </section>
   );
 }
 
@@ -1072,129 +891,44 @@ function LibrarySearchAndFilter({ topic, setTopic }) {
   );
 }
 
-function TrendingSection({ loading, topic, setTopic }) {
-  const { t } = useLib();
-  const trending = React.useMemo(() => {
-    let list = [...VIDEOS];
-    if (topic !== "all") list = list.filter((video) => matchesTopic(video, topic));
-    list.sort((a, b) => b.viewsK - a.viewsK);
-    return list.slice(0, 10);
-  }, [topic]);
-  return (
-    <section className="lib-section lib-wrap" id="lib-popular" aria-label={t("trending.title")}>
-      <div className="lib-sec-head">
-        <h2 className="lib-sec-title">{t("trending.title")}</h2>
-        <span className="lib-sec-spacer" />
-        <a className="lib-view-all" href="#/library/all?sort=popular">{t("libraryPage.viewAll")}</a>
-      </div>
-      <div className="lib-media-tools">
-        <CategoryChips active={topic} onChange={setTopic} keys={BROWSE_TOPICS} max={4} />
-      </div>
-      {trending.length === 0 && !loading ? (
-        <div className="lib-empty">
-          <ListVideo size={30} />
-          <p>{t("allVideos.emptyCategory")}</p>
-        </div>
-      ) : (
-        <VideoCarousel videos={trending} loading={loading} landscape ariaLabel={t("trending.title")} />
-      )}
-    </section>
-  );
+function HomepageCategories() {
+  const Categories = window.LandingCategories;
+  return Categories ? <Categories /> : null;
 }
 
-function BrowseByCategory({ onPick }) {
-  const { t, lang } = useLib();
-  const rtl = lang === "fa";
-  return (
-    <section className="lib-section lib-wrap" aria-label={t("libraryPage.categoriesTitle")}>
-      <div className="lib-sec-head">
-        <h2 className="lib-sec-title">{t("libraryPage.categoriesTitle")}</h2>
-        <span className="lib-sec-spacer" />
-        <a className="lib-view-all" href="#/library/all">{t("libraryPage.viewAll")}</a>
-      </div>
-      <div className="lib-cats">
-        {LIBRARY_GROUPS.map((group) => {
-          const Icon = group.icon;
-          return (
-            <a
-              key={group.key}
-              className="lib-cat-card vidora-interactive-card"
-              href={`#/library?topic=${group.key}`}
-              onClick={(event) => { event.preventDefault(); onPick(group.key); }}
-            >
-              <span className="lib-cat-media vidora-interactive-media">
-                <img src={`${BASE()}${group.image}`} alt="" />
-                <span className="lib-cat-icon"><Icon size={20} strokeWidth={1.7} /></span>
-              </span>
-              <span className="lib-cat-body">
-                <span className="lib-cat-name">{t(`libraryPage.groups.${group.key}.title`)}</span>
-                <span className="lib-cat-desc">{t(`libraryPage.groups.${group.key}.description`)}</span>
-                <span className="lib-cat-link vidora-interactive-affordance">{rtl ? "مشاهده دسته‌بندی" : "View category"}</span>
-              </span>
-            </a>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+function HomepageVideoSection({ videos }) {
+  const { t, lang, title } = useLib();
+  const SelectedVideos = window.LandingSelectedVideos;
+  if (!SelectedVideos || videos.length === 0) return null;
 
-function NewOnVidora({ loading }) {
-  const { t } = useLib();
-  return (
-    <section className="lib-section lib-wrap" id="lib-new" aria-label={t("newOn.title")}>
-      <div className="lib-sec-head">
-        <h2 className="lib-sec-title">{t("newOn.title")}</h2>
-        <span className="lib-sec-spacer" />
-        <a className="lib-view-all" href="#/library/all?sort=newest">{t("libraryPage.viewAll")}</a>
-      </div>
-      <VideoCarousel videos={NEWEST.concat(VIDEOS.filter((video) => !NEWEST.includes(video)).slice(0, 4))} loading={loading} landscape ariaLabel={t("newOn.title")} />
-    </section>
-  );
-}
+  const cards = videos.map((video) => {
+    const minutes = Math.floor(video.durationSeconds / 60);
+    const seconds = String(video.durationSeconds % 60).padStart(2, "0");
+    return {
+      slug: video.slug,
+      title: title(video),
+      speaker: video.categoryTitleFa,
+      meta: video.access === "subscription" ? (lang === "fa" ? "ویژه اعضا" : "Members") : (lang === "fa" ? "رایگان" : "Free"),
+      duration: `${minutes}:${seconds}`,
+      image: video.thumbnailUrl,
+      alt: title(video),
+      position: "center",
+    };
+  });
 
-function EditorsPick() {
-  const { t, lang, title, desc, catName } = useLib();
-  const video = bySlug(EDITORS_PICK_SLUG);
-  return (
-    <section className="lib-section lib-wrap" aria-label={t("editorsPick.label")}>
-      <div className="lib-banner">
-        <div className="lib-banner-media" style={{ backgroundImage: `url(${BASE()}${BANNER_IMAGE})` }} />
-        <div className="lib-banner-shade" />
-        <div className="lib-banner-in">
-          <div className="lib-banner-box">
-            <p className="lib-hero-label">{t("editorsPick.label")}</p>
-            <h2 className="lib-banner-title">{title(video)}</h2>
-            <p className="lib-banner-desc">{desc(video)}</p>
-            <div className="lib-hero-meta">
-              <span>{catName(video.category)}</span>
-              <span>·</span>
-              <span>{t("card.minutes", { minutes: fmtNum(lang, video.durationMin) })}</span>
-            </div>
-            <div className="lib-hero-cta">
-              <a className="lib-btn is-primary" href={`#/watch/${video.slug}`}>
-                <Play size={16} /> {t("hero.watch")}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+  return <SelectedVideos videos={cards} heading={t("newOn.title")} showAction={false} />;
 }
 
 const GRID_STEP = 10;
 
-function AllVideos({ loading, topic, setTopic, initialSort = "newest", initialType = "all", initialDuration = "all", onFiltersChange = null }) {
-  const { t, lang } = useLib();
-  const [type, setType] = React.useState(initialType);
+function AllVideos({ videos, loading, topic, setTopic, initialSort = "newest", initialDuration = "all", onFiltersChange = null }) {
+  const { t } = useLib();
   const [sort, setSort] = React.useState(initialSort);
   const [duration, setDuration] = React.useState(initialDuration);
   const [limit, setLimit] = React.useState(GRID_STEP);
 
   const filtered = React.useMemo(() => {
-    let list = VIDEOS.filter((v) => {
-      if (type !== "all" && v.type !== type) return false;
+    let list = videos.filter((v) => {
       if (topic !== "all" && !matchesTopic(v, topic)) return false;
       if (duration === "under15" && v.durationMin >= 15) return false;
       if (duration === "d15to30" && (v.durationMin < 15 || v.durationMin > 30)) return false;
@@ -1203,25 +937,20 @@ function AllVideos({ loading, topic, setTopic, initialSort = "newest", initialTy
       return true;
     });
     if (sort === "newest") list.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    if (sort === "popular" || sort === "views") list.sort((a, b) => b.viewsK - a.viewsK);
+    if (sort === "popular" || sort === "views") list.sort((a, b) => a.sortOrder - b.sortOrder);
     return list;
-  }, [type, topic, sort, duration]);
+  }, [videos, topic, sort, duration]);
 
-  React.useEffect(() => setLimit(GRID_STEP), [type, topic, sort, duration]);
+  React.useEffect(() => setLimit(GRID_STEP), [topic, sort, duration]);
 
   React.useEffect(() => {
-    onFiltersChange?.({ topic, type, sort, duration });
-  }, [duration, onFiltersChange, sort, topic, type]);
+    onFiltersChange?.({ topic, sort, duration });
+  }, [duration, onFiltersChange, sort, topic]);
+
+  if (!loading && videos.length === 0) return null;
 
   return (
     <section className="lib-all-content" id="lib-all" aria-label={t("allVideos.title")}>
-      <div className="lib-chips" role="tablist" style={{ marginTop: 20 }}>
-        {["all", ...TYPES].map((key) => (
-          <button key={key} className={`lib-chip${type === key ? " is-active" : ""}`} role="tab" aria-selected={type === key} onClick={() => setType(key)}>
-            {t(`types.${key}`)}
-          </button>
-        ))}
-      </div>
       <div className="lib-controls-row">
         <select className="lib-select" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label={t("categories.allTopics")}>
           <option value="all">{t("categories.allTopics")}</option>
@@ -1254,12 +983,7 @@ function AllVideos({ loading, topic, setTopic, initialSort = "newest", initialTy
             <SkeletonCard key={i} />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="lib-empty">
-          <ListVideo size={30} />
-          <p>{t("allVideos.emptyCategory")}</p>
-        </div>
-      ) : (
+      ) : filtered.length > 0 ? (
         <>
           <div className="lib-grid">
             {filtered.slice(0, limit).map((video) => (
@@ -1274,7 +998,7 @@ function AllVideos({ loading, topic, setTopic, initialSort = "newest", initialTy
             </div>
           ) : null}
         </>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -1288,12 +1012,6 @@ function PublicFooter() {
 // Library page
 // ---------------------------------------------------------------------------
 
-function readTopicFromHash() {
-  const query = window.location.hash.split("?")[1] || "";
-  const topic = new URLSearchParams(query).get("topic");
-  return topic && (TOPICS.includes(topic) || BROWSE_TOPICS.includes(topic)) ? topic : "all";
-}
-
 const ALL_VIDEO_SORTS = ["newest", "popular", "views"];
 const ALL_VIDEO_DURATIONS = ["all", "under15", "d15to30", "d30to60", "over60"];
 
@@ -1302,18 +1020,16 @@ function readAllVideoParams() {
   const params = new URLSearchParams(query);
   const category = params.get("category");
   const sort = params.get("sort");
-  const type = params.get("type");
   const duration = params.get("duration");
   return {
     topic: category && (TOPICS.includes(category) || BROWSE_TOPICS.includes(category)) ? category : "all",
     sort: sort && ALL_VIDEO_SORTS.includes(sort) ? sort : "newest",
-    type: type && TYPES.includes(type) ? type : "all",
     duration: duration && ALL_VIDEO_DURATIONS.includes(duration) ? duration : "all",
   };
 }
 
 function AllVideosPageInner() {
-  const { t, rtl } = useLib();
+  const { t, rtl, videos, videosLoading } = useLib();
   const initial = React.useMemo(readAllVideoParams, []);
   const [topic, setTopic] = React.useState(initial.topic);
 
@@ -1321,17 +1037,27 @@ function AllVideosPageInner() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
 
-  const syncUrl = React.useCallback(({ topic: nextTopic, type, sort, duration }) => {
+  const syncUrl = React.useCallback(({ topic: nextTopic, sort, duration }) => {
     const params = new URLSearchParams();
     params.set("sort", sort);
     if (nextTopic !== "all") params.set("category", nextTopic);
-    if (type !== "all") params.set("type", type);
     if (duration !== "all") params.set("duration", duration);
     const query = params.toString();
     try {
       window.history.replaceState(null, "", `#/library/all${query ? `?${query}` : ""}`);
     } catch (error) {/* ignore */}
   }, []);
+
+  if (!videosLoading && videos.length === 0) {
+    return (
+      <>
+        <LibraryHeader />
+        <FeaturedHero />
+        <HomepageCategories />
+        <PublicFooter />
+      </>
+    );
+  }
 
   return (
     <>
@@ -1349,11 +1075,11 @@ function AllVideosPageInner() {
         <LibrarySearchAndFilter topic={topic} setTopic={setTopic} />
         <div className="lib-wrap">
           <AllVideos
-            loading={false}
+            videos={videos}
+            loading={videosLoading}
             topic={topic}
             setTopic={setTopic}
             initialSort={initial.sort}
-            initialType={initial.type}
             initialDuration={initial.duration}
             onFiltersChange={syncUrl}
           />
@@ -1365,28 +1091,15 @@ function AllVideosPageInner() {
 }
 
 function LibraryPageInner() {
-  const loading = false;
-  const [topic, setTopic] = React.useState(readTopicFromHash);
-
-  const updateTopic = (key) => {
-    setTopic(key);
-    try {
-      window.history.replaceState(null, "", key === "all" ? "#/library" : `#/library?topic=${key}`);
-    } catch (e) {/* ignore */}
-  };
-  const pickTopic = (key) => {
-    updateTopic(key);
-    document.getElementById("lib-popular")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const { videos, videosLoading } = useLib();
+  const topic = new URLSearchParams(window.location.hash.split("?")[1] || "").get("topic") || "all";
+  const visibleVideos = videos.filter((video) => matchesTopic(video, topic));
   return (
     <>
-      <LibraryHeader reference />
-      <FeaturedHero loading={loading} />
-      <LibrarySearchAndFilter topic={topic} setTopic={updateTopic} />
-      <BrowseByCategory onPick={pickTopic} />
-      <TrendingSection loading={loading} topic={topic} setTopic={updateTopic} />
-      <NewOnVidora loading={loading} />
-      <ContinueWatching />
+      <LibraryHeader />
+      <FeaturedHero />
+      <HomepageCategories />
+      {!videosLoading && visibleVideos.length > 0 ? <HomepageVideoSection videos={visibleVideos} /> : null}
       <PublicFooter />
     </>
   );
@@ -1397,12 +1110,22 @@ function LibraryPageInner() {
 // ---------------------------------------------------------------------------
 
 function SearchPageInner() {
-  const { t, lang } = useLib();
+  const { t, lang, videos, videosLoading } = useLib();
   const q = React.useMemo(() => {
     const query = window.location.hash.split("?")[1] || "";
     return new URLSearchParams(query).get("q") || "";
   }, [window.location.hash]); // eslint-disable-line react-hooks/exhaustive-deps
-  const results = searchVideos(q);
+  const results = searchVideos(videos, q);
+  if (!videosLoading && videos.length === 0) {
+    return (
+      <>
+        <LibraryHeader />
+        <FeaturedHero />
+        <HomepageCategories />
+        <PublicFooter />
+      </>
+    );
+  }
   return (
     <>
       <LibraryHeader />
@@ -1412,18 +1135,13 @@ function SearchPageInner() {
         </a>
         <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{t("search.resultsFor", { q })}</h1>
         <p style={{ color: "var(--mut)", fontSize: 13.5, marginTop: 8 }}>{t("search.resultsCount", { count: fmtNum(lang, results.length) })}</p>
-        {results.length === 0 ? (
-          <div className="lib-empty">
-            <Search size={30} />
-            <p>{t("search.empty")}</p>
-          </div>
-        ) : (
+        {results.length > 0 ? (
           <div className="lib-grid">
             {results.map((video) => (
               <VideoCard key={video.slug} video={video} />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
       <PublicFooter />
     </>
@@ -1507,14 +1225,23 @@ function WatchAssistant({ video }) {
 }
 
 function WatchPageInner() {
-  const { t, lang, rtl, viewer, subscriptionState, title, desc, catName, showToast } = useLib();
+  const { t, lang, rtl, viewer, subscriptionState, title, desc, catName, showToast, videos, videosLoading } = useLib();
   const slug = window.location.hash.replace(/^#\/watch\//, "").split("?")[0];
-  const video = bySlug(slug);
+  const video = bySlug(videos, slug);
   const [playing, setPlaying] = React.useState(false);
   React.useEffect(() => {
     window.scrollTo(0, 0);
     setPlaying(false);
   }, [slug]);
+
+  if (videosLoading) {
+    return (
+      <>
+        <LibraryHeader />
+        <PublicFooter />
+      </>
+    );
+  }
 
   if (!video) {
     window.location.replace("#/library");
@@ -1524,8 +1251,8 @@ function WatchPageInner() {
   const canWatchFull = canWatchLibraryVideo(subscriptionState).allowed;
   const group = LIBRARY_GROUPS.find((item) => item.categories.includes(video.category));
   const breadcrumbCategory = group ? t(`libraryPage.groups.${group.key}.title`) : catName(video.category);
-  const similar = VIDEOS.filter((v) => v.slug !== video.slug && v.category === video.category)
-    .concat(VIDEOS.filter((v) => v.slug !== video.slug && v.category !== video.category))
+  const similar = videos.filter((v) => v.slug !== video.slug && v.category === video.category)
+    .concat(videos.filter((v) => v.slug !== video.slug && v.category !== video.category))
     .slice(0, 8);
   const relatedHref = `#/library/all?category=${group?.key || video.category}`;
   const currentVideoRoute = `/watch/${video.slug}`;
@@ -1583,7 +1310,11 @@ function WatchPageInner() {
         <div className="lib-watch-grid">
           <div className="lib-watch-main">
             <div className="lib-player">
-              <img className="lib-player-poster" src={`${BASE()}${imageOf(video)}`} alt="" />
+              <img
+                className="lib-player-poster"
+                src={video.thumbnailUrl}
+                alt={title(video)}
+              />
               {subscriptionState === "loading" ? (
                 <div className="lib-player-center">
                   <span className="lib-pillbadge">{lang === "fa" ? "در حال بررسی دسترسی..." : "Checking access..."}</span>
@@ -1647,7 +1378,7 @@ function WatchPageInner() {
           <WatchAssistant key={video.slug} video={video} />
         </div>
 
-        <section className="lib-watch-related" aria-label={t("watch.similar")}>
+        {similar.length > 0 ? <section className="lib-watch-related" aria-label={t("watch.similar")}>
           <div className="lib-sec-head">
             <h2 className="lib-sec-title">{t("watch.similar")}</h2>
             <span className="lib-sec-spacer" />
@@ -1656,7 +1387,7 @@ function WatchPageInner() {
             </a>
           </div>
           <VideoCarousel videos={similar} loading={false} landscape ariaLabel={t("watch.similar")} />
-        </section>
+        </section> : null}
       </main>
       <PublicFooter />
     </>
